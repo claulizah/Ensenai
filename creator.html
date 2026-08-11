@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --profundo: #1E3A8A;       /* Azul profundo — encabezados, botones principales */
@@ -48,11 +48,19 @@
   }
 
   header .marca {
-    font-family: 'Fredoka', sans-serif;
+    font-family: 'Grandstander', sans-serif;
     font-weight: 700;
     font-size: 1.4rem;
   }
-  header .marca .ai { color: var(--aqua); }
+  header .marca .ai {
+    display: inline-block;
+    color: var(--aqua);
+    background: rgba(255,255,255,0.14);
+    padding: 1px 10px;
+    border-radius: 999px;
+    font-size: 0.75em;
+    vertical-align: middle;
+  }
   header .sub { opacity: 0.75; font-size: 0.85rem; }
 
   main {
@@ -66,10 +74,9 @@
     justify-content: center;
     margin-bottom: 6px;
   }
-  .mascota { width: 110px; height: 104px; }
-  .mascota .bounce { animation: flotar 3s ease-in-out infinite; transform-origin: center; }
-  @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-  @media (prefers-reduced-motion: reduce) { .mascota .bounce { animation: none; } }
+  .mascota { width: 130px; height: auto; animation: flotar 3.5s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .mascota { animation: none; } }
+  @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
   .pasos {
     display: flex;
@@ -97,7 +104,7 @@
   @keyframes aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
   h1 {
-    font-family: 'Fredoka', sans-serif;
+    font-family: 'Grandstander', sans-serif;
     font-weight: 600;
     font-size: 1.55rem;
     margin: 0 0 6px;
@@ -177,7 +184,7 @@
     padding: 16px;
     min-height: 52px;
     border-radius: 999px;
-    font-family: 'Fredoka', sans-serif;
+    font-family: 'Grandstander', sans-serif;
     font-weight: 600;
     font-size: 1.05rem;
     cursor: pointer;
@@ -210,7 +217,7 @@
     box-shadow: 0 3px 0 var(--linea);
   }
   .tarjeta h3 {
-    font-family: 'Fredoka', sans-serif;
+    font-family: 'Grandstander', sans-serif;
     margin: 0 0 10px;
     font-size: 1rem;
     color: var(--bosque);
@@ -277,44 +284,13 @@
 <body>
 
 <header>
-  <img src="assets/favicon-48.png" alt="" width="30" height="30" style="border-radius:50%;">
   <span class="marca">Enseñ<span class="ai">AI</span></span>
   <span class="sub">· Panel de creador</span>
 </header>
 
 <main>
   <div class="mascota-wrap">
-    <svg class="mascota" id="mascotaSvg" viewBox="0 20 200 190" xmlns="http://www.w3.org/2000/svg">
-      <g class="bounce">
-        <path d="M62 140 C32 150 22 175 37 197" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
-        <path d="M62 140 C32 150 22 175 37 197" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
-        <path d="M78 146 C60 168 55 186 68 200" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
-        <path d="M78 146 C60 168 55 186 68 200" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
-        <path d="M122 146 C140 168 145 186 132 200" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
-        <path d="M122 146 C140 168 145 186 132 200" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
-        <path d="M138 140 C168 150 178 175 163 197" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
-        <path d="M138 140 C168 150 178 175 163 197" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
-
-        <circle cx="42" cy="172" r="4" fill="#34D399"/>
-        <circle cx="140" cy="172" r="4" fill="#34D399"/>
-
-        <circle cx="100" cy="92" r="60" fill="#7DD3FC" stroke="#1E3A8A" stroke-width="4"/>
-        <ellipse cx="80" cy="64" rx="18" ry="24" fill="#F0FDF4" opacity="0.4"/>
-
-        <g id="mascotaCara">
-          <ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-          <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-          <circle cx="80" cy="103" r="8" fill="#1E3A8A"/>
-          <circle cx="120" cy="103" r="8" fill="#1E3A8A"/>
-          <circle cx="76" cy="97" r="2.8" fill="#FFFFFF"/>
-          <circle cx="116" cy="97" r="2.8" fill="#FFFFFF"/>
-          <path d="M86 124 Q100 133 114 124" stroke="#1E3A8A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        </g>
-
-        <circle cx="60" cy="114" r="8" fill="#60A5FA" opacity="0.45"/>
-        <circle cx="140" cy="114" r="8" fill="#60A5FA" opacity="0.45"/>
-      </g>
-    </svg>
+    <img class="mascota" src="assets/logo-full.png" alt="EnseñAI">
   </div>
 
   <div class="pasos" id="indicadorPasos">
@@ -439,31 +415,6 @@
     modo: "automatico",
   };
 
-  const CARAS = {
-    feliz: `<ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-            <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-            <circle cx="80" cy="103" r="8" fill="#1E3A8A"/>
-            <circle cx="120" cy="103" r="8" fill="#1E3A8A"/>
-            <circle cx="76" cy="97" r="2.8" fill="#FFFFFF"/>
-            <circle cx="116" cy="97" r="2.8" fill="#FFFFFF"/>
-            <path d="M86 124 Q100 133 114 124" stroke="#1E3A8A" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
-    pensando: `<path d="M64 100 q14 -12 28 0" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>
-               <path d="M108 100 q14 -12 28 0" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>
-               <circle cx="100" cy="122" r="3.5" fill="#1E3A8A"/>`,
-    celebrando: `<ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-                 <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
-                 <circle cx="80" cy="103" r="9" fill="#1E3A8A"/>
-                 <circle cx="120" cy="103" r="9" fill="#1E3A8A"/>
-                 <circle cx="77" cy="99" r="3.5" fill="#FFFFFF"/>
-                 <circle cx="117" cy="99" r="3.5" fill="#FFFFFF"/>
-                 <path d="M84 122 Q100 138 116 122" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>`,
-  };
-
-  function ponerCara(nombre) {
-    const el = document.getElementById("mascotaCara");
-    if (el) el.innerHTML = CARAS[nombre] || CARAS.feliz;
-  }
-
   function irAPantalla(numero) {
     document.querySelectorAll(".pantalla").forEach((p) => p.classList.remove("activa"));
     const destino = document.getElementById(`pantalla-${numero}`);
@@ -474,15 +425,12 @@
       punto.classList.toggle("activo", paso === numero);
       punto.classList.toggle("hecho", paso < numero);
     });
-
-    ponerCara(numero === 5 ? "celebrando" : "feliz");
   }
 
   function mostrarCargando(texto) {
     document.querySelectorAll(".pantalla").forEach((p) => p.classList.remove("activa"));
     document.getElementById("texto-cargando").textContent = texto;
     document.getElementById("pantalla-cargando").classList.add("activa");
-    ponerCara("pensando");
   }
 
   function elegirOpcion(el, grupo) {
