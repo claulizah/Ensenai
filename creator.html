@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Panel de creador</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --profundo: #1E3A8A;       /* Azul profundo — encabezados, botones principales */
+    --profundo-oscuro: #16296B;
+    --cielo: #60A5FA;          /* Azul cielo — estados activos, acentos ligeros */
+    --menta: #34D399;          /* Verde menta — éxitos, confirmaciones */
+    --aqua: #7DD3FC;           /* Aqua suave — fondos secundarios, ilustraciones, íconos */
+    --bosque: #065F46;         /* Verde bosque — contraste de texto sobre fondos claros */
+    --hielo: #F0FDF4;          /* Blanco hielo — fondo general */
+    --tinta: #1E3A8A;
+    --linea: #DCEEFC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      radial-gradient(circle at 85% 90%, rgba(96,165,250,0.22) 0, transparent 30%),
+      radial-gradient(circle at 8% 85%, rgba(125,211,252,0.25) 0, transparent 28%),
+      linear-gradient(160deg, rgba(96,165,250,0.16) 0%, rgba(125,211,252,0.12) 45%, transparent 75%),
+      var(--hielo);
+    background-attachment: fixed;
+    color: var(--tinta);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--profundo);
+    color: #fff;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  header .marca {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+  }
+  header .marca .ai { color: var(--aqua); }
+  header .sub { opacity: 0.75; font-size: 0.85rem; }
+
+  main {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+
+  .mascota-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 6px;
+  }
+  .mascota { width: 110px; height: 104px; }
+  .mascota .bounce { animation: flotar 3s ease-in-out infinite; transform-origin: center; }
+  @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @media (prefers-reduced-motion: reduce) { .mascota .bounce { animation: none; } }
+
+  .pasos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0 30px;
+  }
+  .paso-punto {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--linea);
+    transition: all 0.25s ease;
+  }
+  .paso-punto.activo { background: var(--cielo); transform: scale(1.5); box-shadow: 0 0 0 5px rgba(96,165,250,0.28); }
+  .paso-punto.hecho { background: var(--menta); }
+  .paso-linea {
+    width: 26px; height: 3px;
+    border-radius: 2px;
+    background: var(--linea);
+  }
+
+  .pantalla { display: none; animation: aparece 0.3s ease; }
+  .pantalla.activa { display: block; }
+  @keyframes aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  h1 {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 1.55rem;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  p.ayuda {
+    color: #4A6A85;
+    margin: 0 0 24px;
+    line-height: 1.55;
+    text-align: center;
+  }
+
+  label {
+    display: block;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin: 18px 0 6px;
+    color: var(--profundo);
+  }
+
+  input[type=text], input[type=email], input[type=number], textarea {
+    width: 100%;
+    padding: 13px 16px;
+    border: 2px solid var(--linea);
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 1rem;
+    background: #fff;
+    color: var(--tinta);
+  }
+  input:focus, textarea:focus, button:focus-visible {
+    outline: 3px solid var(--cielo);
+    outline-offset: 1px;
+    border-color: var(--cielo);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+
+  input[type=file] {
+    width: 100%;
+    padding: 20px 14px;
+    border: 2px dashed var(--aqua);
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .opciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .opciones.tres { grid-template-columns: 1fr 1fr 1fr; }
+  .opcion {
+    border: 2px solid var(--linea);
+    border-radius: 14px;
+    padding: 14px 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: #fff;
+    transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  }
+  .opcion:hover { transform: translateY(-2px); }
+  .opcion.selec { border-color: var(--cielo); background: var(--hielo); color: var(--bosque); box-shadow: 0 3px 0 var(--cielo); }
+
+  button.primario {
+    margin-top: 26px;
+    width: 100%;
+    background: var(--profundo);
+    color: #fff;
+    border: none;
+    padding: 16px;
+    min-height: 52px;
+    border-radius: 999px;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--profundo-oscuro);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  }
+  button.primario:hover { filter: brightness(1.15); }
+  button.primario:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--profundo-oscuro); }
+  button.primario:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  button.secundario {
+    margin-top: 12px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: #5b7d99;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .tarjeta {
+    background: #fff;
+    border: 2px solid var(--linea);
+    border-radius: 18px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 3px 0 var(--linea);
+  }
+  .tarjeta h3 {
+    font-family: 'Fredoka', sans-serif;
+    margin: 0 0 10px;
+    font-size: 1rem;
+    color: var(--bosque);
+  }
+
+  .trivia-item, .memo-item {
+    border-top: 1px dashed var(--linea);
+    padding: 10px 0;
+    font-size: 0.92rem;
+  }
+  .trivia-item:first-child, .memo-item:first-child { border-top: none; padding-top: 0; }
+
+  .cargando {
+    text-align: center;
+    padding: 50px 20px;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 5px solid var(--linea);
+    border-top-color: var(--cielo);
+    border-radius: 50%;
+    margin: 0 auto 18px;
+    animation: girar 0.8s linear infinite;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  .error {
+    background: #FFF0EC;
+    border: 2px solid #FFC4B5;
+    color: #B94A2E;
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .exito { text-align: center; padding: 10px 0; }
+  .exito .icono {
+    width: 72px; height: 72px;
+    background: var(--menta);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 32px;
+    box-shadow: 0 4px 0 #1FA97D;
+    animation: pop 0.4s ease;
+  }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+  .liga-publica {
+    display: block;
+    background: var(--hielo);
+    border: 2px dashed var(--aqua);
+    border-radius: 14px;
+    padding: 13px 14px;
+    margin: 16px 0;
+    word-break: break-all;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--bosque);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="assets/favicon-48.png" alt="" width="30" height="30" style="border-radius:50%;">
+  <span class="marca">Enseñ<span class="ai">AI</span></span>
+  <span class="sub">· Panel de creador</span>
+</header>
+
+<main>
+  <div class="mascota-wrap">
+    <svg class="mascota" id="mascotaSvg" viewBox="0 20 200 190" xmlns="http://www.w3.org/2000/svg">
+      <g class="bounce">
+        <path d="M62 140 C32 150 22 175 37 197" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M62 140 C32 150 22 175 37 197" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
+        <path d="M78 146 C60 168 55 186 68 200" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M78 146 C60 168 55 186 68 200" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
+        <path d="M122 146 C140 168 145 186 132 200" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M122 146 C140 168 145 186 132 200" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
+        <path d="M138 140 C168 150 178 175 163 197" stroke="#1E3A8A" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M138 140 C168 150 178 175 163 197" stroke="#7DD3FC" stroke-width="12" fill="none" stroke-linecap="round"/>
+
+        <circle cx="42" cy="172" r="4" fill="#34D399"/>
+        <circle cx="140" cy="172" r="4" fill="#34D399"/>
+
+        <circle cx="100" cy="92" r="60" fill="#7DD3FC" stroke="#1E3A8A" stroke-width="4"/>
+        <ellipse cx="80" cy="64" rx="18" ry="24" fill="#F0FDF4" opacity="0.4"/>
+
+        <g id="mascotaCara">
+          <ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+          <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+          <circle cx="80" cy="103" r="8" fill="#1E3A8A"/>
+          <circle cx="120" cy="103" r="8" fill="#1E3A8A"/>
+          <circle cx="76" cy="97" r="2.8" fill="#FFFFFF"/>
+          <circle cx="116" cy="97" r="2.8" fill="#FFFFFF"/>
+          <path d="M86 124 Q100 133 114 124" stroke="#1E3A8A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <circle cx="60" cy="114" r="8" fill="#60A5FA" opacity="0.45"/>
+        <circle cx="140" cy="114" r="8" fill="#60A5FA" opacity="0.45"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="pasos" id="indicadorPasos">
+    <div class="paso-punto activo" data-paso="1"></div>
+    <div class="paso-linea"></div>
+    <div class="paso-punto" data-paso="2"></div>
+    <div class="paso-linea"></div>
+    <div class="paso-punto" data-paso="3"></div>
+    <div class="paso-linea"></div>
+    <div class="paso-punto" data-paso="4"></div>
+  </div>
+
+  <section class="pantalla activa" id="pantalla-1">
+    <h1>¡Bienvenido! Empecemos tu camino como creador 🌊</h1>
+    <p class="ayuda">Solo necesitamos tu nombre y correo para crear tu perfil.</p>
+    <div id="error-1"></div>
+    <label for="nombre">Tu nombre</label>
+    <input type="text" id="nombre" placeholder="Ej. Claudia Acosta">
+    <label for="correo">Tu correo</label>
+    <input type="email" id="correo" placeholder="tucorreo@ejemplo.com">
+    <button class="primario" id="btn-1" onclick="crearCreador()">Continuar</button>
+  </section>
+
+  <section class="pantalla" id="pantalla-2">
+    <h1>Cuéntanos de tu curso</h1>
+    <p class="ayuda">Sube un video corto (2–3 min) explicando el tema. Nosotros hacemos el resto.</p>
+    <div id="error-2"></div>
+
+    <label for="titulo">Título del curso</label>
+    <input type="text" id="titulo" placeholder="Ej. Fracciones básicas">
+
+    <label>¿Para quién es este contenido?</label>
+    <div class="opciones tres" id="opciones-audiencia">
+      <div class="opcion" data-valor="ninos" onclick="elegirOpcion(this, 'audiencia')">Niños</div>
+      <div class="opcion" data-valor="padres" onclick="elegirOpcion(this, 'audiencia')">Padres/cuidadores</div>
+      <div class="opcion" data-valor="profesionales" onclick="elegirOpcion(this, 'audiencia')">Profesionales</div>
+    </div>
+
+    <label>¿Cómo quieres generar el material?</label>
+    <div class="opciones" id="opciones-modo">
+      <div class="opcion selec" data-valor="automatico" onclick="elegirOpcion(this, 'modo')">Automático</div>
+      <div class="opcion" data-valor="ayuda" onclick="elegirOpcion(this, 'modo')">Con mi ayuda</div>
+    </div>
+
+    <div id="preguntas-tutor" style="display:none;">
+      <label for="nivel">Nivel de dificultad</label>
+      <input type="text" id="nivel" placeholder="Ej. principiante">
+      <label for="enfasis">¿En qué quieres que se enfoque?</label>
+      <input type="text" id="enfasis" placeholder="Ej. vocabulario básico">
+    </div>
+
+    <label for="video">Archivo de video</label>
+    <input type="file" id="video" accept="video/*">
+
+    <button class="primario" id="btn-2" onclick="subirCurso()">Subir y generar material</button>
+    <button class="secundario" onclick="irAPantalla(1)">← Regresar</button>
+  </section>
+
+  <section class="pantalla" id="pantalla-cargando">
+    <div class="cargando">
+      <div class="spinner"></div>
+      <p class="ayuda" id="texto-cargando">Transcribiendo tu video…</p>
+    </div>
+  </section>
+
+  <section class="pantalla" id="pantalla-3">
+    <h1>¡Buen trabajo! Revisa el material</h1>
+    <p class="ayuda">Ajusta lo que quieras antes de publicar — tú tienes la última palabra.</p>
+    <div id="error-3"></div>
+
+    <div class="tarjeta">
+      <h3>Resumen</h3>
+      <textarea id="resumen-editado"></textarea>
+    </div>
+
+    <div class="tarjeta" id="tarjeta-trivia">
+      <h3>Trivia</h3>
+      <div id="lista-trivia"></div>
+    </div>
+
+    <div class="tarjeta" id="tarjeta-memorama">
+      <h3>Memorama</h3>
+      <div id="lista-memorama"></div>
+    </div>
+
+    <div class="tarjeta" id="tarjeta-tips">
+      <h3>Tips prácticos</h3>
+      <div id="lista-tips"></div>
+    </div>
+
+    <button class="primario" id="btn-3" onclick="guardarEdicion()">Guardar y continuar</button>
+  </section>
+
+  <section class="pantalla" id="pantalla-4">
+    <h1>Casi listo — pon tu precio</h1>
+    <p class="ayuda">Pago único: quien lo compre tendrá acceso de por vida.</p>
+    <div id="error-4"></div>
+    <label for="precio">Precio (MXN)</label>
+    <input type="number" id="precio" placeholder="79" min="1">
+    <button class="primario" id="btn-4" onclick="publicarCurso()">Publicar curso</button>
+  </section>
+
+  <section class="pantalla" id="pantalla-5">
+    <div class="exito">
+      <div class="icono">✓</div>
+      <h1>¡Lo lograste! Tu curso ya está publicado 🎉</h1>
+      <p class="ayuda">Comparte esta liga con quien quieras.</p>
+      <code class="liga-publica" id="liga-final"></code>
+      <button class="primario" onclick="location.reload()">Crear otro curso</button>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Cambia esto cuando el backend esté hospedado en internet.
+  const API_BASE = "http://localhost:3001";
+
+  let estado = {
+    creatorId: null,
+    courseId: null,
+    audiencia: "ninos",
+    modo: "automatico",
+  };
+
+  const CARAS = {
+    feliz: `<ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+            <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+            <circle cx="80" cy="103" r="8" fill="#1E3A8A"/>
+            <circle cx="120" cy="103" r="8" fill="#1E3A8A"/>
+            <circle cx="76" cy="97" r="2.8" fill="#FFFFFF"/>
+            <circle cx="116" cy="97" r="2.8" fill="#FFFFFF"/>
+            <path d="M86 124 Q100 133 114 124" stroke="#1E3A8A" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+    pensando: `<path d="M64 100 q14 -12 28 0" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>
+               <path d="M108 100 q14 -12 28 0" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>
+               <circle cx="100" cy="122" r="3.5" fill="#1E3A8A"/>`,
+    celebrando: `<ellipse cx="78" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+                 <ellipse cx="122" cy="98" rx="16" ry="18" fill="#FFFFFF"/>
+                 <circle cx="80" cy="103" r="9" fill="#1E3A8A"/>
+                 <circle cx="120" cy="103" r="9" fill="#1E3A8A"/>
+                 <circle cx="77" cy="99" r="3.5" fill="#FFFFFF"/>
+                 <circle cx="117" cy="99" r="3.5" fill="#FFFFFF"/>
+                 <path d="M84 122 Q100 138 116 122" stroke="#1E3A8A" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+  };
+
+  function ponerCara(nombre) {
+    const el = document.getElementById("mascotaCara");
+    if (el) el.innerHTML = CARAS[nombre] || CARAS.feliz;
+  }
+
+  function irAPantalla(numero) {
+    document.querySelectorAll(".pantalla").forEach((p) => p.classList.remove("activa"));
+    const destino = document.getElementById(`pantalla-${numero}`);
+    if (destino) destino.classList.add("activa");
+
+    document.querySelectorAll(".paso-punto").forEach((punto) => {
+      const paso = parseInt(punto.dataset.paso, 10);
+      punto.classList.toggle("activo", paso === numero);
+      punto.classList.toggle("hecho", paso < numero);
+    });
+
+    ponerCara(numero === 5 ? "celebrando" : "feliz");
+  }
+
+  function mostrarCargando(texto) {
+    document.querySelectorAll(".pantalla").forEach((p) => p.classList.remove("activa"));
+    document.getElementById("texto-cargando").textContent = texto;
+    document.getElementById("pantalla-cargando").classList.add("activa");
+    ponerCara("pensando");
+  }
+
+  function elegirOpcion(el, grupo) {
+    const contenedor = el.parentElement;
+    contenedor.querySelectorAll(".opcion").forEach((o) => o.classList.remove("selec"));
+    el.classList.add("selec");
+    estado[grupo] = el.dataset.valor;
+
+    if (grupo === "modo") {
+      document.getElementById("preguntas-tutor").style.display =
+        el.dataset.valor === "ayuda" ? "block" : "none";
+    }
+  }
+
+  function mostrarError(pantalla, mensaje) {
+    document.getElementById(`error-${pantalla}`).innerHTML =
+      `<div class="error">${mensaje}</div>`;
+  }
+  function limpiarError(pantalla) {
+    document.getElementById(`error-${pantalla}`).innerHTML = "";
+  }
+
+  function botonCargando(id, textoCargando) {
+    const btn = document.getElementById(id);
+    btn.dataset.textoOriginal = btn.textContent;
+    btn.textContent = textoCargando;
+    btn.disabled = true;
+  }
+  function botonRestaurar(id) {
+    const btn = document.getElementById(id);
+    btn.textContent = btn.dataset.textoOriginal || btn.textContent;
+    btn.disabled = false;
+  }
+
+  async function crearCreador() {
+    limpiarError(1);
+    const name = document.getElementById("nombre").value.trim();
+    const email = document.getElementById("correo").value.trim();
+    if (!name || !email) return mostrarError(1, "Completa tu nombre y correo.");
+
+    botonCargando("btn-1", "Creando tu perfil…");
+    try {
+      const res = await fetch(`${API_BASE}/api/creators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      const data = await res.json();
+      if (!data.creator?.id) throw new Error(data.error || "No se pudo crear el perfil.");
+      estado.creatorId = data.creator.id;
+      irAPantalla(2);
+    } catch (err) {
+      mostrarError(1, err.message);
+    } finally {
+      botonRestaurar("btn-1");
+    }
+  }
+
+  async function subirCurso() {
+    limpiarError(2);
+    const title = document.getElementById("titulo").value.trim();
+    const videoInput = document.getElementById("video");
+
+    if (!title) return mostrarError(2, "Ponle un título a tu curso.");
+    if (!videoInput.files[0]) return mostrarError(2, "Selecciona un video.");
+    if (videoInput.files[0].size > 25 * 1024 * 1024) {
+      return mostrarError(2, "El video pesa más de 25 MB. Usa uno más corto o comprimido.");
+    }
+
+    const form = new FormData();
+    form.append("video", videoInput.files[0]);
+    form.append("creatorId", estado.creatorId);
+    form.append("title", title);
+    form.append("audience", estado.audiencia);
+
+    if (estado.modo === "ayuda") {
+      const nivel = document.getElementById("nivel").value.trim();
+      const enfasis = document.getElementById("enfasis").value.trim();
+      form.append("tutorAnswers", JSON.stringify({ nivel, enfasis }));
+    }
+
+    mostrarCargando("Transcribiendo tu video…");
+    setTimeout(() => {
+      const el = document.getElementById("texto-cargando");
+      if (el) el.textContent = "Generando el material con IA…";
+    }, 4000);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/upload`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!data.course?.id) throw new Error(data.error || "No se pudo subir el curso.");
+
+      estado.courseId = data.course.id;
+      cargarMaterialesEnPantalla3(data.materials, estado.audiencia);
+      irAPantalla(3);
+    } catch (err) {
+      irAPantalla(2);
+      mostrarError(2, err.message);
+    }
+  }
+
+  function cargarMaterialesEnPantalla3(materiales, audiencia) {
+    document.getElementById("resumen-editado").value = materiales.resumen || "";
+
+    const trivia = document.getElementById("tarjeta-trivia");
+    const memorama = document.getElementById("tarjeta-memorama");
+    const tips = document.getElementById("tarjeta-tips");
+    trivia.style.display = memorama.style.display = tips.style.display = "none";
+
+    if (audiencia === "ninos") {
+      trivia.style.display = "block";
+      memorama.style.display = "block";
+      document.getElementById("lista-trivia").innerHTML = (materiales.trivia || [])
+        .map((t) => `<div class="trivia-item"><strong>${t.pregunta}</strong><br>${(t.opciones || []).join(" · ")}</div>`)
+        .join("");
+      document.getElementById("lista-memorama").innerHTML = (materiales.memorama || [])
+        .map((m) => `<div class="memo-item">${m.a} — ${m.b}</div>`)
+        .join("");
+    } else {
+      tips.style.display = "block";
+      document.getElementById("lista-tips").innerHTML = (materiales.tips || [])
+        .map((t) => `<div class="trivia-item">• ${t}</div>`)
+        .join("");
+    }
+  }
+
+  async function guardarEdicion() {
+    limpiarError(3);
+    const resumen_editado = document.getElementById("resumen-editado").value;
+
+    botonCargando("btn-3", "Guardando…");
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/${estado.courseId}/materials`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumen_editado }),
+      });
+      const data = await res.json();
+      if (!data.materials) throw new Error(data.error || "No se pudo guardar la edición.");
+      irAPantalla(4);
+    } catch (err) {
+      mostrarError(3, err.message);
+    } finally {
+      botonRestaurar("btn-3");
+    }
+  }
+
+  async function publicarCurso() {
+    limpiarError(4);
+    const price_mxn = parseFloat(document.getElementById("precio").value);
+    if (!price_mxn || price_mxn <= 0) return mostrarError(4, "Pon un precio válido.");
+
+    botonCargando("btn-4", "Publicando…");
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/${estado.courseId}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price_mxn }),
+      });
+      const data = await res.json();
+      if (data.course?.status !== "publicado") throw new Error(data.error || "No se pudo publicar.");
+
+      document.getElementById("liga-final").textContent = `ensenai.com/c/${data.course.slug}`;
+      irAPantalla(5);
+    } catch (err) {
+      mostrarError(4, err.message);
+    } finally {
+      botonRestaurar("btn-4");
+    }
+  }
+</script>
+</body>
+</html>
