@@ -88,7 +88,11 @@
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const params = new URLSearchParams(window.location.search);
-  const slug = params.get("slug");
+let slug = params.get("slug");
+if (!slug) {
+  const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
+  if (match) slug = decodeURIComponent(match[1]);
+}
 
   function escapeHtml(str) {
     const d = document.createElement("div");
