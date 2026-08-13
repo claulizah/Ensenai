@@ -100,42 +100,49 @@ if (!slug) {
     return d.innerHTML;
   }
 
-  async function cargarCurso() {
-    const cont = document.getElementById("contenido");
-    if (!slug) {
-      cont.innerHTML = `<div class="error">Falta el curso (liga incompleta).</div>`;
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/courses/publico/${slug}`);
-      const data = await res.json();
-      if (!data.course) throw new Error(data.error || "Curso no encontrado.");
-
-      const { course, preview } = data;
-      const audienciaTexto = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" }[course.audience] || course.audience;
-
-      cont.innerHTML = `
-        <div class="tarjeta">
-          <span class="etiqueta">${audienciaTexto}</span>
-          <h1>${escapeHtml(course.title)}</h1>
-          <p class="creador">Por ${escapeHtml(course.creators?.name || "Creador de EnseñAI")}</p>
-          <video controls src="${escapeHtml(course.video_url)}" poster=""></video>
-          ${preview?.resumen ? `<h3>De qué trata</h3><p class="texto">${escapeHtml(preview.resumen)}</p>` : ""}
-          <p class="precio">$${Number(course.price_mxn).toFixed(2)} MXN</p>
-          <div id="zona-accion">
-            <button class="primario" id="btnComprar">Obtener acceso</button>
-          </div>
-          <div id="mensaje"></div>
-        </div>
-      `;
-
-      document.getElementById("btnComprar").addEventListener("click", () => manejarCompra(course.id));
-      await revisarSiYaTieneAcceso(course.id);
-    } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-    }
+async function cargarCurso() {
+  const cont = document.getElementById("contenido");
+  if (!slug) {
+    cont.innerHTML = `<div class="error">Falta el curso (liga incompleta).</div>`;
+    return;
   }
+
+  try {
+    const session = await obtenerSesion();
+    const headers = session ? { Authorization: `Bearer ${session.access_token}` } : {};
+    const res = await fetch(`${API_BASE}/api/courses/publico/${slug}`, { headers });
+    const data = await res.json();
+    if (!data.course) throw new Error(data.error || "Curso no encontrado.");
+
+    const { course, preview, tieneAcceso } = data;
+    const audienciaTexto = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" }[course.audience] || course.audience;
+
+    const videoHtml = tieneAcceso
+      ? `<video controls src="${escapeHtml(course.video_url)}" poster=""></video>`
+      : `<div class="aviso">🔒 Compra el acceso para ver el video completo.</div>`;
+
+    cont.innerHTML = `
+      <div class="tarjeta">
+        <span class="etiqueta">${audienciaTexto}</span>
+        <h1>${escapeHtml(course.title)}</h1>
+        <p class="creador">Por ${escapeHtml(course.creators?.name || "Creador de EnseñAI")}</p>
+        ${videoHtml}
+        ${preview?.resumen ? `<h3>De qué trata</h3><p class="texto">${escapeHtml(preview.resumen)}</p>` : ""}
+        <p class="precio">$${Number(course.price_mxn).toFixed(2)} MXN</p>
+        <div id="zona-accion">
+          ${tieneAcceso ? `<div class="aviso">✓ Ya tienes acceso a este curso.</div>` : `<button class="primario" id="btnComprar">Obtener acceso</button>`}
+        </div>
+        <div id="mensaje"></div>
+      </div>
+    `;
+
+    if (!tieneAcceso) {
+      document.getElementById("btnComprar").addEventListener("click", () => manejarCompra(course.id));
+    }
+  } catch (err) {
+    cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+}
 
   async function obtenerSesion() {
     const { data } = await supabaseClient.auth.getSession();
