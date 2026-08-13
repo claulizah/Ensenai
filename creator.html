@@ -316,7 +316,7 @@
 
   <section class="pantalla" id="pantalla-2">
     <h1>Cuéntanos de tu curso</h1>
-    <p class="ayuda">Sube un video corto (2–3 min) explicando el tema. Nosotros hacemos el resto.</p>
+    <p class="ayuda">Sube un video de hasta 10 min explicando el tema. Nosotros hacemos el resto.</p>
     <div id="error-2"></div>
 
     <label for="titulo">Título del curso</label>
@@ -385,11 +385,9 @@
   </section>
 
   <section class="pantalla" id="pantalla-4">
-    <h1>Casi listo — pon tu precio</h1>
-    <p class="ayuda">Pago único: quien lo compre tendrá acceso de por vida.</p>
+    <h1>Casi listo — confirma y publica</h1>
+    <p class="ayuda">Cada curso individual cuesta <strong id="precio-mostrado">$29.90 MXN</strong> — pago único, acceso de por vida para quien lo compre.</p>
     <div id="error-4"></div>
-    <label for="precio">Precio (MXN)</label>
-    <input type="number" id="precio" placeholder="79" min="1">
     <button class="primario" id="btn-4" onclick="publicarCurso()">Publicar curso</button>
   </section>
 
@@ -571,6 +569,7 @@
       const data = await res.json();
       if (!data.materials) throw new Error(data.error || "No se pudo guardar la edición.");
       irAPantalla(4);
+      cargarPrecioVigente();
     } catch (err) {
       mostrarError(3, err.message);
     } finally {
@@ -578,17 +577,27 @@
     }
   }
 
+  async function cargarPrecioVigente() {
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/precio-vigente`);
+      const data = await res.json();
+      if (data.price_mxn) {
+        document.getElementById("precio-mostrado").textContent =
+          `$${Number(data.price_mxn).toFixed(2)} MXN`;
+      }
+    } catch (err) {
+      // si falla, se queda el texto por default — no bloquea el flujo
+    }
+  }
+
   async function publicarCurso() {
     limpiarError(4);
-    const price_mxn = parseFloat(document.getElementById("precio").value);
-    if (!price_mxn || price_mxn <= 0) return mostrarError(4, "Pon un precio válido.");
 
     botonCargando("btn-4", "Publicando…");
     try {
       const res = await fetch(`${API_BASE}/api/courses/${estado.courseId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ price_mxn }),
       });
       const data = await res.json();
       if (data.course?.status !== "publicado") throw new Error(data.error || "No se pudo publicar.");
