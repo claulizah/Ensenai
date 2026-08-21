@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Paquete</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 10px; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
+  main { max-width: 620px; margin: 0 auto; padding: 32px 20px 80px; }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
+  .etiqueta {
+    display: inline-block; background: var(--hielo); color: var(--bosque); font-weight: 700; font-size: 0.78rem;
+    padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.6rem; margin: 0 0 6px; }
+  .creador { color: #4A6A85; font-size: 0.95rem; margin-bottom: 6px; }
+  .creador a { color: var(--profundo); font-weight: 700; text-decoration: none; }
+
+  .incluye-tarjeta {
+    background: linear-gradient(135deg, var(--hielo) 0%, #fff 100%);
+    border: 2px solid var(--menta); border-radius: 16px; padding: 18px 20px; margin-bottom: 18px;
+  }
+  .incluye-tarjeta h3 { color: var(--profundo); margin: 0 0 12px; font-size: 1.05rem; font-family: 'Grandstander', sans-serif; }
+  .curso-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--linea); font-weight: 600; font-size: 0.92rem;
+  }
+  .curso-item:first-child { border-top: none; padding-top: 0; }
+  .curso-item .check { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--menta); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; }
+  .incluye-nota { margin-top: 12px; font-size: 0.82rem; color: #4A6A85; font-style: italic; }
+
+  .precio { font-family: 'Grandstander', sans-serif; font-size: 1.4rem; color: var(--profundo); margin: 4px 0 16px; }
+  button.primario {
+    width: 100%; background: var(--profundo); color: #fff; border: none; padding: 16px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1.05rem; cursor: pointer;
+    box-shadow: 0 4px 0 var(--profundo-oscuro);
+  }
+  button.primario:disabled { opacity: 0.6; cursor: not-allowed; }
+  .aviso { background: var(--hielo); border: 2px dashed var(--aqua); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-top: 12px; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
+  .cargando { text-align: center; padding: 60px 20px; color: #4A6A85; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+</header>
+
+<main id="contenido">
+  <div class="cargando">Cargando paquete…</div>
+</main>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get("slug");
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  async function cargarPaquete() {
+    const cont = document.getElementById("contenido");
+    if (!slug) {
+      cont.innerHTML = `<div class="error">Falta el paquete (liga incompleta).</div>`;
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/bundles/publico/${slug}`);
+      const data = await res.json();
+      if (!data.bundle) throw new Error(data.error || "Paquete no encontrado.");
+
+      const { bundle, courses } = data;
+
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <span class="etiqueta">Paquete de ${courses.length} cursos</span>
+          <h1>${escapeHtml(bundle.title)}</h1>
+          <p class="creador">Por <a href="creador.html?slug=${encodeURIComponent(bundle.creators?.slug || "")}">${escapeHtml(bundle.creators?.name || "Creador de EnseñAI")}</a></p>
+        </div>
+
+        <div class="incluye-tarjeta">
+          <h3>✨ Cursos incluidos</h3>
+          ${courses
+            .map((c) => `<div class="curso-item"><span class="check">✓</span> ${escapeHtml(c.title)}</div>`)
+            .join("")}
+          <p class="incluye-nota">Acceso completo a los ${courses.length} cursos — un solo pago.</p>
+        </div>
+
+        <div class="tarjeta">
+          <p class="precio">$${Number(bundle.price_mxn).toFixed(2)} MXN</p>
+          <div id="zona-accion">
+            <button class="primario" id="btnComprar">Obtener el paquete completo</button>
+          </div>
+          <div id="mensaje"></div>
+        </div>
+      `;
+
+      document.getElementById("btnComprar").addEventListener("click", () => comprarPaquete(bundle.id));
+      await revisarSiYaTieneAcceso(bundle);
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function obtenerSesion() {
+    const { data } = await supabaseClient.auth.getSession();
+    return data.session;
+  }
+
+  async function revisarSiYaTieneAcceso(bundle) {
+    const session = await obtenerSesion();
+    if (!session) return;
+    try {
+      const { data } = await supabaseClient
+        .from("bundle_purchases")
+        .select("id")
+        .eq("bundle_id", bundle.id)
+        .eq("user_id", session.user.id)
+        .eq("stripe_payment_status", "pagado")
+        .maybeSingle();
+      if (data) {
+        document.getElementById("zona-accion").innerHTML =
+          `<div class="aviso">✓ Ya tienes acceso a este paquete completo. Ve a "Mis cursos" para verlos.</div>`;
+      }
+    } catch (err) {
+      // no bloquea nada si falla
+    }
+  }
+
+  async function comprarPaquete(bundleId) {
+    const mensaje = document.getElementById("mensaje");
+    mensaje.innerHTML = "";
+    const btn = document.getElementById("btnComprar");
+
+    const session = await obtenerSesion();
+    if (!session) {
+      window.location.href = `comprador.html?despues=paquete&slug=${encodeURIComponent(slug)}`;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Redirigiendo a pago seguro…";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/purchases/checkout-bundle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ bundleId }),
+      });
+      const data = await res.json();
+      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      mensaje.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Obtener el paquete completo";
+    }
+  }
+
+  cargarPaquete();
+</script>
+</body>
+</html>

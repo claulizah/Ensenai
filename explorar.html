@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Explorar</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 10px; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
+  main { max-width: 680px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.5rem; margin: 0 0 6px; text-align: center; }
+  p.ayuda { color: #4A6A85; margin: 0 0 20px; text-align: center; }
+
+  .filtros { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .filtro {
+    border: 2px solid var(--linea); border-radius: 999px; padding: 8px 16px; font-weight: 700;
+    font-size: 0.85rem; cursor: pointer; background: #fff; color: var(--profundo);
+  }
+  .filtro.activo { border-color: var(--cielo); background: var(--hielo); color: var(--bosque); }
+
+  h2.seccion { font-family: 'Grandstander', sans-serif; font-size: 1.1rem; color: var(--profundo); margin: 26px 0 14px; }
+
+  .card {
+    background: #fff; border: 2px solid var(--linea); border-radius: 16px; padding: 16px 18px;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit;
+    box-shadow: 0 3px 0 var(--linea); transition: transform 0.12s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--cielo); }
+  .card-icono { width: 44px; height: 44px; flex-shrink: 0; object-fit: contain; }
+  .card-contenido { flex: 1; min-width: 0; }
+  .card-etiqueta {
+    display: inline-block; background: var(--hielo); color: var(--bosque); font-weight: 700; font-size: 0.72rem;
+    padding: 3px 10px; border-radius: 999px; margin-bottom: 8px; text-transform: uppercase;
+  }
+  .card h3 { font-family: 'Grandstander', sans-serif; font-size: 1.05rem; margin: 0 0 4px; color: var(--profundo); }
+  .card .creador { font-size: 0.85rem; color: #4A6A85; margin-bottom: 6px; }
+  .card .precio { color: var(--bosque); font-weight: 700; font-size: 0.9rem; }
+
+  .vacio { text-align: center; color: #4A6A85; padding: 20px 0; }
+  .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+</header>
+
+<main>
+  <h1>Explora cursos y paquetes</h1>
+  <p class="ayuda">Todo el contenido publicado por nuestros creadores verificados.</p>
+
+  <div class="filtros" id="filtros">
+    <div class="filtro activo" data-valor="">Todos</div>
+    <div class="filtro" data-valor="ninos">Niños</div>
+    <div class="filtro" data-valor="padres">Padres/cuidadores</div>
+    <div class="filtro" data-valor="profesionales">Profesionales</div>
+  </div>
+
+  <h2 class="seccion">📦 Paquetes temáticos</h2>
+  <div id="listaPaquetes"><div class="cargando">Cargando…</div></div>
+
+  <h2 class="seccion">🎬 Cursos individuales</h2>
+  <div id="listaCursos"><div class="cargando">Cargando…</div></div>
+</main>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const AUDIENCIA_TEXTO = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" };
+  let filtroActual = "";
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  async function cargarTodo() {
+    cargarPaquetes();
+    cargarCursos();
+  }
+
+  async function cargarPaquetes() {
+    const cont = document.getElementById("listaPaquetes");
+    try {
+      const res = await fetch(`${API_BASE}/api/bundles/publicos`);
+      const data = await res.json();
+      const paquetes = data.bundles || [];
+
+      if (paquetes.length === 0) {
+        cont.innerHTML = `<div class="vacio">Todavía no hay paquetes publicados.</div>`;
+        return;
+      }
+
+      cont.innerHTML = paquetes
+        .map(
+          (p) => `
+        <a class="card" href="paquete.html?slug=${encodeURIComponent(p.slug)}">
+          <div class="card-contenido">
+            <h3>${escapeHtml(p.title)}</h3>
+            <p class="creador">Por ${escapeHtml(p.creators?.name || "Creador de EnseñAI")}</p>
+            <span class="precio">$${Number(p.price_mxn).toFixed(2)} MXN</span>
+          </div>
+        </a>`
+        )
+        .join("");
+    } catch (err) {
+      cont.innerHTML = `<div class="vacio">No se pudieron cargar los paquetes.</div>`;
+    }
+  }
+
+  async function cargarCursos() {
+    const cont = document.getElementById("listaCursos");
+    cont.innerHTML = `<div class="cargando">Cargando…</div>`;
+    try {
+      const url = filtroActual
+        ? `${API_BASE}/api/courses/publicos?audience=${encodeURIComponent(filtroActual)}`
+        : `${API_BASE}/api/courses/publicos`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const cursos = data.courses || [];
+
+      if (cursos.length === 0) {
+        cont.innerHTML = `<div class="vacio">No hay cursos publicados en esta categoría todavía.</div>`;
+        return;
+      }
+
+      cont.innerHTML = cursos
+        .map(
+          (c) => `
+        <a class="card" href="curso.html?slug=${encodeURIComponent(c.slug)}">
+          ${c.icono_portada_url ? `<img class="card-icono" src="${escapeHtml(c.icono_portada_url)}" alt="">` : ""}
+          <div class="card-contenido">
+            <span class="card-etiqueta">${AUDIENCIA_TEXTO[c.audience] || c.audience}</span>
+            <h3>${escapeHtml(c.title)}</h3>
+            <p class="creador">Por ${escapeHtml(c.creators?.name || "Creador de EnseñAI")}</p>
+            <span class="precio">$${Number(c.price_mxn).toFixed(2)} MXN</span>
+          </div>
+        </a>`
+        )
+        .join("");
+    } catch (err) {
+      cont.innerHTML = `<div class="vacio">No se pudieron cargar los cursos.</div>`;
+    }
+  }
+
+  document.getElementById("filtros").addEventListener("click", (e) => {
+    const filtro = e.target.closest(".filtro");
+    if (!filtro) return;
+    document.querySelectorAll(".filtro").forEach((f) => f.classList.remove("activo"));
+    filtro.classList.add("activo");
+    filtroActual = filtro.dataset.valor;
+    cargarCursos();
+  });
+
+  cargarTodo();
+</script>
+</body>
+</html>

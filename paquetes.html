@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Mis paquetes</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 10px; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
+  header .sub { opacity: 0.75; font-size: 0.85rem; }
+  main { max-width: 620px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  h1 { font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1.4rem; margin: 0 0 6px; text-align: center; }
+  p.ayuda { color: #4A6A85; margin: 0 0 20px; line-height: 1.55; text-align: center; }
+  label { display: block; font-weight: 700; font-size: 0.9rem; margin: 16px 0 6px; color: var(--profundo); }
+  input[type=text], input[type=email], input[type=number] {
+    width: 100%; padding: 13px 16px; border: 2px solid var(--linea); border-radius: 14px;
+    font-family: inherit; font-size: 1rem; background: #fff; color: var(--tinta);
+  }
+  input:focus { outline: 3px solid var(--cielo); outline-offset: 1px; border-color: var(--cielo); }
+
+  button.primario {
+    margin-top: 22px; width: 100%; background: var(--profundo); color: #fff; border: none;
+    padding: 15px; border-radius: 999px; font-family: 'Grandstander', sans-serif; font-weight: 600;
+    font-size: 1rem; cursor: pointer; box-shadow: 0 4px 0 var(--profundo-oscuro);
+  }
+  button.primario:disabled { opacity: 0.6; cursor: not-allowed; }
+  button.secundario { width: 100%; background: none; border: none; color: #5b7d99; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-decoration: underline; }
+
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 20px; margin-bottom: 16px; box-shadow: 0 3px 0 var(--linea); }
+  .tarjeta h3 { font-family: 'Grandstander', sans-serif; margin: 0 0 12px; font-size: 1rem; color: var(--bosque); }
+
+  .curso-check { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px dashed var(--linea); cursor: pointer; }
+  .curso-check:first-child { border-top: none; padding-top: 0; }
+  .curso-check input { width: auto; }
+  .curso-check .nombre { font-weight: 600; flex: 1; }
+  .curso-check .precio { color: var(--bosque); font-size: 0.85rem; font-weight: 700; }
+
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; font-size: 0.9rem; }
+  .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-bottom: 16px; }
+  .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="creator.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+  <span class="sub">· Mis paquetes</span>
+</header>
+
+<main id="contenido">
+  <div class="tarjeta">
+    <h1>Arma tu paquete temático</h1>
+    <p class="ayuda">Junta varios de tus cursos (ej. "Matemáticas básicas 1er grado") y ponle tu propio precio.</p>
+    <div id="error-identificar"></div>
+    <label for="correo">Tu correo (el mismo con el que te registraste)</label>
+    <input type="email" id="correo" placeholder="tucorreo@ejemplo.com">
+    <button class="primario" id="btnEntrar" onclick="identificarCreador()">Ver mis cursos y paquetes</button>
+  </div>
+</main>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  let estado = { creatorId: null, cursos: [], bundleActualId: null, cursosSeleccionados: new Set() };
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  async function identificarCreador() {
+    const correo = document.getElementById("correo").value.trim();
+    const errorDiv = document.getElementById("error-identificar");
+    errorDiv.innerHTML = "";
+    if (!correo) {
+      errorDiv.innerHTML = `<div class="error">Escribe tu correo.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("btnEntrar");
+    btn.disabled = true;
+    btn.textContent = "Buscando…";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/creators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "—", email: correo }),
+      });
+      const data = await res.json();
+      if (!data.creator?.id) throw new Error(data.error || "No se encontró tu perfil. ¿Ya te registraste en el panel de creador?");
+
+      estado.creatorId = data.creator.id;
+      await mostrarPanel();
+    } catch (err) {
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Ver mis cursos y paquetes";
+    }
+  }
+
+  async function mostrarPanel() {
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `<div class="cargando">Cargando tus cursos…</div>`;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/creators/${estado.creatorId}/courses`);
+      const data = await res.json();
+      estado.cursos = data.courses || [];
+
+      if (estado.cursos.length < 2) {
+        cont.innerHTML = `
+          <div class="tarjeta">
+            <div class="aviso">Necesitas al menos 2 cursos publicados para armar un paquete. Ahora mismo tienes ${estado.cursos.length}.</div>
+            <a href="creator.html" style="color:var(--profundo); font-weight:700;">← Publica otro curso primero</a>
+          </div>`;
+        return;
+      }
+
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <h3>Crea un paquete nuevo</h3>
+          <label for="tituloPaquete">Nombre del paquete</label>
+          <input type="text" id="tituloPaquete" placeholder="Ej. Matemáticas básicas 1er grado">
+          <div id="error-crear"></div>
+          <button class="primario" id="btnCrearPaquete" onclick="crearPaquete()">Crear paquete</button>
+        </div>
+        <div id="zonaPaqueteActivo"></div>
+      `;
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function crearPaquete() {
+    const titulo = document.getElementById("tituloPaquete").value.trim();
+    const errorDiv = document.getElementById("error-crear");
+    errorDiv.innerHTML = "";
+    if (!titulo) {
+      errorDiv.innerHTML = `<div class="error">Ponle un nombre a tu paquete.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("btnCrearPaquete");
+    btn.disabled = true;
+    btn.textContent = "Creando…";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/bundles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorId: estado.creatorId, title: titulo }),
+      });
+      const data = await res.json();
+      if (!data.bundle?.id) throw new Error(data.error || "No se pudo crear el paquete.");
+
+      estado.bundleActualId = data.bundle.id;
+      estado.cursosSeleccionados = new Set();
+      mostrarSelectorDeCursos(titulo);
+    } catch (err) {
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Crear paquete";
+    }
+  }
+
+  function mostrarSelectorDeCursos(titulo) {
+    const zona = document.getElementById("zonaPaqueteActivo");
+    const AUDIENCIA_TEXTO = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" };
+
+    zona.innerHTML = `
+      <div class="tarjeta">
+        <h3>"${escapeHtml(titulo)}" — elige los cursos que incluye</h3>
+        <div id="listaCursosSelect">
+          ${estado.cursos
+            .map(
+              (c) => `
+            <label class="curso-check">
+              <input type="checkbox" value="${c.id}" onchange="toggleCurso('${c.id}')">
+              <span class="nombre">${escapeHtml(c.title)} <small style="color:#4A6A85;">(${AUDIENCIA_TEXTO[c.audience] || c.audience})</small></span>
+              <span class="precio">$${Number(c.price_mxn).toFixed(2)}</span>
+            </label>`
+            )
+            .join("")}
+        </div>
+        <div id="error-cursos"></div>
+
+        <label for="precioPaquete">Precio de tu paquete (MXN)</label>
+        <input type="number" id="precioPaquete" placeholder="Ej. 99.90" min="1" step="0.01">
+
+        <button class="primario" id="btnPublicarPaquete" onclick="publicarPaquete()">Publicar paquete</button>
+        <button class="secundario" onclick="mostrarPanel()">← Cancelar</button>
+      </div>
+    `;
+  }
+
+  async function toggleCurso(courseId) {
+    const yaEsta = estado.cursosSeleccionados.has(courseId);
+    try {
+      if (yaEsta) {
+        await fetch(`${API_BASE}/api/bundles/${estado.bundleActualId}/courses/${courseId}`, { method: "DELETE" });
+        estado.cursosSeleccionados.delete(courseId);
+      } else {
+        await fetch(`${API_BASE}/api/bundles/${estado.bundleActualId}/courses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ courseId }),
+        });
+        estado.cursosSeleccionados.add(courseId);
+      }
+    } catch (err) {
+      document.getElementById("error-cursos").innerHTML = `<div class="error">No se pudo actualizar el curso en el paquete.</div>`;
+    }
+  }
+
+  async function publicarPaquete() {
+    const errorDiv = document.getElementById("error-cursos");
+    errorDiv.innerHTML = "";
+
+    if (estado.cursosSeleccionados.size < 2) {
+      errorDiv.innerHTML = `<div class="error">Elige al menos 2 cursos para tu paquete.</div>`;
+      return;
+    }
+
+    const precio = parseFloat(document.getElementById("precioPaquete").value);
+    if (!precio || precio <= 0) {
+      errorDiv.innerHTML = `<div class="error">Pon un precio válido para el paquete.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("btnPublicarPaquete");
+    btn.disabled = true;
+    btn.textContent = "Publicando…";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/bundles/${estado.bundleActualId}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price_mxn: precio }),
+      });
+      const data = await res.json();
+      if (data.status !== "publicado") throw new Error(data.error || "No se pudo publicar el paquete.");
+
+      document.getElementById("zonaPaqueteActivo").innerHTML = `
+        <div class="tarjeta">
+          <div class="aviso">✓ ¡Tu paquete "${escapeHtml(data.bundle.title)}" ya está publicado!</div>
+          <p class="ayuda" style="margin-bottom:8px;">Comparte esta liga:</p>
+          <code style="display:block; background:var(--hielo); border:2px dashed var(--aqua); border-radius:14px; padding:12px 14px; margin-bottom:16px; word-break:break-all; font-weight:700; color:var(--bosque);">ensenai.com/paquete.html?slug=${escapeHtml(data.bundle.slug)}</code>
+          <button class="primario" onclick="mostrarPanel()">Crear otro paquete</button>
+        </div>
+      `;
+    } catch (err) {
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Publicar paquete";
+    }
+  }
+</script>
+</body>
+</html>

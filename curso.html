@@ -24,10 +24,7 @@
       var(--hielo);
     color: var(--tinta); min-height: 100vh;
   }
-  header {
-    background: var(--profundo); color: #fff; padding: 18px 24px;
-    display: flex; align-items: center; gap: 10px;
-  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 10px; }
   header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
   header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
   header .marca .ai {
@@ -35,39 +32,39 @@
     padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle;
   }
   main { max-width: 620px; margin: 0 auto; padding: 32px 20px 80px; }
-  .tarjeta {
-    background: #fff; border: 2px solid var(--linea); border-radius: 18px;
-    padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea);
-  }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
   .etiqueta {
-    display: inline-block; background: var(--hielo); color: var(--bosque);
-    font-weight: 700; font-size: 0.78rem; padding: 4px 12px; border-radius: 999px;
-    margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.02em;
+    display: inline-block; background: var(--hielo); color: var(--bosque); font-weight: 700; font-size: 0.78rem;
+    padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.02em;
   }
   h1 { font-family: 'Grandstander', sans-serif; font-size: 1.6rem; margin: 0 0 6px; }
   .creador { color: #4A6A85; font-size: 0.95rem; margin-bottom: 18px; }
   video { width: 100%; border-radius: 14px; margin-bottom: 18px; background: #000; }
   h3 { font-family: 'Grandstander', sans-serif; color: var(--bosque); font-size: 1rem; margin: 18px 0 8px; }
   p.texto { line-height: 1.6; margin: 0; }
-  .precio {
-    font-family: 'Grandstander', sans-serif; font-size: 1.4rem; color: var(--profundo);
-    margin: 4px 0 16px;
+
+  .incluye-tarjeta {
+    background: linear-gradient(135deg, var(--hielo) 0%, #fff 100%);
+    border: 2px solid var(--menta); border-radius: 16px; padding: 18px 20px; margin-bottom: 18px;
   }
+  .incluye-tarjeta h3 { color: var(--profundo); margin-top: 0; font-size: 1.05rem; }
+  .incluye-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .incluye-lista li { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.95rem; }
+  .incluye-check {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--menta);
+    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900;
+  }
+  .incluye-nota { margin-top: 12px; font-size: 0.82rem; color: #4A6A85; font-style: italic; }
+
+  .precio { font-family: 'Grandstander', sans-serif; font-size: 1.4rem; color: var(--profundo); margin: 4px 0 16px; }
   button.primario {
-    width: 100%; background: var(--profundo); color: #fff; border: none;
-    padding: 16px; border-radius: 999px; font-family: 'Grandstander', sans-serif;
-    font-weight: 600; font-size: 1.05rem; cursor: pointer;
+    width: 100%; background: var(--profundo); color: #fff; border: none; padding: 16px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1.05rem; cursor: pointer;
     box-shadow: 0 4px 0 var(--profundo-oscuro);
   }
   button.primario:disabled { opacity: 0.6; cursor: not-allowed; }
-  .aviso {
-    background: var(--hielo); border: 2px dashed var(--aqua); border-radius: 12px;
-    padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-top: 12px;
-  }
-  .error {
-    background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E;
-    padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem;
-  }
+  .aviso { background: var(--hielo); border: 2px dashed var(--aqua); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-top: 12px; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
   .cargando { text-align: center; padding: 60px 20px; color: #4A6A85; }
 </style>
 </head>
@@ -88,11 +85,7 @@
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const params = new URLSearchParams(window.location.search);
-let slug = params.get("slug");
-if (!slug) {
-  const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
-  if (match) slug = decodeURIComponent(match[1]);
-}
+  const slug = params.get("slug");
 
   function escapeHtml(str) {
     const d = document.createElement("div");
@@ -100,59 +93,95 @@ if (!slug) {
     return d.innerHTML;
   }
 
-async function cargarCurso() {
-  const cont = document.getElementById("contenido");
-  if (!slug) {
-    cont.innerHTML = `<div class="error">Falta el curso (liga incompleta).</div>`;
-    return;
-  }
+  const ETIQUETAS_INCLUYE = {
+    resumen: "Resumen para repasar",
+    glosario: "Glosario de términos clave",
+    reflexion: "Espacio de reflexión",
+    trivia: "Trivia de 5 preguntas",
+    memorama: "Memorama para practicar",
+    flashcards: "Flashcards digitales",
+    rima: "Rima/canción para recordar",
+    ejercicios: "Ejercicios imprimibles (PDF)",
+    tips: "Tips prácticos",
+  };
 
-  try {
-    const session = await obtenerSesion();
-    const headers = session ? { Authorization: `Bearer ${session.access_token}` } : {};
-    const res = await fetch(`${API_BASE}/api/courses/publico/${slug}`, { headers });
-    const data = await res.json();
-    if (!data.course) throw new Error(data.error || "Curso no encontrado.");
+  function armarQueIncluye(course, preview) {
+    const items = ["Video explicativo"];
+    if (!preview) return items;
 
-    const { course, preview, tieneAcceso } = data;
-    const audienciaTexto = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" }[course.audience] || course.audience;
+    if (preview.resumen) items.push(ETIQUETAS_INCLUYE.resumen);
 
-    const videoHtml = tieneAcceso
-      ? `<video controls src="${escapeHtml(course.video_url)}" poster=""></video>`
-      : `<div class="aviso">🔒 Compra el acceso para ver el video completo.</div>`;
-
-    cont.innerHTML = `
-      <div class="tarjeta">
-        <span class="etiqueta">${audienciaTexto}</span>
-        <h1>${escapeHtml(course.title)}</h1>
-        <p class="creador">Por ${escapeHtml(course.creators?.name || "Creador de EnseñAI")}</p>
-        ${videoHtml}
-        ${preview?.resumen ? `<h3>De qué trata</h3><p class="texto">${escapeHtml(preview.resumen)}</p>` : ""}
-        <p class="precio">$${Number(course.price_mxn).toFixed(2)} MXN</p>
-        <div id="zona-accion">
-          ${tieneAcceso ? `<div class="aviso">✓ Ya tienes acceso a este curso.</div>` : `<button class="primario" id="btnComprar">Obtener acceso</button>`}
-        </div>
-        <div id="mensaje"></div>
-      </div>
-    `;
-
-    if (!tieneAcceso) {
-      document.getElementById("btnComprar").addEventListener("click", () => manejarCompra(course.id));
+    if (course.audience === "ninos") {
+      if (preview.glosario?.length) items.push(ETIQUETAS_INCLUYE.glosario);
+      items.push(ETIQUETAS_INCLUYE.reflexion);
+      if (preview.trivia?.length) items.push(ETIQUETAS_INCLUYE.trivia);
+      if (preview.repaso_tipo === "memorama" && preview.memorama?.length) items.push(ETIQUETAS_INCLUYE.memorama);
+      if (preview.repaso_tipo === "flashcards" && preview.flashcards?.length) items.push(ETIQUETAS_INCLUYE.flashcards);
+      if (preview.repaso_tipo === "rima" && preview.rima) items.push(ETIQUETAS_INCLUYE.rima);
+      if (preview.incluye_ejercicios && preview.ejercicios_pdf_url) items.push(ETIQUETAS_INCLUYE.ejercicios);
+    } else {
+      if (preview.tips?.length) items.push(ETIQUETAS_INCLUYE.tips);
     }
-  } catch (err) {
-    cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    return items;
   }
-}
+
+  async function cargarCurso() {
+    const cont = document.getElementById("contenido");
+    if (!slug) {
+      cont.innerHTML = `<div class="error">Falta el curso (liga incompleta).</div>`;
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/courses/publico/${slug}`);
+      const data = await res.json();
+      if (!data.course) throw new Error(data.error || "Curso no encontrado.");
+
+      const { course, preview } = data;
+      const audienciaTexto = { ninos: "Niños", padres: "Padres/cuidadores", profesionales: "Profesionales" }[course.audience] || course.audience;
+      const queIncluye = armarQueIncluye(course, preview);
+
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <span class="etiqueta">${audienciaTexto}</span>
+          <h1>${course.icono_portada_url ? `<img src="${escapeHtml(course.icono_portada_url)}" alt="" style="width:32px; height:32px; vertical-align:middle; margin-right:8px;">` : ""}${escapeHtml(course.title)}</h1>
+          <p class="creador">Por <a href="creador.html?slug=${encodeURIComponent(course.creators?.slug || '')}" style="color:inherit; font-weight:700;">${escapeHtml(course.creators?.name || "Creador de EnseñAI")}</a></p>
+          <video controls src="${escapeHtml(course.video_url)}" poster=""></video>
+          ${preview?.resumen ? `<h3>De qué trata</h3><p class="texto">${escapeHtml(preview.resumen)}</p>` : ""}
+        </div>
+
+        <div class="incluye-tarjeta">
+          <h3>✨ Qué incluye tu compra</h3>
+          <ul class="incluye-lista">
+            ${queIncluye.map((item) => `<li><span class="incluye-check">✓</span> ${escapeHtml(item)}</li>`).join("")}
+          </ul>
+          <p class="incluye-nota">Todo esto por un solo pago — acceso de por vida.</p>
+        </div>
+
+        <div class="tarjeta">
+          <p class="precio">$${Number(course.price_mxn).toFixed(2)} MXN</p>
+          <div id="zona-accion">
+            <button class="primario" id="btnComprar">Obtener acceso</button>
+          </div>
+          <div id="mensaje"></div>
+        </div>
+      `;
+
+      document.getElementById("btnComprar").addEventListener("click", () => manejarCompra(course.id));
+      await revisarSiYaTieneAcceso(course.id, preview?.ejercicios_pdf_url);
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
 
   async function obtenerSesion() {
     const { data } = await supabaseClient.auth.getSession();
     return data.session;
   }
 
-  async function revisarSiYaTieneAcceso(courseId) {
+  async function revisarSiYaTieneAcceso(courseId, ejerciciosPdfUrl) {
     const session = await obtenerSesion();
     if (!session) return;
-
     try {
       const res = await fetch(`${API_BASE}/api/purchases/mis-cursos`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -160,11 +189,14 @@ async function cargarCurso() {
       const data = await res.json();
       const yaComprado = (data.cursos || []).some((c) => c.course_id === courseId);
       if (yaComprado) {
+        const linkPdf = ejerciciosPdfUrl
+          ? `<br><a href="${escapeHtml(ejerciciosPdfUrl)}" target="_blank" style="color:var(--bosque); font-weight:700;">📄 Descargar ejercicios en PDF</a>`
+          : "";
         document.getElementById("zona-accion").innerHTML =
-          `<div class="aviso">✓ Ya tienes acceso a este curso — el video de arriba está disponible completo.</div>`;
+          `<div class="aviso">✓ Ya tienes acceso a este curso — el video de arriba está disponible completo.${linkPdf}</div>`;
       }
     } catch (err) {
-      // si falla, simplemente no mostramos el aviso — no bloquea nada
+      // no bloquea nada si falla
     }
   }
 
@@ -196,7 +228,6 @@ async function cargarCurso() {
         return;
       }
 
-      // si no hay créditos disponibles, lo mandamos a comprar un paquete
       if (data.error && data.error.includes("créditos")) {
         window.location.href = `comprador.html?despues=curso&slug=${encodeURIComponent(slug)}&comprar=creditos`;
         return;
