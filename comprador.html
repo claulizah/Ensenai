@@ -109,6 +109,10 @@
         window.location.href = "grupo.html";
         return;
       }
+      if (params.get("despues") === "tema") {
+        window.location.href = "tema.html";
+        return;
+      }
       mostrarDashboard(data.session);
     } else {
       mostrarLogin();
@@ -220,6 +224,11 @@
       <div class="tarjeta">
         <p class="creditos-label">Créditos disponibles</p>
         <div class="creditos-num" id="numCreditos">…</div>
+      </div>
+      <div class="tarjeta">
+        <h1 style="text-align:left; font-size:1.1rem;">✨ Genera material sobre un tema</h1>
+        <p class="ayuda" style="margin:0 0 4px; text-align:left;">Explicación, trivia e imprimible adaptados a tu edad y a tu forma de aprender.</p>
+        <a href="tema.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">Generar tema</button></a>
       </div>
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">Estilo de aprendizaje</h1>
