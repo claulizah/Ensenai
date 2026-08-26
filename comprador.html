@@ -105,6 +105,10 @@
         window.location.href = `paquete.html?slug=${encodeURIComponent(params.get("slug"))}`;
         return;
       }
+      if (params.get("despues") === "grupo") {
+        window.location.href = "grupo.html";
+        return;
+      }
       mostrarDashboard(data.session);
     } else {
       mostrarLogin();
@@ -228,6 +232,11 @@
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">Comprar más créditos</h1>
         <div class="paquetes" id="listaPaquetes"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta">
+        <h1 style="text-align:left; font-size:1.1rem;">¿Eres maestro/a o psicólogo/a?</h1>
+        <p class="ayuda" style="margin:0 0 4px; text-align:left;">Genera material para todo tu grupo y compártelo con una sola liga — tus alumnos o pacientes entran gratis, sin cuenta.</p>
+        <a href="grupo.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">🏫 Ir a Mi grupo</button></a>
       </div>
     `;
 
