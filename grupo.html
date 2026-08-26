@@ -120,14 +120,18 @@
       window.location.href = "comprador.html";
     };
 
-    if (new URLSearchParams(window.location.search).get("tema_grupo") === "activado") {
-      document.getElementById("contenido").innerHTML = `<div class="aviso">✓ ¡Pago recibido! Tu tema ya está activo en la liga de tu grupo.</div>`;
+    const qp = new URLSearchParams(window.location.search);
+    let avisoInicial = null;
+    if (qp.get("tema_grupo") === "activado") {
+      avisoInicial = "✓ ¡Pago recibido! Tu tema ya está activo en la liga de tu grupo.";
+    } else if (qp.get("suscripcion") === "exitosa") {
+      avisoInicial = "✓ ¡Suscripción de grupo activada! Los temas que agregues quedan cubiertos automáticamente.";
     }
 
-    cargarGrupos();
+    cargarGrupos(avisoInicial);
   }
 
-  async function cargarGrupos() {
+  async function cargarGrupos(avisoInicial) {
     const cont = document.getElementById("contenido");
     try {
       const res = await fetch(`${API_BASE}/api/grupos/mios`, {
@@ -136,20 +140,26 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus grupos.");
 
-      renderGrupos(data.grupos || []);
+      renderGrupos(data.grupos || [], avisoInicial);
     } catch (err) {
       cont.innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(err.message)}</div></div>`;
     }
   }
 
-  function renderGrupos(grupos) {
+  function renderGrupos(grupos, avisoInicial) {
     const cont = document.getElementById("contenido");
     const ligaBase = `${window.location.origin}/g.html`;
 
     cont.innerHTML = `
+      ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
       <div class="tarjeta">
         <h1>Mi grupo</h1>
         <p class="ayuda">Genera material para tu salón o tus pacientes y compártelo con una sola liga — ellos entran gratis, sin cuenta, con solo su nombre.</p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Mi suscripción de grupo</h2>
+        <div id="zona-suscripcion-grupo"><div class="cargando">Cargando…</div></div>
       </div>
 
       ${grupos.length === 0 ? `<div class="tarjeta"><div class="aviso">Todavía no tienes ningún grupo — crea el primero abajo.</div></div>` : ""}
@@ -205,6 +215,49 @@
     `;
 
     grupos.forEach((g) => cargarTemas(g.id));
+    cargarSuscripcionGrupo();
+  }
+
+  async function cargarSuscripcionGrupo() {
+    const cont = document.getElementById("zona-suscripcion-grupo");
+    if (!cont) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/purchases/mi-suscripcion`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+
+      if (data.tiene_suscripcion_activa && data.suscripcion.tipo === "grupo") {
+        const s = data.suscripcion;
+        cont.innerHTML = `<p class="ayuda" style="margin:0;">✓ Suscripción de grupo activa${s.es_founder ? " — precio de fundador" : ""}${s.precio_mxn ? ` ($${Number(s.precio_mxn).toFixed(2)} MXN/mes)` : ""}. Todos los temas que agregues quedan cubiertos automáticamente.</p>`;
+        return;
+      }
+
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:0 0 10px;">En vez de pagar cada tema por separado, suscríbete y comparte temas ilimitados con tu grupo.</p>
+        <button class="primario" style="margin-top:0;" id="btn-suscribir-grupo">Suscribirme — mensual</button>
+      `;
+      document.getElementById("btn-suscribir-grupo").addEventListener("click", suscribirGrupo);
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu suscripción.</div>`;
+    }
+  }
+
+  async function suscribirGrupo() {
+    const cont = document.getElementById("zona-suscripcion-grupo");
+    cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
+    try {
+      const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ tipo: "grupo", plan: "mensual" }),
+      });
+      const data = await res.json();
+      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
   }
 
   function copiarLiga(grupoId) {
@@ -264,12 +317,48 @@
       resultado.innerHTML = `
         <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Revísalo y agrégalo a tu liga.</div>
         <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${esPrimerTemaGratis ? " (gratis)" : ""}</button>
+        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF)</button>
       `;
       document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
         agregarTemaAGrupo(grupoId, tema, data.contenido, esPrimerTemaGratis)
       );
+      document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
+        descargarPdf(grupoId, data.contenido, ev.target)
+      );
     } catch (err) {
       resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // Cachea la URL del PDF ya generado por grupo, para no volver a generarlo
+  // (llamada a IA de por medio) si el profesional ya lo descargó antes de
+  // agregar el tema a su liga.
+  const pdfCache = {};
+
+  async function generarPdfEnServidor(contenido) {
+    const res = await fetch(`${API_BASE}/api/temas/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+      body: JSON.stringify({ contenido, modo: "grupo" }),
+    });
+    const data = await res.json();
+    if (!data.pdf_url) throw new Error(data.error || "No se pudo generar el PDF.");
+    return data.pdf_url;
+  }
+
+  async function descargarPdf(grupoId, contenido, btn) {
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Preparando PDF…";
+    try {
+      const pdfUrl = pdfCache[grupoId] || (await generarPdfEnServidor(contenido));
+      pdfCache[grupoId] = pdfUrl;
+      window.open(pdfUrl, "_blank");
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
     }
   }
 
@@ -278,10 +367,22 @@
     resultado.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
 
     try {
+      // Si el profesional ya generó el PDF (o si falla, seguimos sin él —
+      // no debe bloquear que el tema se agregue a la liga).
+      let pdfUrl = pdfCache[grupoId] || null;
+      if (!pdfUrl) {
+        try {
+          pdfUrl = await generarPdfEnServidor(contenido);
+          pdfCache[grupoId] = pdfUrl;
+        } catch (err) {
+          pdfUrl = null;
+        }
+      }
+
       const res = await fetch(`${API_BASE}/api/grupos/${grupoId}/temas`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ titulo, contenido, esPrimerTemaGratis }),
+        body: JSON.stringify({ titulo, contenido, esPrimerTemaGratis, pdfUrl }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo agregar el tema.");
@@ -297,6 +398,7 @@
         resultado.innerHTML = `<div class="aviso">✓ ¡Listo! Ya está activo en tu liga.</div>`;
       }
 
+      delete pdfCache[grupoId];
       document.getElementById(`tema-input-${grupoId}`).value = "";
       cargarTemas(grupoId);
       cargarGrupos();

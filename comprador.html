@@ -96,6 +96,11 @@
       return;
     }
 
+    if (params.get("suscripcion") === "exitosa") {
+      mostrarDashboard(data.session, "✓ ¡Suscripción activada! Ya puedes generar temas ilimitados.");
+      return;
+    }
+
     if (data.session) {
       if (params.get("despues") === "curso" && params.get("slug") && params.get("comprar") !== "creditos") {
         window.location.href = `curso.html?slug=${encodeURIComponent(params.get("slug"))}`;
@@ -226,6 +231,10 @@
         <div class="creditos-num" id="numCreditos">…</div>
       </div>
       <div class="tarjeta">
+        <h1 style="text-align:left; font-size:1.1rem;">Mi suscripción</h1>
+        <div id="zonaSuscripcion"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">✨ Genera material sobre un tema</h1>
         <p class="ayuda" style="margin:0 0 4px; text-align:left;">Explicación, trivia e imprimible adaptados a tu edad y a tu forma de aprender.</p>
         <a href="tema.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">Generar tema</button></a>
@@ -250,6 +259,7 @@
     `;
 
     cargarCreditos(session);
+    cargarSuscripcion(session);
     cargarAprendizaje(session);
     cargarMisCursos(session);
     cargarPaquetes(session);
@@ -331,6 +341,50 @@
       cargarAprendizaje(sesionActual);
     } catch (err) {
       alert("Error: " + err.message);
+    }
+  }
+
+  async function cargarSuscripcion(session) {
+    const cont = document.getElementById("zonaSuscripcion");
+    try {
+      const res = await fetch(`${API_BASE}/api/purchases/mi-suscripcion`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const data = await res.json();
+
+      if (data.tiene_suscripcion_activa) {
+        const s = data.suscripcion;
+        const etiquetaPlan = s.plan === "anual" ? "anual" : "mensual";
+        cont.innerHTML = `
+          <p class="ayuda" style="margin:0; text-align:left;">✓ Suscripción individual ${etiquetaPlan} activa${s.es_founder ? " — precio de fundador" : ""}${s.precio_mxn ? ` ($${Number(s.precio_mxn).toFixed(2)} MXN/${s.plan === "anual" ? "año" : "mes"})` : ""}.</p>
+        `;
+        return;
+      }
+
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:0 0 10px; text-align:left;">Genera temas ilimitados sin gastar créditos.</p>
+        <button class="primario" style="margin-top:0;" id="btnSuscribirMensual">Suscribirme — mensual</button>
+        <button class="secundario" style="width:100%; margin-top:8px;" id="btnSuscribirAnual">Ver plan anual</button>
+      `;
+      document.getElementById("btnSuscribirMensual").addEventListener("click", () => suscribirse(session, "individual", "mensual"));
+      document.getElementById("btnSuscribirAnual").addEventListener("click", () => suscribirse(session, "individual", "anual"));
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu suscripción.</div>`;
+    }
+  }
+
+  async function suscribirse(session, tipo, plan) {
+    const cont = document.getElementById("zonaSuscripcion");
+    cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
+    try {
+      const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ tipo, plan }),
+      });
+      const data = await res.json();
+      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
 
