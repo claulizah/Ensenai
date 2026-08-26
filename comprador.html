@@ -227,29 +227,17 @@
     document.getElementById("contenido").innerHTML = `
       ${avisoExtra ? `<div class="aviso">${avisoExtra}</div>` : ""}
       <div class="tarjeta">
-        <p class="creditos-label">Créditos disponibles</p>
-        <div class="creditos-num" id="numCreditos">…</div>
-      </div>
-      <div class="tarjeta">
-        <h1 style="text-align:left; font-size:1.1rem;">Mi suscripción</h1>
+        <h1 style="text-align:left; font-size:1.1rem;">Mi plan</h1>
         <div id="zonaSuscripcion"><div class="cargando">Cargando…</div></div>
       </div>
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">✨ Genera material sobre un tema</h1>
-        <p class="ayuda" style="margin:0 0 4px; text-align:left;">Explicación, trivia e imprimible adaptados a tu edad y a tu forma de aprender.</p>
+        <p class="ayuda" style="margin:0 0 4px; text-align:left;">Explicación, trivia e imprimible adaptados a tu edad y a tu forma de aprender. También administras ahí los perfiles de aprendizaje (uno por hijo/a) y el quiz de inteligencias múltiples.</p>
         <a href="tema.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">Generar tema</button></a>
-      </div>
-      <div class="tarjeta">
-        <h1 style="text-align:left; font-size:1.1rem;">Estilo de aprendizaje</h1>
-        <div id="zonaAprendizaje"><div class="cargando">Cargando…</div></div>
       </div>
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">Mis cursos</h1>
         <div id="listaCursos"><div class="cargando">Cargando…</div></div>
-      </div>
-      <div class="tarjeta">
-        <h1 style="text-align:left; font-size:1.1rem;">Comprar más créditos</h1>
-        <div class="paquetes" id="listaPaquetes"><div class="cargando">Cargando…</div></div>
       </div>
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">¿Eres maestro/a o psicólogo/a?</h1>
@@ -258,11 +246,8 @@
       </div>
     `;
 
-    cargarCreditos(session);
     cargarSuscripcion(session);
-    cargarAprendizaje(session);
     cargarMisCursos(session);
-    cargarPaquetes(session);
 
     document.getElementById("btnSalir").onclick = async () => {
       await supabaseClient.auth.signOut();
@@ -270,131 +255,59 @@
     };
   }
 
-  async function cargarAprendizaje(session) {
-    const cont = document.getElementById("zonaAprendizaje");
-    try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/mi-resultado`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const data = await res.json();
-
-      if (!data.tiene_resultado) {
-        cont.innerHTML = `
-          <p class="ayuda" style="margin:0 0 12px;">Descubre cómo aprende mejor tu hijo/a con un mini-quiz de 5 preguntas.</p>
-          <button class="primario" style="margin-top:0;" onclick="mostrarQuizAprendizaje()">Hacer el quiz</button>
-        `;
-        return;
-      }
-
-      cont.innerHTML = `
-        <p class="ayuda" style="margin:0 0 8px; text-align:left;"><strong>Tipo dominante:</strong> ${data.dominantes_texto.map(escapeHtml).join(" y ")}</p>
-        <p class="ayuda" style="margin:0; text-align:left; font-size:0.85rem;">Sugerencia de repaso: ${data.repaso_sugerido.map(escapeHtml).join(", ") || "sin sugerencia específica"}</p>
-        <button class="secundario" onclick="mostrarQuizAprendizaje()">Repetir el quiz</button>
-      `;
-    } catch (err) {
-      cont.innerHTML = `<div class="error">No se pudo cargar tu resultado.</div>`;
-    }
-  }
-
-  async function mostrarQuizAprendizaje() {
-    const cont = document.getElementById("zonaAprendizaje");
-    cont.innerHTML = `<div class="cargando">Cargando preguntas…</div>`;
-
-    const res = await fetch(`${API_BASE}/api/aprendizaje/quiz`);
-    const data = await res.json();
-
-    cont.innerHTML =
-      data.preguntas
-        .map(
-          (p, i) => `
-      <div style="margin-bottom:16px;">
-        <p style="font-weight:700; margin-bottom:6px;">${i + 1}. ${escapeHtml(p.pregunta)}</p>
-        <select id="pregunta-aprendizaje-${p.id}" style="width:100%; padding:10px; border:2px solid var(--linea); border-radius:10px;">
-          <option value="">Elige una opción…</option>
-          ${p.opciones.map((op, idx) => `<option value="${idx}">${escapeHtml(op)}</option>`).join("")}
-        </select>
-      </div>`
-        )
-        .join("") + `<button class="primario" onclick="enviarQuizAprendizaje()">Ver resultado</button>`;
-  }
-
-  async function enviarQuizAprendizaje() {
-    const respuestas = [];
-    for (let i = 1; i <= 5; i++) {
-      const valor = document.getElementById(`pregunta-aprendizaje-${i}`).value;
-      if (valor === "") {
-        alert("Responde las 5 preguntas antes de continuar.");
-        return;
-      }
-      respuestas.push(parseInt(valor, 10));
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/resultado`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ respuestas }),
-      });
-      const data = await res.json();
-      if (data.status !== "resultado_guardado") throw new Error(data.error || "No se pudo guardar el resultado.");
-
-      cargarAprendizaje(sesionActual);
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
-  }
+  const NOMBRES_NIVEL = { gratis: "Gratis", aprendemos: "Aprendemos", ilimitado: "Ilimitado" };
 
   async function cargarSuscripcion(session) {
     const cont = document.getElementById("zonaSuscripcion");
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/mi-suscripcion`, { headers: { Authorization: `Bearer ${session.access_token}` } });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/api/temas/mi-plan`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
-      if (data.tiene_suscripcion_activa) {
-        const s = data.suscripcion;
-        const etiquetaPlan = s.plan === "anual" ? "anual" : "mensual";
-        cont.innerHTML = `
-          <p class="ayuda" style="margin:0; text-align:left;">✓ Suscripción individual ${etiquetaPlan} activa${s.es_founder ? " — precio de fundador" : ""}${s.precio_mxn ? ` ($${Number(s.precio_mxn).toFixed(2)} MXN/${s.plan === "anual" ? "año" : "mes"})` : ""}.</p>
-        `;
-        return;
+      const usoTexto =
+        plan.limite_temas_mes === null
+          ? `${plan.usados_este_mes} temas generados este mes — sin límite`
+          : `${plan.usados_este_mes} de ${plan.limite_temas_mes} temas este mes`;
+
+      let botones = "";
+      if (plan.nivel !== "ilimitado") {
+        botones += `<button class="primario" style="margin-top:10px;" id="btnIlimitado">Pasar a Ilimitado — $129/mes</button>`;
+      }
+      if (plan.nivel === "gratis") {
+        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btnAprendemos">Pasar a Aprendemos — $79/mes (20 temas, 3 perfiles)</button>`;
       }
 
       cont.innerHTML = `
-        <p class="ayuda" style="margin:0 0 10px; text-align:left;">Genera temas ilimitados sin gastar créditos.</p>
-        <button class="primario" style="margin-top:0;" id="btnSuscribirMensual">Suscribirme — mensual</button>
-        <button class="secundario" style="width:100%; margin-top:8px;" id="btnSuscribirAnual">Ver plan anual</button>
+        <p class="ayuda" style="margin:0 0 4px; text-align:left;"><strong>Plan ${NOMBRES_NIVEL[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN/mes` : ""}</p>
+        <p class="ayuda" style="margin:0 0 4px; text-align:left; font-size:0.85rem;">${escapeHtml(usoTexto)}</p>
+        <p class="ayuda" style="margin:0; text-align:left; font-size:0.85rem;">Hasta ${plan.limite_perfiles} perfil(es) de aprendizaje.</p>
+        ${botones}
       `;
-      document.getElementById("btnSuscribirMensual").addEventListener("click", () => suscribirse(session, "individual", "mensual"));
-      document.getElementById("btnSuscribirAnual").addEventListener("click", () => suscribirse(session, "individual", "anual"));
+      if (document.getElementById("btnIlimitado")) {
+        document.getElementById("btnIlimitado").addEventListener("click", () => suscribirse(session, "individual", "ilimitado"));
+      }
+      if (document.getElementById("btnAprendemos")) {
+        document.getElementById("btnAprendemos").addEventListener("click", () => suscribirse(session, "individual", "aprendemos"));
+      }
     } catch (err) {
-      cont.innerHTML = `<div class="error">No se pudo cargar tu suscripción.</div>`;
+      cont.innerHTML = `<div class="error">No se pudo cargar tu plan.</div>`;
     }
   }
 
-  async function suscribirse(session, tipo, plan) {
+  async function suscribirse(session, tipo, nivel) {
     const cont = document.getElementById("zonaSuscripcion");
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
       const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ tipo, plan }),
+        body: JSON.stringify({ tipo, nivel }),
       });
       const data = await res.json();
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
       window.location.href = data.checkout_url;
     } catch (err) {
       cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-    }
-  }
-
-  async function cargarCreditos(session) {
-    try {
-      const res = await fetch(`${API_BASE}/api/purchases/mis-creditos`, { headers: { Authorization: `Bearer ${session.access_token}` } });
-      const data = await res.json();
-      document.getElementById("numCreditos").textContent = data.creditos_disponibles ?? "0";
-    } catch (err) {
-      document.getElementById("numCreditos").textContent = "—";
     }
   }
 
@@ -415,40 +328,6 @@
         .join("");
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudieron cargar tus cursos.</div>`;
-    }
-  }
-
-  async function cargarPaquetes(session) {
-    const cont = document.getElementById("listaPaquetes");
-    try {
-      const { data: paquetes, error } = await supabaseClient.from("credit_packs").select("*").eq("active", true).order("credits", { ascending: true });
-      if (error) throw new Error(error.message);
-
-      cont.innerHTML = paquetes
-        .map((p) => `<div class="paquete" data-id="${p.id}"><span class="nombre">${escapeHtml(p.label)}</span><span class="precio">$${Number(p.price_mxn).toFixed(2)} MXN</span></div>`)
-        .join("");
-
-      cont.querySelectorAll(".paquete").forEach((el) => {
-        el.addEventListener("click", () => comprarPaquete(session, el.dataset.id, cont));
-      });
-    } catch (err) {
-      cont.innerHTML = `<div class="error">No se pudieron cargar los paquetes.</div>`;
-    }
-  }
-
-  async function comprarPaquete(session, creditPackId, cont) {
-    cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
-    try {
-      const res = await fetch(`${API_BASE}/api/purchases/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ creditPackId }),
-      });
-      const data = await res.json();
-      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
-      window.location.href = data.checkout_url;
-    } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
 

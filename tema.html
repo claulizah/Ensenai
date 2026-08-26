@@ -101,6 +101,8 @@
   let sesionActual = null;
   let ultimoContenido = null;
   let ultimoTemaId = null;
+  let perfilesCache = [];
+  let perfilSeleccionadoId = "";
 
   function escapeHtml(str) {
     const d = document.createElement("div");
@@ -127,8 +129,15 @@
   function mostrarFormulario() {
     document.getElementById("contenido").innerHTML = `
       <div class="tarjeta">
+        <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
+        <p class="ayuda" style="margin:0 0 10px;">Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender.</p>
+        <div id="zona-perfiles"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta">
         <h1>✨ Genera material sobre un tema</h1>
         <p class="ayuda">Escribe cualquier tema y lo adaptamos a tu edad y a tu forma de aprender.</p>
+        <label>Perfil a usar</label>
+        <select id="perfil-input"><option value="">Balanceado (sin perfil específico)</option></select>
         <label>Tema</label>
         <input type="text" id="tema-input" placeholder="Ej. Las fracciones, La Revolución Mexicana, El sistema solar…">
         <label>Nivel</label>
@@ -144,12 +153,144 @@
       </div>
     `;
     document.getElementById("btn-generar").addEventListener("click", generarTema);
+    cargarPerfiles();
     cargarHistorial();
+  }
+
+  async function cargarPerfiles() {
+    const cont = document.getElementById("zona-perfiles");
+    try {
+      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus perfiles.");
+
+      perfilesCache = data.perfiles || [];
+      const limite = data.limite_perfiles;
+
+      const listaHtml = perfilesCache.length
+        ? perfilesCache
+            .map(
+              (p) => `
+        <div class="historial-item" data-perfil-id="${p.id}">
+          <span class="titulo">🧩 ${escapeHtml(p.nombre)} <span style="font-weight:400; color:#4A6A85;">— ${escapeHtml(ETIQUETAS_INTELIGENCIA[p.inteligencia_dominante?.[0]] || "")}</span></span>
+          <button class="secundario" style="margin:0; padding:6px 10px;" data-borrar="${p.id}">Borrar</button>
+        </div>
+      `
+            )
+            .join("")
+        : `<p class="ayuda" style="margin:0 0 10px;">Todavía no tienes perfiles guardados.</p>`;
+
+      cont.innerHTML = `
+        ${listaHtml}
+        <p class="ayuda" style="margin:10px 0 0; font-size:0.85rem;">${perfilesCache.length} de ${limite} perfil(es) de tu plan.</p>
+        ${
+          perfilesCache.length < limite
+            ? `<button class="secundario" style="width:100%;" id="btn-nuevo-perfil">+ Agregar perfil (hacer quiz)</button>`
+            : `<p class="ayuda" style="margin:6px 0 0; font-size:0.85rem;">Llegaste al límite de tu plan — <a href="comprador.html">mejora tu plan</a> para agregar más.</p>`
+        }
+      `;
+
+      if (document.getElementById("btn-nuevo-perfil")) {
+        document.getElementById("btn-nuevo-perfil").addEventListener("click", () => mostrarQuizPerfil());
+      }
+      cont.querySelectorAll("[data-borrar]").forEach((btn) => {
+        btn.addEventListener("click", () => borrarPerfil(btn.dataset.borrar));
+      });
+
+      // llena el selector de perfil del formulario de generación
+      const select = document.getElementById("perfil-input");
+      if (select) {
+        select.innerHTML =
+          `<option value="">Balanceado (sin perfil específico)</option>` +
+          perfilesCache.map((p) => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join("");
+      }
+    } catch (err) {
+      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function mostrarQuizPerfil() {
+    const cont = document.getElementById("zona-perfiles");
+    cont.innerHTML = `
+      <label>Nombre de este perfil</label>
+      <input type="text" id="nombre-perfil-input" placeholder="Ej. Sofía, Mateo, yo…">
+      <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
+    `;
+
+    const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=ninos`);
+    const data = await res.json();
+
+    document.getElementById("preguntas-perfil").innerHTML =
+      data.preguntas
+        .map(
+          (p, i) => `
+      <div style="margin-bottom:14px;">
+        <p style="font-weight:700; margin-bottom:6px; font-size:0.92rem;">${i + 1}. ${escapeHtml(p.pregunta)}</p>
+        <select id="pregunta-perfil-${p.id}" style="width:100%; padding:10px; border:2px solid var(--linea); border-radius:10px;">
+          <option value="">Elige una opción…</option>
+          ${p.opciones.map((op, idx) => `<option value="${idx}">${escapeHtml(op)}</option>`).join("")}
+        </select>
+      </div>`
+        )
+        .join("") +
+      `<button class="primario" id="btn-guardar-perfil">Guardar perfil</button>
+       <button class="secundario" style="width:100%;" id="btn-cancelar-perfil">Cancelar</button>`;
+
+    document.getElementById("btn-guardar-perfil").addEventListener("click", () => enviarQuizPerfil(data.preguntas));
+    document.getElementById("btn-cancelar-perfil").addEventListener("click", cargarPerfiles);
+  }
+
+  async function enviarQuizPerfil(preguntas) {
+    const nombre = document.getElementById("nombre-perfil-input").value.trim();
+    if (!nombre) {
+      alert("Escribe un nombre para este perfil.");
+      return;
+    }
+    const respuestas = [];
+    for (const p of preguntas) {
+      const valor = document.getElementById(`pregunta-perfil-${p.id}`).value;
+      if (valor === "") {
+        alert("Responde todas las preguntas antes de continuar.");
+        return;
+      }
+      respuestas.push(parseInt(valor, 10));
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ nombre, respuestas }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
+      cargarPerfiles();
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+  }
+
+  async function borrarPerfil(perfilId) {
+    if (!confirm("¿Borrar este perfil?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles/${perfilId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo borrar el perfil.");
+      cargarPerfiles();
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
   }
 
   async function generarTema() {
     const tema = document.getElementById("tema-input").value.trim();
     const nivel = document.getElementById("nivel-input").value;
+    const perfilId = document.getElementById("perfil-input").value || null;
     const resultado = document.getElementById("resultado-generar");
     resultado.innerHTML = "";
 
@@ -164,9 +305,16 @@
       const res = await fetch(`${API_BASE}/api/temas/generar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tema, nivel, modo: "individual" }),
+        body: JSON.stringify({ tema, nivel, modo: "individual", perfilId }),
       });
       const data = await res.json();
+      if (res.status === 402) {
+        resultado.innerHTML = `
+          <div class="error">${escapeHtml(data.error)}</div>
+          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
       mostrarTemaGenerado(data.contenido, data.tema_id, null);

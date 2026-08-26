@@ -158,7 +158,7 @@
       </div>
 
       <div class="tarjeta">
-        <h2>Mi suscripción de grupo</h2>
+        <h2>Mi plan de grupo</h2>
         <div id="zona-suscripcion-grupo"><div class="cargando">Cargando…</div></div>
       </div>
 
@@ -218,39 +218,58 @@
     cargarSuscripcionGrupo();
   }
 
+  const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Aprendemos", ilimitado: "Ilimitado" };
+
   async function cargarSuscripcionGrupo() {
     const cont = document.getElementById("zona-suscripcion-grupo");
     if (!cont) return;
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/mi-suscripcion`, {
+      const res = await fetch(`${API_BASE}/api/grupos/mi-plan`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
       });
-      const data = await res.json();
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
-      if (data.tiene_suscripcion_activa && data.suscripcion.tipo === "grupo") {
-        const s = data.suscripcion;
-        cont.innerHTML = `<p class="ayuda" style="margin:0;">✓ Suscripción de grupo activa${s.es_founder ? " — precio de fundador" : ""}${s.precio_mxn ? ` ($${Number(s.precio_mxn).toFixed(2)} MXN/mes)` : ""}. Todos los temas que agregues quedan cubiertos automáticamente.</p>`;
-        return;
+      const usoTexto =
+        plan.nivel === "gratis"
+          ? "El primer tema de cada grupo es gratis; los siguientes se pagan sueltos o con un plan."
+          : plan.limite_temas_mes === null
+          ? `${plan.temas_usados_este_mes} temas-grupo cubiertos este mes — sin límite`
+          : `${plan.temas_usados_este_mes} de ${plan.limite_temas_mes} temas-grupo cubiertos este mes`;
+
+      let botones = "";
+      if (plan.nivel !== "ilimitado") {
+        botones += `<button class="primario" style="margin-top:10px;" id="btn-ilimitado-grupo">Pasar a Ilimitado — $159/mes</button>`;
+      }
+      if (plan.nivel === "gratis") {
+        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Aprendemos — $109/mes (20 temas-grupo, 3 grupos)</button>`;
       }
 
       cont.innerHTML = `
-        <p class="ayuda" style="margin:0 0 10px;">En vez de pagar cada tema por separado, suscríbete y comparte temas ilimitados con tu grupo.</p>
-        <button class="primario" style="margin-top:0;" id="btn-suscribir-grupo">Suscribirme — mensual</button>
+        <p class="ayuda" style="margin:0 0 4px;"><strong>Plan ${NOMBRES_NIVEL_GRUPO[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN/mes` : ""}</p>
+        <p class="ayuda" style="margin:0 0 4px; font-size:0.85rem;">${escapeHtml(usoTexto)}</p>
+        <p class="ayuda" style="margin:0; font-size:0.85rem;">${plan.grupos_actuales} de ${plan.limite_grupos} grupo(s) creados.</p>
+        ${botones}
       `;
-      document.getElementById("btn-suscribir-grupo").addEventListener("click", suscribirGrupo);
+      if (document.getElementById("btn-ilimitado-grupo")) {
+        document.getElementById("btn-ilimitado-grupo").addEventListener("click", () => suscribirGrupo("ilimitado"));
+      }
+      if (document.getElementById("btn-aprendemos-grupo")) {
+        document.getElementById("btn-aprendemos-grupo").addEventListener("click", () => suscribirGrupo("aprendemos"));
+      }
     } catch (err) {
-      cont.innerHTML = `<div class="error">No se pudo cargar tu suscripción.</div>`;
+      cont.innerHTML = `<div class="error">No se pudo cargar tu plan.</div>`;
     }
   }
 
-  async function suscribirGrupo() {
+  async function suscribirGrupo(nivel) {
     const cont = document.getElementById("zona-suscripcion-grupo");
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
       const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tipo: "grupo", plan: "mensual" }),
+        body: JSON.stringify({ tipo: "grupo", nivel }),
       });
       const data = await res.json();
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
