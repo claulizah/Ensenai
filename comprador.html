@@ -267,6 +267,50 @@
     }
   }
 
+  /**
+   * Al volver de Stripe, ANTES se mostraba "✓ ¡Suscripción activada!" solo
+   * porque la URL traía ?suscripcion=exitosa — sin comprobar nada. Cuando el
+   * webhook fallaba, la persona veía el mensaje de éxito y justo abajo
+   * "Plan Gratis": pagó y el producto le decía que sí y que no al mismo
+   * tiempo. Ahora se consulta el plan de verdad antes de afirmar nada.
+   *
+   * Se reintenta unas veces porque el webhook de Stripe puede tardar unos
+   * segundos legítimamente — no es un error, solo hay que esperarlo.
+   */
+  async function confirmarSuscripcion(session) {
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `<div class="cargando">Confirmando tu pago con el banco… esto tarda unos segundos.</div>`;
+
+    for (let intento = 0; intento < 6; intento++) {
+      try {
+        const res = await fetchConReintento(
+          `${API_BASE}/api/temas/mi-plan`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } },
+          null,
+          null
+        );
+        if (res.ok) {
+          const plan = await res.json();
+          if (plan.nivel && plan.nivel !== "gratis") {
+            const nombre = { aprendemos: "Aprendemos", ilimitado: "Ilimitado" }[plan.nivel] || plan.nivel;
+            mostrarDashboard(session, `✓ ¡Listo! Tu plan ${nombre} ya está activo.`);
+            return;
+          }
+        }
+      } catch (err) {
+        /* seguimos intentando */
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+
+    // Se acabaron los intentos y el plan sigue en gratis: hay que decirlo,
+    // no fingir éxito. El cobro pudo haberse hecho igual.
+    mostrarDashboard(
+      session,
+      "⏳ Tu pago se procesó, pero tu plan todavía no se activa. Suele tardar un par de minutos — recarga esta página en un momento. Si sigue igual, escríbenos y lo activamos a mano; no se te va a cobrar dos veces."
+    );
+  }
+
   async function init() {
     const { data } = await supabaseClient.auth.getSession();
     document.getElementById("btnSalir").style.display = data.session ? "inline-block" : "none";
@@ -277,7 +321,7 @@
     }
 
     if (params.get("suscripcion") === "exitosa") {
-      mostrarDashboard(data.session, "✓ ¡Suscripción activada! Ya puedes generar temas ilimitados.");
+      await confirmarSuscripcion(data.session);
       return;
     }
 
