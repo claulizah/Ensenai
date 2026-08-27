@@ -68,7 +68,21 @@
   .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
   .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
   .opcion-btn:disabled { cursor: default; }
-  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: var(--bosque); background: var(--hielo); border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: #4A6A85; background: #F4F8FC; border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback.bien { color: var(--bosque); background: #E7FBF3; }
+  .trivia-feedback.mal { color: #B94A2E; background: #FFF0EC; }
+  .etiqueta-op {
+    float: right; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+    background: rgba(0,0,0,0.07);
+  }
+  .opcion-btn.correcta .etiqueta-op { background: var(--menta); color: #fff; }
+  .opcion-btn.incorrecta .etiqueta-op { background: #E4796B; color: #fff; }
+  .respuesta-abierta {
+    width: 100%; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 0.94rem; resize: vertical;
+  }
+  .respuesta-abierta:disabled { background: #F7FAFD; color: #4A6A85; }
   #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
   /* ── Pestañas del material ── */
   .pestanas { display: flex; gap: 4px; background: var(--hielo); border-radius: 999px; padding: 4px; margin: 14px 0 20px; }
@@ -99,6 +113,10 @@
   .caja-ojo p, .caja-truco p { margin: 0; font-size: 0.93rem; line-height: 1.55; }
   .bloque-est.plegable { border-left-color: var(--cielo); }
   .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
+
+  .diagrama-caja { border: 2px solid var(--linea); border-radius: 16px; padding: 16px; margin-bottom: 18px; background: #fff; }
+  .diagrama-scroll { overflow-x: auto; }
+  .diagrama-scroll svg { min-width: 460px; display: block; }
 
   /* ── Ejercicios ── */
   .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
@@ -157,6 +175,23 @@
     const d = document.createElement("div");
     d.textContent = str || "";
     return d.innerHTML;
+  }
+
+  /**
+   * El modelo escribe en markdown aunque se le pida texto plano — sale
+   * "**1. Género Narrativo**" con los asteriscos a la vista. Esto convierte
+   * lo mínimo (negritas, cursivas, código y saltos) a HTML de verdad.
+   * Siempre escapa primero: las únicas etiquetas que llegan al DOM son las
+   * que se generan aquí.
+   */
+  function formatearTexto(str) {
+    let t = escapeHtml(str || "");
+    t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[\s([{])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+    t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return t.replace(/\n/g, "<br>");
   }
 
   function nombreGuardado(grupoSlug) {
@@ -272,44 +307,330 @@
     return (s || "").trim().toLowerCase();
   }
 
+  /**
+   * Antes, al revisar, la opción correcta se pintaba de verde — pero si tú
+   * también la habías elegido, se veía idéntica: no había forma de saber
+   * cuál habías escogido tú. Y si fallabas, no se decía con palabras cuál
+   * era la buena. Ahora cada opción se etiqueta ("Tu respuesta" / "Correcta")
+   * y debajo de cada pregunta sale una línea que explica qué pasó.
+   */
   function revisarTrivia() {
     let total = 0;
     let correctas = 0;
+
     document.querySelectorAll(".trivia-item").forEach((item) => {
       item.classList.add("revisado");
       const correcta = item.dataset.correcta || "";
       const opciones = item.querySelectorAll(".opcion-btn");
       const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
       if (opciones.length) {
         total++;
         const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
         opciones.forEach((btn) => {
           btn.disabled = true;
-          if (normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta)) {
-            btn.classList.add("correcta");
-          } else if (btn === seleccionado) {
-            btn.classList.add("incorrecta");
-          }
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
         });
-        if (seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta)) {
-          correctas++;
-        } else if (!seleccionado) {
-          feedback.style.display = "block";
-          feedback.textContent = "No elegiste una respuesta.";
-        }
-      } else if (correcta) {
+
         feedback.style.display = "block";
-        feedback.innerHTML = `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+      } else {
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") +
+          `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
       }
     });
 
     const resumen = document.getElementById("trivia-resumen");
     if (resumen && total > 0) {
       resumen.style.display = "block";
-      resumen.textContent = `Obtuviste ${correctas} de ${total} correctas.`;
+      const pct = correctas / total;
+      const mensaje =
+        pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver a intentar.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
     }
+
     const btnRevisar = document.getElementById("btn-revisar-trivia");
-    if (btnRevisar) btnRevisar.style.display = "none";
+    if (btnRevisar) {
+      // Clon para soltar el listener anterior (si no, "Intentar de nuevo"
+      // volvería a ejecutar la revisión también).
+      const nuevo = btnRevisar.cloneNode(false);
+      nuevo.textContent = "Intentar de nuevo";
+      btnRevisar.replaceWith(nuevo);
+      nuevo.addEventListener("click", () => mostrarTema(temaAbiertoIdx));
+    }
+  }
+
+  // ── Diagramas dibujados (SVG) ───────────────────────────────────────────
+  // El generador ya no entrega el esquema como arte ASCII con guiones: manda
+  // datos estructurados (ver `diagrama` en agents/generateTema.js) y aquí se
+  // dibujan como gráficos de verdad. Todo es SVG inline, sin librerías: se
+  // ve nítido en cualquier pantalla, se puede imprimir, y no agrega peso.
+  const DIAG = {
+    ancho: 600,
+    colores: ["#1E3A8A", "#34D399", "#F97066", "#7C6FE0", "#F5A524", "#60A5FA"],
+  };
+
+  /** Corta un texto en varias líneas de ~`max` caracteres, sin partir palabras. */
+  function partirLineas(texto, max) {
+    const palabras = String(texto || "").split(/\s+/).filter(Boolean);
+    const lineas = [];
+    let actual = "";
+    for (const p of palabras) {
+      if ((actual + " " + p).trim().length > max && actual) {
+        lineas.push(actual);
+        actual = p;
+      } else {
+        actual = (actual + " " + p).trim();
+      }
+    }
+    if (actual) lineas.push(actual);
+    return lineas;
+  }
+
+  function svgTexto(texto, x, y, opts = {}) {
+    const { max = 22, tam = 12, color = "#1F2937", peso = "600", alto = 15, ancla = "middle" } = opts;
+    const lineas = partirLineas(texto, max);
+    const inicio = y - ((lineas.length - 1) * alto) / 2;
+    return lineas
+      .map(
+        (l, i) =>
+          `<text x="${x}" y="${inicio + i * alto}" text-anchor="${ancla}" font-family="Nunito, sans-serif" font-size="${tam}" font-weight="${peso}" fill="${color}" dominant-baseline="middle">${escapeHtml(l)}</text>`
+      )
+      .join("");
+  }
+
+  function dibujarMapaMental(d) {
+    const ramas = (d.ramas || []).slice(0, 5);
+    if (!ramas.length) return "";
+    const filaAlto = 74;
+    const alto = 90 + ramas.length * filaAlto;
+    const cx = 118;
+    const cyCentro = alto / 2;
+
+    let s = `<rect x="20" y="${cyCentro - 34}" width="196" height="68" rx="16" fill="#1E3A8A"/>`;
+    s += svgTexto(d.centro || "", 118, cyCentro, { max: 18, tam: 14, color: "#fff", peso: "700" });
+
+    ramas.forEach((r, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const y = 60 + i * filaAlto + 26;
+      // Curva del centro a la rama
+      s += `<path d="M216 ${cyCentro} C 268 ${cyCentro}, 268 ${y}, 300 ${y}" stroke="${color}" stroke-width="2.5" fill="none"/>`;
+      s += `<rect x="300" y="${y - 22}" width="180" height="44" rx="12" fill="${color}"/>`;
+      s += svgTexto(r.titulo || "", 390, y, { max: 20, tam: 12, color: "#fff", peso: "700" });
+
+      (r.hijos || []).slice(0, 3).forEach((h, j) => {
+        const hy = y - 14 + j * 17;
+        s += `<circle cx="496" cy="${hy}" r="3" fill="${color}"/>`;
+        s += `<text x="506" y="${hy}" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85" dominant-baseline="middle">${escapeHtml(String(h).slice(0, 26))}</text>`;
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarLineaTiempo(d) {
+    const hitos = (d.hitos || []).slice(0, 7);
+    if (!hitos.length) return "";
+    const filaAlto = 78;
+    const alto = 40 + hitos.length * filaAlto;
+    const x = 92;
+
+    let s = `<line x1="${x}" y1="30" x2="${x}" y2="${alto - 30}" stroke="#DCEEFC" stroke-width="4" stroke-linecap="round"/>`;
+    hitos.forEach((h, i) => {
+      const color = DIAG.colores[i % DIAG.colores.length];
+      const y = 40 + i * filaAlto + 20;
+      s += `<circle cx="${x}" cy="${y}" r="11" fill="${color}"/>`;
+      s += `<text x="${x - 24}" y="${y}" text-anchor="end" font-family="Grandstander, sans-serif" font-size="13" font-weight="700" fill="${color}" dominant-baseline="middle">${escapeHtml(String(h.fecha || "").slice(0, 12))}</text>`;
+      s += svgTexto(h.titulo || "", 120, y - (h.detalle ? 10 : 0), { max: 44, tam: 12.5, color: "#1F2937", peso: "700", ancla: "start", alto: 15 });
+      if (h.detalle) {
+        s += svgTexto(h.detalle, 120, y + 14, { max: 52, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
+      }
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarComparativo(d) {
+    const cols = (d.columnas || []).slice(0, 3);
+    const filas = (d.filas || []).slice(0, 6);
+    if (!cols.length || !filas.length) return "";
+
+    const anchoCriterio = 150;
+    const anchoCol = (600 - anchoCriterio - 20) / cols.length;
+    const filaAlto = 54;
+    const alto = 54 + filas.length * filaAlto + 10;
+
+    let s = "";
+    // Encabezados
+    cols.forEach((c, i) => {
+      const cx = anchoCriterio + 10 + i * anchoCol + anchoCol / 2;
+      const color = DIAG.colores[i % DIAG.colores.length];
+      s += `<rect x="${anchoCriterio + 10 + i * anchoCol + 3}" y="8" width="${anchoCol - 6}" height="36" rx="10" fill="${color}"/>`;
+      s += svgTexto(c, cx, 26, { max: 18, tam: 12, color: "#fff", peso: "700", alto: 13 });
+    });
+
+    filas.forEach((f, i) => {
+      const y = 54 + i * filaAlto;
+      if (i % 2 === 0) s += `<rect x="6" y="${y}" width="588" height="${filaAlto - 4}" rx="8" fill="#F7FAFD"/>`;
+      s += svgTexto(f.criterio || "", 16, y + (filaAlto - 4) / 2, { max: 24, tam: 11.5, color: "#1E3A8A", peso: "700", ancla: "start", alto: 14 });
+      (f.valores || []).slice(0, cols.length).forEach((v, j) => {
+        const cx = anchoCriterio + 10 + j * anchoCol + anchoCol / 2;
+        s += svgTexto(v, cx, y + (filaAlto - 4) / 2, { max: 26, tam: 11, color: "#2E4A63", peso: "400", alto: 13 });
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarProceso(d) {
+    const pasos = (d.pasos || []).slice(0, 6);
+    if (!pasos.length) return "";
+    const filaAlto = 76;
+    const alto = 20 + pasos.length * filaAlto;
+
+    let s = "";
+    pasos.forEach((p, i) => {
+      const color = DIAG.colores[i % DIAG.colores.length];
+      const y = 16 + i * filaAlto;
+      s += `<rect x="8" y="${y}" width="584" height="60" rx="14" fill="#fff" stroke="${color}" stroke-width="2"/>`;
+      s += `<circle cx="44" cy="${y + 30}" r="17" fill="${color}"/>`;
+      s += `<text x="44" y="${y + 30}" text-anchor="middle" font-family="Grandstander, sans-serif" font-size="15" font-weight="700" fill="#fff" dominant-baseline="middle">${i + 1}</text>`;
+      s += svgTexto(p.titulo || "", 76, y + (p.detalle ? 21 : 30), { max: 52, tam: 12.5, peso: "700", ancla: "start", alto: 15 });
+      if (p.detalle) s += svgTexto(p.detalle, 76, y + 42, { max: 62, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
+      // Flecha al siguiente
+      if (i < pasos.length - 1) {
+        s += `<path d="M300 ${y + 60} l0 10 m-5 -5 l5 5 l5 -5" stroke="#B9CFE4" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarCiclo(d) {
+    const etapas = (d.etapas || []).slice(0, 6);
+    if (etapas.length < 2) return "";
+    const size = 420;
+    const cx = 300, cy = size / 2, r = 130;
+
+    let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#DCEEFC" stroke-width="3" stroke-dasharray="7 7"/>`;
+    etapas.forEach((e, i) => {
+      const ang = (i / etapas.length) * 2 * Math.PI - Math.PI / 2;
+      const x = cx + r * Math.cos(ang);
+      const y = cy + r * Math.sin(ang);
+      const color = DIAG.colores[i % DIAG.colores.length];
+      s += `<circle cx="${x}" cy="${y}" r="46" fill="${color}"/>`;
+      s += svgTexto(e.titulo || "", x, y, { max: 12, tam: 10.5, color: "#fff", peso: "700", alto: 12 });
+      // Flecha hacia la siguiente etapa
+      const angF = ((i + 0.5) / etapas.length) * 2 * Math.PI - Math.PI / 2;
+      const fx = cx + (r + 2) * Math.cos(angF);
+      const fy = cy + (r + 2) * Math.sin(angF);
+      s += `<circle cx="${fx}" cy="${fy}" r="7" fill="#B9CFE4"/>`;
+      s += `<text x="${fx}" y="${fy}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" dominant-baseline="middle">›</text>`;
+    });
+    return `<svg viewBox="0 0 600 ${size}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarJerarquia(d) {
+    const niveles = (d.niveles || []).slice(0, 4);
+    if (!niveles.length) return "";
+    const anchoCaja = Math.min(170, (600 - 40) / niveles.length - 12);
+    const paso = (600 - 40) / niveles.length;
+    let maxHijos = 0;
+    niveles.forEach((n) => (maxHijos = Math.max(maxHijos, (n.hijos || []).length)));
+    const alto = 150 + maxHijos * 26;
+
+    let s = `<rect x="${300 - 110}" y="14" width="220" height="52" rx="14" fill="#1E3A8A"/>`;
+    s += svgTexto(d.raiz || "", 300, 40, { max: 22, tam: 13.5, color: "#fff", peso: "700" });
+
+    niveles.forEach((n, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const cx = 20 + i * paso + paso / 2;
+      s += `<path d="M300 66 C 300 92, ${cx} 92, ${cx} 110" stroke="${color}" stroke-width="2.5" fill="none"/>`;
+      s += `<rect x="${cx - anchoCaja / 2}" y="110" width="${anchoCaja}" height="42" rx="11" fill="${color}"/>`;
+      s += svgTexto(n.titulo || "", cx, 131, { max: 16, tam: 11, color: "#fff", peso: "700", alto: 12 });
+      (n.hijos || []).slice(0, 4).forEach((h, j) => {
+        s += `<text x="${cx}" y="${168 + j * 22}" text-anchor="middle" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85">${escapeHtml(String(h).slice(0, 22))}</text>`;
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarPartes(d) {
+    const partes = (d.partes || []).slice(0, 6);
+    if (!partes.length) return "";
+    const filaAlto = 50;
+    const alto = 60 + partes.length * filaAlto;
+
+    let s = `<rect x="8" y="8" width="584" height="42" rx="12" fill="#1E3A8A"/>`;
+    s += svgTexto(d.todo || "", 300, 29, { max: 40, tam: 13.5, color: "#fff", peso: "700" });
+
+    partes.forEach((p, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const y = 62 + i * filaAlto;
+      s += `<rect x="8" y="${y}" width="584" height="${filaAlto - 8}" rx="11" fill="#fff" stroke="#DCEEFC" stroke-width="1.5"/>`;
+      s += `<rect x="8" y="${y}" width="6" height="${filaAlto - 8}" rx="3" fill="${color}"/>`;
+      s += svgTexto(p.nombre || "", 24, y + (filaAlto - 8) / 2, { max: 20, tam: 12, color: color, peso: "700", ancla: "start", alto: 13 });
+      s += svgTexto(p.funcion || "", 190, y + (filaAlto - 8) / 2, { max: 56, tam: 10.5, color: "#4A6A85", peso: "400", ancla: "start", alto: 13 });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  /**
+   * Devuelve el HTML del diagrama, o "" si no hay uno válido.
+   * Cada tipo de diagrama tiene su propio dibujante; si el generador manda
+   * un tipo que no conocemos, simplemente no se dibuja nada.
+   */
+  function dibujarDiagrama(diagrama) {
+    if (!diagrama || !diagrama.tipo) return "";
+    const d = diagrama.datos || {};
+    const dibujantes = {
+      mapa_mental: dibujarMapaMental,
+      linea_tiempo: dibujarLineaTiempo,
+      comparativo: dibujarComparativo,
+      proceso: dibujarProceso,
+      ciclo: dibujarCiclo,
+      jerarquia: dibujarJerarquia,
+      partes: dibujarPartes,
+    };
+    const fn = dibujantes[diagrama.tipo];
+    if (!fn) return "";
+
+    let svg = "";
+    try {
+      svg = fn(d);
+    } catch (err) {
+      return ""; // un diagrama mal formado nunca debe tumbar la vista del tema
+    }
+    if (!svg) return "";
+
+    return `
+      <div class="diagrama-caja">
+        ${diagrama.titulo ? `<h3 class="bloque-titulo" style="margin-bottom:10px;">${escapeHtml(diagrama.titulo)}</h3>` : ""}
+        <div class="diagrama-scroll">${svg}</div>
+      </div>`;
   }
 
   /**
@@ -337,7 +658,10 @@
     return t.length > 110 ? t.slice(0, 110) + "…" : t;
   }
 
+  let temaAbiertoIdx = 0; // para poder re-renderizar el mismo tema al "Intentar de nuevo"
+
   function mostrarTema(idx) {
+    temaAbiertoIdx = idx;
     const tema = temasActuales[idx];
     const c = tema.contenido || {};
     const cont = document.getElementById("contenido");
@@ -348,8 +672,8 @@
             (a) => `
         <div class="actividad-box">
           <span class="inteligencia">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)}</span>
-          <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(a.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(a.instrucciones || "")}</div>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(a.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(a.instrucciones || "")}</div>
         </div>
       `
           )
@@ -357,8 +681,8 @@
       : c.actividad
       ? `
         <div class="actividad-box">
-          <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(c.actividad.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(c.actividad.instrucciones || "")}</div>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(c.actividad.instrucciones || "")}</div>
         </div>
       `
       : "";
@@ -367,11 +691,13 @@
       .map(
         (p, i) => `
       <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
-        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${escapeHtml(p.pregunta || "")}</div>
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
         ${
           p.opciones?.length
-            ? `<div class="opciones">${p.opciones.map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join("")}</div>`
-            : ""
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
         }
         <div class="trivia-feedback" style="display:none;"></div>
       </div>
@@ -384,7 +710,7 @@
         (m) => `
       <div class="material-extra-box">
         <div style="font-weight:700; text-transform:capitalize; margin-bottom:4px;">${escapeHtml(m.tipo || "")}</div>
-        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line;">${escapeHtml(m.contenido || "")}</div>
+        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line;">${formatearTexto(m.contenido || "")}</div>
       </div>
     `
       )
@@ -411,34 +737,35 @@
     const ejercicios = c.ejercicios || [];
 
     const estudiarHtml = `
-      ${res.que_es ? `<div class="bloque-est destacado"><p>${escapeHtml(res.que_es)}</p></div>` : ""}
+      ${res.que_es ? `<div class="bloque-est destacado"><p>${formatearTexto(res.que_es)}</p></div>` : ""}
+      ${dibujarDiagrama(c.diagrama)}
       ${res.secciones
         .map(
           (s) => `
         <div class="bloque-est">
-          ${s.titulo ? `<h3 class="bloque-titulo">${escapeHtml(s.titulo)}</h3>` : ""}
-          <p>${escapeHtml(s.texto || "")}</p>
+          ${s.titulo ? `<h3 class="bloque-titulo">${formatearTexto(s.titulo)}</h3>` : ""}
+          <p>${formatearTexto(s.texto || "")}</p>
         </div>`
         )
         .join("")}
       ${
         res.pasos.length
           ? `<div class="bloque-est"><h3 class="bloque-titulo">🧭 Paso a paso</h3>
-             <ol class="lista-pasos">${res.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol></div>`
+             <ol class="lista-pasos">${res.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol></div>`
           : ""
       }
       ${
         res.ideas_clave.length
           ? `<div class="bloque-est"><h3 class="bloque-titulo">⭐ Lo que no se te puede olvidar</h3>
-             <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${escapeHtml(k)}</li>`).join("")}</ul></div>`
+             <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${formatearTexto(k)}</li>`).join("")}</ul></div>`
           : ""
       }
-      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${escapeHtml(res.ojo_aqui)}</p></div>` : ""}
-      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${escapeHtml(res.truco)}</p></div>` : ""}
+      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${formatearTexto(res.ojo_aqui)}</p></div>` : ""}
+      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${formatearTexto(res.truco)}</p></div>` : ""}
       ${
         c.esquema_visual
           ? `<details class="bloque-est plegable"><summary>Ver el esquema completo</summary>
-             <p style="white-space:pre-line; margin-top:8px;">${escapeHtml(c.esquema_visual)}</p></details>`
+             <p style="white-space:pre-line; margin-top:8px;">${formatearTexto(c.esquema_visual)}</p></details>`
           : ""
       }
     `;
@@ -449,18 +776,18 @@
       <div class="ejercicio">
         <div class="ejercicio-cabeza">
           <span class="ejercicio-num">${i + 1}</span>
-          <p class="ejercicio-enunciado">${escapeHtml(e.enunciado || "")}</p>
+          <p class="ejercicio-enunciado">${formatearTexto(e.enunciado || "")}</p>
         </div>
         ${
           e.pista
             ? `<button type="button" class="btn-pista" data-ej="${i}">💡 Ver pista</button>
-               <div class="pista-caja" id="pista-${i}" style="display:none;">${escapeHtml(e.pista)}</div>`
+               <div class="pista-caja" id="pista-${i}" style="display:none;">${formatearTexto(e.pista)}</div>`
             : ""
         }
         <button type="button" class="btn-solucion" data-ej="${i}">Ver solución</button>
         <div class="solucion-caja" id="solucion-${i}" style="display:none;">
-          ${(e.pasos || []).length ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol>` : ""}
-          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${escapeHtml(e.respuesta)}</div>` : ""}
+          ${(e.pasos || []).length ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>` : ""}
+          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
         </div>
       </div>`
       )

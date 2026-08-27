@@ -72,6 +72,44 @@
   .barra-perfil-fill { height: 100%; background: var(--aqua); border-radius: 999px; }
   .barra-perfil-fill.dominante { background: var(--profundo); }
   .barra-perfil-pct { flex: 0 0 32px; text-align: right; font-size: 0.78rem; color: #4A6A85; }
+  .avatar-perfil {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    border-radius: 50%; color: #fff; overflow: hidden; vertical-align: middle;
+  }
+  .avatar-perfil img { width: 78%; height: 78%; object-fit: contain; display: block; }
+  .rejilla-avatares { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opcion-avatar {
+    width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--linea); background: #fff;
+    font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s, transform .15s;
+  }
+  .opcion-avatar img { width: 76%; height: 76%; object-fit: contain; }
+  .opcion-avatar:hover { transform: translateY(-2px); border-color: var(--cielo); }
+  .opcion-avatar.activa { border-color: var(--profundo); background: #EAF1FE; }
+
+  /* ── Intro al quiz (onboarding) ── */
+  .rejilla-intro { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .chip-intro {
+    width: 40px; height: 40px; border-radius: 50%; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem;
+  }
+
+  /* ── Tarjeta de perfil activo ── */
+  .perfil-activo {
+    display: flex; align-items: center; gap: 11px;
+    border: 2px solid var(--linea); border-radius: 14px; padding: 11px 14px; margin-top: 8px;
+    background: #fff;
+  }
+  .perfil-activo.neutro { border-style: dashed; }
+  .perfil-activo strong { display: block; font-size: 0.93rem; color: var(--profundo); }
+  .perfil-activo .pa-sub { display: block; font-size: 0.79rem; color: #5b7d99; margin-top: 1px; }
+  .pa-icono {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem;
+    background: var(--linea);
+  }
+  .pa-icono.chico { width: 24px; height: 24px; font-size: 0.75rem; vertical-align: middle; margin-right: 4px; }
+
   /* ── Pestañas del material ── */
   .pestanas { display: flex; gap: 4px; background: var(--hielo); border-radius: 999px; padding: 4px; margin: 14px 0 20px; }
   .pestana {
@@ -101,6 +139,10 @@
   .caja-ojo p, .caja-truco p { margin: 0; font-size: 0.93rem; line-height: 1.55; }
   .bloque-est.plegable { border-left-color: var(--cielo); }
   .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
+
+  .diagrama-caja { border: 2px solid var(--linea); border-radius: 16px; padding: 16px; margin-bottom: 18px; background: #fff; }
+  .diagrama-scroll { overflow-x: auto; }
+  .diagrama-scroll svg { min-width: 460px; display: block; }
 
   /* ── Ejercicios ── */
   .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
@@ -211,7 +253,21 @@
   .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
   .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
   .opcion-btn:disabled { cursor: default; }
-  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: var(--bosque); background: var(--hielo); border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: #4A6A85; background: #F4F8FC; border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback.bien { color: var(--bosque); background: #E7FBF3; }
+  .trivia-feedback.mal { color: #B94A2E; background: #FFF0EC; }
+  .etiqueta-op {
+    float: right; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+    background: rgba(0,0,0,0.07);
+  }
+  .opcion-btn.correcta .etiqueta-op { background: var(--menta); color: #fff; }
+  .opcion-btn.incorrecta .etiqueta-op { background: #E4796B; color: #fff; }
+  .respuesta-abierta {
+    width: 100%; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 0.94rem; resize: vertical;
+  }
+  .respuesta-abierta:disabled { background: #F7FAFD; color: #4A6A85; }
   #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .respuestas-toggle { text-align: center; }
@@ -294,6 +350,25 @@
     return d.innerHTML;
   }
 
+  /**
+   * El modelo escribe en markdown aunque se le pida texto plano — sale
+   * "**1. Género Narrativo**" con los asteriscos a la vista, que se ve roto.
+   * Esto convierte lo mínimo (negritas, cursivas, código y saltos de línea)
+   * a HTML de verdad.
+   *
+   * SIEMPRE escapa primero: las únicas etiquetas que llegan al DOM son las
+   * que se generan aquí, nunca las que pudiera traer el texto.
+   */
+  function formatearTexto(str) {
+    let t = escapeHtml(str || "");
+    t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[\s([{])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+    t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return t.replace(/\n/g, "<br>");
+  }
+
   // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
   // tarda 30-60s en despertar con la primera petición — esa primera
   // petición puede fallar con un "Failed to fetch" genérico. Este helper
@@ -329,6 +404,57 @@
 
     await cargarTipoUsuario();
     mostrarFormulario();
+
+    // `?bienvenida=1` lo pone comprador.html cuando alguien acaba de decir
+    // quién es. En vez de dejarlo frente a un formulario vacío, se le abre
+    // directo el quiz: es lo más "wow" del producto y explica de golpe por
+    // qué el material va a estar personalizado.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("bienvenida") === "1") {
+      mostrarIntroQuiz();
+      // Quitar el parámetro para que la intro no se repita al refrescar.
+      // En try/catch porque replaceState truena en contextos sin origen
+      // (por ejemplo al abrir el archivo directo con file://).
+      try {
+        history.replaceState({}, "", "tema.html");
+      } catch (err) {
+        /* sin consecuencias: solo significa que al refrescar se vuelve a ver */
+      }
+    }
+  }
+
+  /**
+   * Pantalla puente entre "¿quién eres?" y el quiz. No pide nada todavía:
+   * explica en una línea qué va a pasar y cuánto tarda, para que hacer el
+   * quiz se sienta como el primer paso natural y no como un trámite.
+   */
+  function mostrarIntroQuiz() {
+    const esAdulto = versionQuiz() === "adulto";
+    document.getElementById("contenido").innerHTML = `
+      <div class="tarjeta" style="text-align:center;">
+        <p style="color:var(--bosque); font-weight:700; font-size:0.88rem; margin:0 0 6px;">Empecemos por aquí 🎉</p>
+        <h1 style="margin:0 0 10px;">${esAdulto ? "¿Cómo aprendes mejor?" : "¿Cómo aprende mejor?"}</h1>
+        <p class="ayuda" style="margin:0 0 18px;">
+          Son <strong>12 preguntas rápidas</strong>, menos de dos minutos. Con eso sabemos si ${
+            esAdulto ? "te" : "le"
+          } funciona mejor ver, escuchar, moverse o razonar — y todo el material que generes después se adapta a eso.
+        </p>
+        <div class="rejilla-intro">
+          ${["📖", "🔢", "🎨", "♪", "🏃", "👥", "💭", "🌿"]
+            .map((e, i) => `<span class="chip-intro" style="background:${Object.values(COLOR_INTELIGENCIA)[i]};">${e}</span>`)
+            .join("")}
+        </div>
+        <p class="ayuda" style="font-size:0.82rem; margin:14px 0 0;">Es una guía para personalizar el material, no un diagnóstico.</p>
+        <button class="primario" id="btn-empezar-quiz">Contestar el quiz</button>
+        <button class="secundario" style="width:100%;" id="btn-saltar-quiz">Ahora no, quiero generar un tema</button>
+      </div>
+    `;
+    document.getElementById("btn-empezar-quiz").addEventListener("click", () => {
+      mostrarFormulario();
+      cargarPerfiles().then(() => mostrarQuizPerfil());
+      setTimeout(() => document.getElementById("zona-perfiles")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    });
+    document.getElementById("btn-saltar-quiz").addEventListener("click", mostrarFormulario);
   }
 
   function mostrarFormulario() {
@@ -347,6 +473,10 @@
         <p class="ayuda">Escribe cualquier tema y lo adaptamos a tu edad y a tu forma de aprender.</p>
         <label>Perfil a usar</label>
         <select id="perfil-input"><option value="">Balanceado (sin perfil específico)</option></select>
+        <!-- El selector solo era fácil de pasar por alto y generar con el
+             perfil equivocado. Esta tarjeta muestra en grande para quién se
+             está generando y con qué estilo, y se actualiza al cambiarlo. -->
+        <div id="perfil-activo" class="perfil-activo"></div>
         <label>Tema</label>
         <input type="text" id="tema-input" placeholder="Ej. Las fracciones, La Revolución Mexicana, El sistema solar…">
         <label>¿Algo específico que quieras que incluya? (opcional)</label>
@@ -403,8 +533,17 @@
             .map(
               (p) => `
         <div class="historial-item" data-perfil-id="${p.id}">
-          <span class="titulo">🧩 ${escapeHtml(p.nombre)} <span style="font-weight:400; color:#4A6A85;">— ${escapeHtml(ETIQUETAS_INTELIGENCIA[p.inteligencia_dominante?.[0]] || "")}</span></span>
-          <button class="secundario" style="margin:0; padding:6px 10px;" data-borrar="${p.id}">Borrar</button>
+          <span class="titulo">
+            ${htmlAvatar(p, 26)}
+            ${escapeHtml(p.nombre)}
+            <span style="font-weight:400; color:#4A6A85;">— ${escapeHtml(
+              (p.inteligencia_dominante || []).map((t) => COMO_APRENDE[t] || ETIQUETAS_INTELIGENCIA[t] || t).join(" · ")
+            )}</span>
+          </span>
+          <span style="display:flex; gap:6px;">
+            <button class="secundario" style="margin:0; padding:6px 10px;" data-rehacer="${p.id}" title="Volver a hacer el quiz">🔄 Rehacer</button>
+            <button class="secundario" style="margin:0; padding:6px 10px;" data-borrar="${p.id}">Borrar</button>
+          </span>
         </div>
       `
             )
@@ -427,17 +566,65 @@
       cont.querySelectorAll("[data-borrar]").forEach((btn) => {
         btn.addEventListener("click", () => borrarPerfil(btn.dataset.borrar));
       });
+      // "Rehacer" resuelve la fricción de que un perfil solo se pudiera
+      // borrar: si el niño creció, cambió su forma de aprender, o el quiz se
+      // contestó a la ligera la primera vez, antes había que borrarlo — y en
+      // el plan Gratis eso te dejaba en cero perfiles.
+      cont.querySelectorAll("[data-rehacer]").forEach((btn) => {
+        btn.addEventListener("click", () => mostrarQuizPerfil(btn.dataset.rehacer));
+      });
 
       // llena el selector de perfil del formulario de generación
       const select = document.getElementById("perfil-input");
       if (select) {
+        const previo = select.value;
         select.innerHTML =
           `<option value="">Balanceado (sin perfil específico)</option>` +
           perfilesCache.map((p) => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join("");
+        // Si solo hay un perfil, se preselecciona: es lo que la persona
+        // quiere el 99% de las veces y evita generar con "Balanceado" sin
+        // darse cuenta.
+        select.value = perfilesCache.some((p) => p.id === previo)
+          ? previo
+          : perfilesCache.length === 1
+          ? perfilesCache[0].id
+          : previo;
+        select.onchange = pintarPerfilActivo;
+        pintarPerfilActivo();
       }
     } catch (err) {
       cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
+  }
+
+  /**
+   * Tarjeta que deja ver de un golpe para quién se va a generar el material
+   * y con qué estilo. Antes solo estaba el `<select>`, muy fácil de pasar por
+   * alto — y quien tiene varios hijos terminaba generando con el perfil
+   * equivocado sin enterarse.
+   */
+  function pintarPerfilActivo() {
+    const cont = document.getElementById("perfil-activo");
+    if (!cont) return;
+    const id = document.getElementById("perfil-input")?.value;
+    const perfil = perfilesCache.find((p) => p.id === id);
+
+    if (!perfil) {
+      cont.className = "perfil-activo neutro";
+      cont.innerHTML = `<span class="pa-icono">⚖️</span>
+        <div><strong>Perfil balanceado</strong><span class="pa-sub">El material no se adapta a una forma de aprender en particular.</span></div>`;
+      return;
+    }
+
+    const tipos = (perfil.inteligencia_dominante || []).slice(0, 2);
+    cont.className = "perfil-activo";
+    cont.style.borderColor = COLOR_INTELIGENCIA[tipos[0]] || "var(--linea)";
+    cont.innerHTML = `
+      ${htmlAvatar(perfil, 38)}
+      <div>
+        <strong>Generando para ${escapeHtml(perfil.nombre)}</strong>
+        <span class="pa-sub">${tipos.map((t) => escapeHtml(COMO_APRENDE[t] || ETIQUETAS_INTELIGENCIA[t] || t)).join(" · ")}</span>
+      </div>`;
   }
 
   // ── Quiz de perfil de aprendizaje ───────────────────────────────────────
@@ -564,17 +751,81 @@
     }
   }
 
-  async function mostrarQuizPerfil() {
+  // ── Avatares de los perfiles ────────────────────────────────────────────
+  // Se guarda solo el ID (ej. "avatar-03"), nunca la imagen: los archivos
+  // viven en el frontend. Mientras Claudia termina las ilustraciones se usan
+  // estos emojis; cuando estén listas basta con poner los SVG en
+  // assets/avatares/ y cambiar USAR_ILUSTRACIONES a true — sin migración
+  // ni tocar los perfiles ya guardados, porque los IDs son los mismos.
+  const USAR_ILUSTRACIONES = false;
+  const AVATARES = [
+    { id: "avatar-01", emoji: "🦊" }, { id: "avatar-02", emoji: "🐙" },
+    { id: "avatar-03", emoji: "🦉" }, { id: "avatar-04", emoji: "🐢" },
+    { id: "avatar-05", emoji: "🦋" }, { id: "avatar-06", emoji: "🐬" },
+    { id: "avatar-07", emoji: "🦁" }, { id: "avatar-08", emoji: "🐨" },
+    { id: "avatar-09", emoji: "🦜" }, { id: "avatar-10", emoji: "🐝" },
+    { id: "avatar-11", emoji: "🦕" }, { id: "avatar-12", emoji: "🐳" },
+  ];
+
+  /** Devuelve el HTML del avatar de un perfil: ilustración si ya existen, si no el emoji, y si no tiene avatar el ícono de su inteligencia. */
+  function htmlAvatar(perfil, tam = 34) {
+    const av = AVATARES.find((a) => a.id === perfil?.avatar);
+    const tipo = perfil?.inteligencia_dominante?.[0];
+    const fondo = COLOR_INTELIGENCIA[tipo] || "#B9CFE4";
+    const estilo = `width:${tam}px; height:${tam}px; background:${fondo}; font-size:${Math.round(tam * 0.5)}px;`;
+
+    if (av && USAR_ILUSTRACIONES) {
+      return `<span class="avatar-perfil" style="${estilo}"><img src="assets/avatares/${av.id}.svg" alt=""></span>`;
+    }
+    return `<span class="avatar-perfil" style="${estilo}">${av ? av.emoji : ICONO_INTELIGENCIA[tipo] || "🧩"}</span>`;
+  }
+
+  let avatarElegido = null;
+
+  function pintarSelectorAvatar() {
+    const cont = document.getElementById("selector-avatar");
+    if (!cont) return;
+    cont.innerHTML = AVATARES.map(
+      (a) => `
+      <button type="button" class="opcion-avatar${avatarElegido === a.id ? " activa" : ""}" data-avatar="${a.id}">
+        ${USAR_ILUSTRACIONES ? `<img src="assets/avatares/${a.id}.svg" alt="">` : a.emoji}
+      </button>`
+    ).join("");
+    cont.querySelectorAll("[data-avatar]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        // Volver a picar el mismo lo deselecciona.
+        avatarElegido = avatarElegido === btn.dataset.avatar ? null : btn.dataset.avatar;
+        pintarSelectorAvatar();
+      });
+    });
+  }
+
+  // Si viene `perfilIdEditando`, el quiz actualiza ese perfil en vez de
+  // crear uno nuevo (así no choca con el límite de perfiles del plan).
+  let perfilIdEditando = null;
+
+  async function mostrarQuizPerfil(idExistente) {
+    perfilIdEditando = idExistente || null;
+    const existente = perfilesCache.find((p) => p.id === perfilIdEditando);
     const cont = document.getElementById("zona-perfiles");
     cont.innerHTML = `
+      ${
+        existente
+          ? `<div class="aviso" style="margin-bottom:14px;">Vas a rehacer el quiz de <strong>${escapeHtml(existente.nombre)}</strong>. Su perfil se actualiza — no se crea uno nuevo ni se gasta espacio de tu plan.</div>`
+          : ""
+      }
       <label>Nombre de este perfil</label>
-      <input type="text" id="nombre-perfil-input" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
+      <input type="text" id="nombre-perfil-input" value="${existente ? escapeHtml(existente.nombre) : ""}" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
+      <label>Elige un avatar (opcional)</label>
+      <div class="rejilla-avatares" id="selector-avatar"></div>
       <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
     `;
 
     respuestasQuiz = {};
     resultadoQuiz = null;
     ajusteManual = null;
+    avatarElegido = existente?.avatar || null;
+    pintarSelectorAvatar();
 
     const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
     const data = await res.json();
@@ -859,18 +1110,20 @@
     const { nombre, respuestas } = resultadoQuiz;
     const cont = document.getElementById("zona-perfiles");
     try {
+      const editando = Boolean(perfilIdEditando);
       const res = await fetchConReintento(
-        `${API_BASE}/api/aprendizaje/perfiles`,
+        editando ? `${API_BASE}/api/aprendizaje/perfiles/${perfilIdEditando}` : `${API_BASE}/api/aprendizaje/perfiles`,
         {
-          method: "POST",
+          method: editando ? "PUT" : "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-          body: JSON.stringify({ nombre, respuestas, dominante_manual: ajusteManual || undefined }),
+          body: JSON.stringify({ nombre, respuestas, dominante_manual: ajusteManual || undefined, avatar: avatarElegido || undefined }),
         },
         cont,
         "Guardando el perfil…"
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
+      perfilIdEditando = null;
       cargarPerfiles();
     } catch (err) {
       cont.insertAdjacentHTML("beforeend", `<div class="error">${escapeHtml(err.message)}</div>`);
@@ -1159,44 +1412,334 @@
     return (s || "").trim().toLowerCase();
   }
 
+  /**
+   * Antes, al revisar, la opción correcta se pintaba de verde — pero si tú
+   * también la habías elegido, se veía idéntica: no había forma de saber
+   * cuál habías escogido tú. Y si fallabas, tampoco se decía con palabras
+   * cuál era la buena. Ahora cada opción se etiqueta explícitamente
+   * ("Tu respuesta" / "Correcta") y debajo de cada pregunta sale una línea
+   * que dice qué pasó, en vez de dejarlo todo al color.
+   */
   function revisarTrivia() {
     let total = 0;
     let correctas = 0;
+
     document.querySelectorAll(".trivia-item").forEach((item) => {
       item.classList.add("revisado");
       const correcta = item.dataset.correcta || "";
       const opciones = item.querySelectorAll(".opcion-btn");
       const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
       if (opciones.length) {
         total++;
         const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
         opciones.forEach((btn) => {
           btn.disabled = true;
-          if (normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta)) {
-            btn.classList.add("correcta");
-          } else if (btn === seleccionado) {
-            btn.classList.add("incorrecta");
-          }
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+
+          // La etiqueta es lo que quita la ambigüedad del color.
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
         });
-        if (seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta)) {
-          correctas++;
-        } else if (!seleccionado) {
-          feedback.style.display = "block";
-          feedback.textContent = "No elegiste una respuesta.";
-        }
-      } else if (correcta) {
+
         feedback.style.display = "block";
-        feedback.innerHTML = `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+      } else {
+        // Pregunta abierta: no se califica, pero sí se compara con la sugerida.
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") +
+          `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
       }
     });
 
     const resumen = document.getElementById("trivia-resumen");
     if (resumen && total > 0) {
       resumen.style.display = "block";
-      resumen.textContent = `Obtuviste ${correctas} de ${total} correctas.`;
+      const pct = correctas / total;
+      const mensaje =
+        pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver a intentar.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
     }
+
     const btnRevisar = document.getElementById("btn-revisar-trivia");
-    if (btnRevisar) btnRevisar.style.display = "none";
+    if (btnRevisar) {
+      // Se reemplaza el botón por un clon para soltar el listener anterior
+      // (si no, "Intentar de nuevo" volvería a ejecutar la revisión también).
+      const nuevo = btnRevisar.cloneNode(false);
+      nuevo.textContent = "Intentar de nuevo";
+      btnRevisar.replaceWith(nuevo);
+      nuevo.addEventListener("click", () => mostrarTemaGenerado(ultimoContenido, ultimoTemaId, null));
+    }
+  }
+
+  // ── Diagramas dibujados (SVG) ───────────────────────────────────────────
+  // El generador ya no entrega el esquema como arte ASCII con guiones: manda
+  // datos estructurados (ver `diagrama` en agents/generateTema.js) y aquí se
+  // dibujan como gráficos de verdad. Todo es SVG inline, sin librerías: se
+  // ve nítido en cualquier pantalla, se puede imprimir, y no agrega peso.
+  const DIAG = {
+    ancho: 600,
+    colores: ["#1E3A8A", "#34D399", "#F97066", "#7C6FE0", "#F5A524", "#60A5FA"],
+  };
+
+  /** Corta un texto en varias líneas de ~`max` caracteres, sin partir palabras. */
+  function partirLineas(texto, max) {
+    const palabras = String(texto || "").split(/\s+/).filter(Boolean);
+    const lineas = [];
+    let actual = "";
+    for (const p of palabras) {
+      if ((actual + " " + p).trim().length > max && actual) {
+        lineas.push(actual);
+        actual = p;
+      } else {
+        actual = (actual + " " + p).trim();
+      }
+    }
+    if (actual) lineas.push(actual);
+    return lineas;
+  }
+
+  function svgTexto(texto, x, y, opts = {}) {
+    const { max = 22, tam = 12, color = "#1F2937", peso = "600", alto = 15, ancla = "middle" } = opts;
+    const lineas = partirLineas(texto, max);
+    const inicio = y - ((lineas.length - 1) * alto) / 2;
+    return lineas
+      .map(
+        (l, i) =>
+          `<text x="${x}" y="${inicio + i * alto}" text-anchor="${ancla}" font-family="Nunito, sans-serif" font-size="${tam}" font-weight="${peso}" fill="${color}" dominant-baseline="middle">${escapeHtml(l)}</text>`
+      )
+      .join("");
+  }
+
+  function dibujarMapaMental(d) {
+    const ramas = (d.ramas || []).slice(0, 5);
+    if (!ramas.length) return "";
+    const filaAlto = 74;
+    const alto = 90 + ramas.length * filaAlto;
+    const cx = 118;
+    const cyCentro = alto / 2;
+
+    let s = `<rect x="20" y="${cyCentro - 34}" width="196" height="68" rx="16" fill="#1E3A8A"/>`;
+    s += svgTexto(d.centro || "", 118, cyCentro, { max: 18, tam: 14, color: "#fff", peso: "700" });
+
+    ramas.forEach((r, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const y = 60 + i * filaAlto + 26;
+      // Curva del centro a la rama
+      s += `<path d="M216 ${cyCentro} C 268 ${cyCentro}, 268 ${y}, 300 ${y}" stroke="${color}" stroke-width="2.5" fill="none"/>`;
+      s += `<rect x="300" y="${y - 22}" width="180" height="44" rx="12" fill="${color}"/>`;
+      s += svgTexto(r.titulo || "", 390, y, { max: 20, tam: 12, color: "#fff", peso: "700" });
+
+      (r.hijos || []).slice(0, 3).forEach((h, j) => {
+        const hy = y - 14 + j * 17;
+        s += `<circle cx="496" cy="${hy}" r="3" fill="${color}"/>`;
+        s += `<text x="506" y="${hy}" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85" dominant-baseline="middle">${escapeHtml(String(h).slice(0, 26))}</text>`;
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarLineaTiempo(d) {
+    const hitos = (d.hitos || []).slice(0, 7);
+    if (!hitos.length) return "";
+    const filaAlto = 78;
+    const alto = 40 + hitos.length * filaAlto;
+    const x = 92;
+
+    let s = `<line x1="${x}" y1="30" x2="${x}" y2="${alto - 30}" stroke="#DCEEFC" stroke-width="4" stroke-linecap="round"/>`;
+    hitos.forEach((h, i) => {
+      const color = DIAG.colores[i % DIAG.colores.length];
+      const y = 40 + i * filaAlto + 20;
+      s += `<circle cx="${x}" cy="${y}" r="11" fill="${color}"/>`;
+      s += `<text x="${x - 24}" y="${y}" text-anchor="end" font-family="Grandstander, sans-serif" font-size="13" font-weight="700" fill="${color}" dominant-baseline="middle">${escapeHtml(String(h.fecha || "").slice(0, 12))}</text>`;
+      s += svgTexto(h.titulo || "", 120, y - (h.detalle ? 10 : 0), { max: 44, tam: 12.5, color: "#1F2937", peso: "700", ancla: "start", alto: 15 });
+      if (h.detalle) {
+        s += svgTexto(h.detalle, 120, y + 14, { max: 52, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
+      }
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarComparativo(d) {
+    const cols = (d.columnas || []).slice(0, 3);
+    const filas = (d.filas || []).slice(0, 6);
+    if (!cols.length || !filas.length) return "";
+
+    const anchoCriterio = 150;
+    const anchoCol = (600 - anchoCriterio - 20) / cols.length;
+    const filaAlto = 54;
+    const alto = 54 + filas.length * filaAlto + 10;
+
+    let s = "";
+    // Encabezados
+    cols.forEach((c, i) => {
+      const cx = anchoCriterio + 10 + i * anchoCol + anchoCol / 2;
+      const color = DIAG.colores[i % DIAG.colores.length];
+      s += `<rect x="${anchoCriterio + 10 + i * anchoCol + 3}" y="8" width="${anchoCol - 6}" height="36" rx="10" fill="${color}"/>`;
+      s += svgTexto(c, cx, 26, { max: 18, tam: 12, color: "#fff", peso: "700", alto: 13 });
+    });
+
+    filas.forEach((f, i) => {
+      const y = 54 + i * filaAlto;
+      if (i % 2 === 0) s += `<rect x="6" y="${y}" width="588" height="${filaAlto - 4}" rx="8" fill="#F7FAFD"/>`;
+      s += svgTexto(f.criterio || "", 16, y + (filaAlto - 4) / 2, { max: 24, tam: 11.5, color: "#1E3A8A", peso: "700", ancla: "start", alto: 14 });
+      (f.valores || []).slice(0, cols.length).forEach((v, j) => {
+        const cx = anchoCriterio + 10 + j * anchoCol + anchoCol / 2;
+        s += svgTexto(v, cx, y + (filaAlto - 4) / 2, { max: 26, tam: 11, color: "#2E4A63", peso: "400", alto: 13 });
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarProceso(d) {
+    const pasos = (d.pasos || []).slice(0, 6);
+    if (!pasos.length) return "";
+    const filaAlto = 76;
+    const alto = 20 + pasos.length * filaAlto;
+
+    let s = "";
+    pasos.forEach((p, i) => {
+      const color = DIAG.colores[i % DIAG.colores.length];
+      const y = 16 + i * filaAlto;
+      s += `<rect x="8" y="${y}" width="584" height="60" rx="14" fill="#fff" stroke="${color}" stroke-width="2"/>`;
+      s += `<circle cx="44" cy="${y + 30}" r="17" fill="${color}"/>`;
+      s += `<text x="44" y="${y + 30}" text-anchor="middle" font-family="Grandstander, sans-serif" font-size="15" font-weight="700" fill="#fff" dominant-baseline="middle">${i + 1}</text>`;
+      s += svgTexto(p.titulo || "", 76, y + (p.detalle ? 21 : 30), { max: 52, tam: 12.5, peso: "700", ancla: "start", alto: 15 });
+      if (p.detalle) s += svgTexto(p.detalle, 76, y + 42, { max: 62, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
+      // Flecha al siguiente
+      if (i < pasos.length - 1) {
+        s += `<path d="M300 ${y + 60} l0 10 m-5 -5 l5 5 l5 -5" stroke="#B9CFE4" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarCiclo(d) {
+    const etapas = (d.etapas || []).slice(0, 6);
+    if (etapas.length < 2) return "";
+    const size = 420;
+    const cx = 300, cy = size / 2, r = 130;
+
+    let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#DCEEFC" stroke-width="3" stroke-dasharray="7 7"/>`;
+    etapas.forEach((e, i) => {
+      const ang = (i / etapas.length) * 2 * Math.PI - Math.PI / 2;
+      const x = cx + r * Math.cos(ang);
+      const y = cy + r * Math.sin(ang);
+      const color = DIAG.colores[i % DIAG.colores.length];
+      s += `<circle cx="${x}" cy="${y}" r="46" fill="${color}"/>`;
+      s += svgTexto(e.titulo || "", x, y, { max: 12, tam: 10.5, color: "#fff", peso: "700", alto: 12 });
+      // Flecha hacia la siguiente etapa
+      const angF = ((i + 0.5) / etapas.length) * 2 * Math.PI - Math.PI / 2;
+      const fx = cx + (r + 2) * Math.cos(angF);
+      const fy = cy + (r + 2) * Math.sin(angF);
+      s += `<circle cx="${fx}" cy="${fy}" r="7" fill="#B9CFE4"/>`;
+      s += `<text x="${fx}" y="${fy}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" dominant-baseline="middle">›</text>`;
+    });
+    return `<svg viewBox="0 0 600 ${size}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarJerarquia(d) {
+    const niveles = (d.niveles || []).slice(0, 4);
+    if (!niveles.length) return "";
+    const anchoCaja = Math.min(170, (600 - 40) / niveles.length - 12);
+    const paso = (600 - 40) / niveles.length;
+    let maxHijos = 0;
+    niveles.forEach((n) => (maxHijos = Math.max(maxHijos, (n.hijos || []).length)));
+    const alto = 150 + maxHijos * 26;
+
+    let s = `<rect x="${300 - 110}" y="14" width="220" height="52" rx="14" fill="#1E3A8A"/>`;
+    s += svgTexto(d.raiz || "", 300, 40, { max: 22, tam: 13.5, color: "#fff", peso: "700" });
+
+    niveles.forEach((n, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const cx = 20 + i * paso + paso / 2;
+      s += `<path d="M300 66 C 300 92, ${cx} 92, ${cx} 110" stroke="${color}" stroke-width="2.5" fill="none"/>`;
+      s += `<rect x="${cx - anchoCaja / 2}" y="110" width="${anchoCaja}" height="42" rx="11" fill="${color}"/>`;
+      s += svgTexto(n.titulo || "", cx, 131, { max: 16, tam: 11, color: "#fff", peso: "700", alto: 12 });
+      (n.hijos || []).slice(0, 4).forEach((h, j) => {
+        s += `<text x="${cx}" y="${168 + j * 22}" text-anchor="middle" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85">${escapeHtml(String(h).slice(0, 22))}</text>`;
+      });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  function dibujarPartes(d) {
+    const partes = (d.partes || []).slice(0, 6);
+    if (!partes.length) return "";
+    const filaAlto = 50;
+    const alto = 60 + partes.length * filaAlto;
+
+    let s = `<rect x="8" y="8" width="584" height="42" rx="12" fill="#1E3A8A"/>`;
+    s += svgTexto(d.todo || "", 300, 29, { max: 40, tam: 13.5, color: "#fff", peso: "700" });
+
+    partes.forEach((p, i) => {
+      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
+      const y = 62 + i * filaAlto;
+      s += `<rect x="8" y="${y}" width="584" height="${filaAlto - 8}" rx="11" fill="#fff" stroke="#DCEEFC" stroke-width="1.5"/>`;
+      s += `<rect x="8" y="${y}" width="6" height="${filaAlto - 8}" rx="3" fill="${color}"/>`;
+      s += svgTexto(p.nombre || "", 24, y + (filaAlto - 8) / 2, { max: 20, tam: 12, color: color, peso: "700", ancla: "start", alto: 13 });
+      s += svgTexto(p.funcion || "", 190, y + (filaAlto - 8) / 2, { max: 56, tam: 10.5, color: "#4A6A85", peso: "400", ancla: "start", alto: 13 });
+    });
+    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
+  }
+
+  /**
+   * Devuelve el HTML del diagrama, o "" si no hay uno válido.
+   * Cada tipo de diagrama tiene su propio dibujante; si el generador manda
+   * un tipo que no conocemos, simplemente no se dibuja nada.
+   */
+  function dibujarDiagrama(diagrama) {
+    if (!diagrama || !diagrama.tipo) return "";
+    const d = diagrama.datos || {};
+    const dibujantes = {
+      mapa_mental: dibujarMapaMental,
+      linea_tiempo: dibujarLineaTiempo,
+      comparativo: dibujarComparativo,
+      proceso: dibujarProceso,
+      ciclo: dibujarCiclo,
+      jerarquia: dibujarJerarquia,
+      partes: dibujarPartes,
+    };
+    const fn = dibujantes[diagrama.tipo];
+    if (!fn) return "";
+
+    let svg = "";
+    try {
+      svg = fn(d);
+    } catch (err) {
+      return ""; // un diagrama mal formado nunca debe tumbar la vista del tema
+    }
+    if (!svg) return "";
+
+    return `
+      <div class="diagrama-caja">
+        ${diagrama.titulo ? `<h3 class="bloque-titulo" style="margin-bottom:10px;">${escapeHtml(diagrama.titulo)}</h3>` : ""}
+        <div class="diagrama-scroll">${svg}</div>
+      </div>`;
   }
 
   /**
@@ -1230,8 +1773,8 @@
             (a) => `
         <div class="actividad-box">
           <span class="inteligencia">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)}</span>
-          <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(a.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(a.instrucciones || "")}</div>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(a.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(a.instrucciones || "")}</div>
         </div>
       `
           )
@@ -1239,21 +1782,27 @@
       : c.actividad
       ? `
         <div class="actividad-box">
-          <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(c.actividad.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(c.actividad.instrucciones || "")}</div>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(c.actividad.instrucciones || "")}</div>
         </div>
       `
       : "";
 
+    // Las preguntas ABIERTAS (sin opciones) antes no tenían dónde contestar:
+    // solo aparecía la respuesta sugerida al revisar. Ahora llevan su propio
+    // campo de texto, para que la persona intente responder antes de ver la
+    // sugerencia — que es donde está el valor del repaso.
     const triviaHtml = (c.trivia || [])
       .map(
         (p, i) => `
       <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
-        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${escapeHtml(p.pregunta || "")}</div>
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
         ${
           p.opciones?.length
-            ? `<div class="opciones">${p.opciones.map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join("")}</div>`
-            : ""
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
         }
         <div class="trivia-feedback" style="display:none;"></div>
       </div>
@@ -1266,7 +1815,7 @@
         (m) => `
       <div class="material-extra-box">
         <div style="font-weight:700; text-transform:capitalize; margin-bottom:4px;">${escapeHtml(m.tipo || "")}</div>
-        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line;">${escapeHtml(m.contenido || "")}</div>
+        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line;">${formatearTexto(m.contenido || "")}</div>
       </div>
     `
       )
@@ -1294,13 +1843,14 @@
 
     // ── Pestaña 1: ESTUDIAR ──────────────────────────────────────────────
     const estudiarHtml = `
-      ${res.que_es ? `<div class="bloque-est destacado"><p>${escapeHtml(res.que_es)}</p></div>` : ""}
+      ${res.que_es ? `<div class="bloque-est destacado"><p>${formatearTexto(res.que_es)}</p></div>` : ""}
+      ${dibujarDiagrama(c.diagrama)}
       ${res.secciones
         .map(
           (s) => `
         <div class="bloque-est">
-          ${s.titulo ? `<h3 class="bloque-titulo">${escapeHtml(s.titulo)}</h3>` : ""}
-          <p>${escapeHtml(s.texto || "")}</p>
+          ${s.titulo ? `<h3 class="bloque-titulo">${formatearTexto(s.titulo)}</h3>` : ""}
+          <p>${formatearTexto(s.texto || "")}</p>
         </div>`
         )
         .join("")}
@@ -1308,7 +1858,7 @@
         res.pasos.length
           ? `<div class="bloque-est">
               <h3 class="bloque-titulo">🧭 Paso a paso</h3>
-              <ol class="lista-pasos">${res.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol>
+              <ol class="lista-pasos">${res.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>
              </div>`
           : ""
       }
@@ -1316,17 +1866,17 @@
         res.ideas_clave.length
           ? `<div class="bloque-est">
               <h3 class="bloque-titulo">⭐ Lo que no se te puede olvidar</h3>
-              <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${escapeHtml(k)}</li>`).join("")}</ul>
+              <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${formatearTexto(k)}</li>`).join("")}</ul>
              </div>`
           : ""
       }
-      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${escapeHtml(res.ojo_aqui)}</p></div>` : ""}
-      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${escapeHtml(res.truco)}</p></div>` : ""}
+      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${formatearTexto(res.ojo_aqui)}</p></div>` : ""}
+      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${formatearTexto(res.truco)}</p></div>` : ""}
       ${
         c.esquema_visual
           ? `<details class="bloque-est plegable">
               <summary>Ver el esquema completo</summary>
-              <p style="white-space:pre-line; margin-top:8px;">${escapeHtml(c.esquema_visual)}</p>
+              <p style="white-space:pre-line; margin-top:8px;">${formatearTexto(c.esquema_visual)}</p>
              </details>`
           : ""
       }
@@ -1339,22 +1889,22 @@
       <div class="ejercicio" data-ej="${i}">
         <div class="ejercicio-cabeza">
           <span class="ejercicio-num">${i + 1}</span>
-          <p class="ejercicio-enunciado">${escapeHtml(e.enunciado || "")}</p>
+          <p class="ejercicio-enunciado">${formatearTexto(e.enunciado || "")}</p>
         </div>
         ${
           e.pista
             ? `<button type="button" class="btn-pista" data-ej="${i}">💡 Ver pista</button>
-               <div class="pista-caja" id="pista-${i}" style="display:none;">${escapeHtml(e.pista)}</div>`
+               <div class="pista-caja" id="pista-${i}" style="display:none;">${formatearTexto(e.pista)}</div>`
             : ""
         }
         <button type="button" class="btn-solucion" data-ej="${i}">Ver solución</button>
         <div class="solucion-caja" id="solucion-${i}" style="display:none;">
           ${
             (e.pasos || []).length
-              ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol>`
+              ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>`
               : ""
           }
-          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${escapeHtml(e.respuesta)}</div>` : ""}
+          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
         </div>
       </div>`
       )

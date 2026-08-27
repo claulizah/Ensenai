@@ -246,7 +246,20 @@
 
       // Si venía con una intención explícita en la URL (ej. dio clic en
       // "Soy maestro/a" desde la landing), esa manda sobre el default.
-      const destinoUrl = params.get("despues") === "grupo" ? "grupo.html" : params.get("despues") === "tema" ? "tema.html" : elegido.destino;
+      // Quien viene a generar material va DIRECTO al quiz de inteligencias,
+      // no al formulario. Es la parte más distintiva del producto (y la que
+      // hace que el material se sienta personalizado), así que enseñarla
+      // primero explica de golpe para qué sirve todo lo demás. Quien da
+      // clases se salta esto: su material es para un grupo con perfiles
+      // mezclados, así que un perfil individual no le aporta al inicio.
+      const destinoUrl =
+        params.get("despues") === "grupo"
+          ? "grupo.html"
+          : params.get("despues") === "tema"
+          ? "tema.html?bienvenida=1"
+          : elegido.destino === "tema.html"
+          ? "tema.html?bienvenida=1"
+          : elegido.destino;
       window.location.href = destinoUrl;
     } catch (err) {
       mostrarBienvenida(session);
@@ -327,7 +340,11 @@
         <label for="contrasena">Contraseña</label>
         <input type="password" id="contrasena" placeholder="Mínimo 6 caracteres">
         <button class="primario" id="btnAccion">${esRegistro ? "Crear cuenta" : "Entrar"}</button>
-        ${esRegistro ? "" : `<span class="enlace-chico" id="btnOlvide">¿Olvidaste tu contraseña?</span>`}
+        ${
+          esRegistro
+            ? `<p class="ayuda" style="font-size:0.78rem; margin:12px 0 0;">Al crear tu cuenta aceptas los <a href="terminos.html" target="_blank">términos y condiciones</a> y el <a href="privacidad.html" target="_blank">aviso de privacidad</a>.</p>`
+            : `<span class="enlace-chico" id="btnOlvide">¿Olvidaste tu contraseña?</span>`
+        }
       </div>
     `;
     document.getElementById("tabLogin").addEventListener("click", () => mostrarLogin("login"));
