@@ -250,6 +250,7 @@
       window.location.href = "comprador.html";
     };
 
+    await cargarTipoUsuario();
     mostrarFormulario();
   }
 
@@ -257,7 +258,11 @@
     document.getElementById("contenido").innerHTML = `
       <div class="tarjeta">
         <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
-        <p class="ayuda" style="margin:0 0 10px;">Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender.</p>
+        <p class="ayuda" style="margin:0 0 10px;">${
+          versionQuiz() === "adulto"
+            ? "Tu perfil define el estilo del material. Puedes tener más de uno si estudias cosas muy distintas."
+            : "Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender."
+        }</p>
         <div id="zona-perfiles"><div class="cargando">Cargando…</div></div>
       </div>
       <div class="tarjeta">
@@ -368,11 +373,34 @@
   let resultadoQuiz = null;
   let ajusteManual = null;
 
+  // Tipo de usuario elegido al registrarse (papa/estudiante/educador/adulto/otro).
+  // Decide qué versión del quiz se pide: "ninos" está redactada para que un
+  // papá describa a su hijo ("Cuando tiene tiempo libre, prefiere…"), y
+  // "adulto" está en primera persona ("Cuando tengo tiempo libre, prefiero…").
+  // Antes siempre se pedía la de niños, así que un adolescente o un adulto
+  // aprendiendo por su cuenta contestaba preguntas escritas para otra persona.
+  let tipoUsuario = null;
+
+  function versionQuiz() {
+    return tipoUsuario === "estudiante" || tipoUsuario === "adulto" ? "adulto" : "ninos";
+  }
+
+  async function cargarTipoUsuario() {
+    try {
+      const res = await fetch(`${API_BASE}/api/aprendizaje/mi-tipo`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (res.ok) tipoUsuario = (await res.json()).tipo_usuario || null;
+    } catch (err) {
+      tipoUsuario = null; // sin tipo, se usa la versión de niños como antes
+    }
+  }
+
   async function mostrarQuizPerfil() {
     const cont = document.getElementById("zona-perfiles");
     cont.innerHTML = `
       <label>Nombre de este perfil</label>
-      <input type="text" id="nombre-perfil-input" placeholder="Ej. Sofía, Mateo, yo…">
+      <input type="text" id="nombre-perfil-input" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
       <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
     `;
 
@@ -380,13 +408,13 @@
     resultadoQuiz = null;
     ajusteManual = null;
 
-    const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=ninos`);
+    const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
     const data = await res.json();
     preguntasQuiz = data.preguntas || [];
 
     document.getElementById("preguntas-perfil").innerHTML = `
       <div class="aviso" style="margin-bottom:14px;">
-        Elige la opción que <strong>más</strong> se le parece. Si dudas entre dos, márcalas las dos — la segunda cuenta un poco menos y nos ayuda a afinar el resultado.
+        Elige la opción que <strong>más</strong> ${versionQuiz() === "adulto" ? "te describe" : "se le parece"}. Si dudas entre dos, márcalas las dos — la segunda cuenta un poco menos y nos ayuda a afinar el resultado.
       </div>
       ${preguntasQuiz.map((p, i) => pintarPreguntaQuiz(p, i)).join("")}
       <div id="aviso-confiabilidad"></div>
@@ -596,7 +624,7 @@
       </details>
 
       <div class="aviso" style="margin-top:16px;">
-        <strong>¿Te suena?</strong> Tú lo conoces mejor que 12 preguntas. Si algo no encaja, ajústalo.
+        <strong>¿Te suena?</strong> ${versionQuiz() === "adulto" ? "Tú te conoces mejor que 12 preguntas." : "Tú lo conoces mejor que 12 preguntas."} Si algo no encaja, ajústalo.
       </div>
       <button class="primario" id="btn-confirmar-perfil">Sí, guardar perfil</button>
       <button class="secundario" style="width:100%;" id="btn-ajustar-perfil">Ajustar</button>

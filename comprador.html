@@ -47,6 +47,25 @@
   button.secundario { width: 100%; background: none; border: none; color: #5b7d99; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-decoration: underline; }
   .enlace-chico { display: block; text-align: center; color: #5b7d99; font-size: 0.85rem; margin-top: 14px; cursor: pointer; text-decoration: underline; }
   .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 14px; font-size: 0.9rem; }
+  /* ── Pantalla de bienvenida "¿quién eres?" ── */
+  .bienvenida-intro { text-align: center; margin-bottom: 22px; }
+  .bienvenida-intro .saludo { color: var(--bosque); font-weight: 700; font-size: 0.88rem; margin: 0 0 6px; }
+  .rejilla-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tarjeta-tipo {
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+    background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 20px 12px;
+    font-family: inherit; cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s;
+  }
+  .tarjeta-tipo:hover { transform: translateY(-3px); border-color: var(--cielo); box-shadow: 0 8px 18px rgba(30,58,138,0.10); }
+  .tarjeta-tipo .emoji {
+    width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 1.9rem; line-height: 1;
+  }
+  .tarjeta-tipo .titulo { display: block; font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 0.98rem; color: var(--profundo); margin-bottom: 3px; }
+  .tarjeta-tipo .sub { display: block; font-size: 0.78rem; color: #5b7d99; line-height: 1.35; }
+  .tarjeta-tipo.ancha { grid-column: 1 / -1; flex-direction: row; text-align: left; gap: 14px; padding: 16px 18px; }
+  .tarjeta-tipo.ancha .emoji { width: 48px; height: 48px; font-size: 1.5rem; flex-shrink: 0; }
+
   .segmentado { display: flex; background: var(--hielo); border-radius: 999px; padding: 4px; margin-bottom: 22px; }
   .segmentado button { flex: 1; border: none; background: none; padding: 10px; border-radius: 999px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.92rem; cursor: pointer; color: #5b7d99; transition: background 0.15s, color 0.15s; }
   .segmentado button.activo { background: #fff; color: var(--profundo); box-shadow: 0 2px 6px rgba(30,58,138,0.12); }
@@ -110,6 +129,131 @@
     }
   }
 
+  // ── ¿Quién eres? (se pregunta una sola vez) ─────────────────────────────
+  const TIPOS_USUARIO = [
+    {
+      id: "papa",
+      emoji: "👨‍👩‍👧",
+      fondo: "#EAF1FE",
+      titulo: "Soy papá o mamá",
+      sub: "Quiero apoyar a mi hijo/a con la tarea y el estudio",
+      destino: "tema.html",
+    },
+    {
+      id: "estudiante",
+      emoji: "🎒",
+      fondo: "#E7FBF3",
+      titulo: "Soy estudiante",
+      sub: "Quiero estudiar mis temas de la escuela a mi manera",
+      destino: "tema.html",
+    },
+    {
+      id: "educador",
+      emoji: "🍎",
+      fondo: "#FFF0EC",
+      titulo: "Doy clases o acompaño",
+      sub: "Maestro/a, psicólogo/a u otro profesional de la educación",
+      destino: "grupo.html",
+    },
+    {
+      id: "adulto",
+      emoji: "💡",
+      fondo: "#FFF7E6",
+      titulo: "Quiero aprender algo",
+      sub: "Por mi cuenta, a mi ritmo — sin importar mi edad",
+      destino: "tema.html",
+    },
+    {
+      id: "otro",
+      emoji: "✨",
+      fondo: "#F3F0FF",
+      titulo: "Otra cosa",
+      sub: "Prefiero echar un ojo primero",
+      destino: "tema.html",
+      ancha: true,
+    },
+  ];
+
+  /**
+   * Regresa el tipo guardado, `null` si nunca lo ha contestado, o
+   * `"desconocido"` si no se pudo consultar (backend dormido, sin red).
+   * En ese último caso NO se muestra la bienvenida — vale más dejarlo
+   * pasar al dashboard que atorarlo en una pantalla por un error de red.
+   */
+  async function obtenerTipoUsuario(session) {
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/aprendizaje/mi-tipo`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        document.getElementById("contenido"),
+        "Preparando tu cuenta…"
+      );
+      if (!res.ok) return "desconocido";
+      const data = await res.json();
+      return data.tipo_usuario || null;
+    } catch (err) {
+      return "desconocido";
+    }
+  }
+
+  function mostrarBienvenida(session) {
+    document.getElementById("contenido").innerHTML = `
+      <div class="tarjeta">
+        <div class="bienvenida-intro">
+          <p class="saludo">Bienvenido/a a EnseñAI 🎉</p>
+          <h1>¿Quién eres?</h1>
+          <p class="ayuda" style="margin:0;">Así te mostramos lo que te sirve y nada más. Puedes cambiarlo después.</p>
+        </div>
+        <div class="rejilla-tipos">
+          ${TIPOS_USUARIO.map(
+            (t) => `
+            <button type="button" class="tarjeta-tipo${t.ancha ? " ancha" : ""}" data-tipo="${t.id}">
+              <span class="emoji" style="background:${t.fondo};">${t.emoji}</span>
+              <span>
+                <span class="titulo">${escapeHtml(t.titulo)}</span>
+                <span class="sub">${escapeHtml(t.sub)}</span>
+              </span>
+            </button>`
+          ).join("")}
+        </div>
+        <div id="error-bienvenida"></div>
+      </div>
+    `;
+
+    document.querySelectorAll(".tarjeta-tipo").forEach((btn) => {
+      btn.addEventListener("click", () => guardarTipoUsuario(session, btn.dataset.tipo));
+    });
+  }
+
+  async function guardarTipoUsuario(session, tipo) {
+    const cont = document.getElementById("contenido");
+    const elegido = TIPOS_USUARIO.find((t) => t.id === tipo);
+    cont.innerHTML = `<div class="cargando">Preparando tu cuenta…</div>`;
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/aprendizaje/mi-tipo`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ tipo_usuario: tipo }),
+        },
+        cont,
+        "Guardando…"
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+
+      // Si venía con una intención explícita en la URL (ej. dio clic en
+      // "Soy maestro/a" desde la landing), esa manda sobre el default.
+      const destinoUrl = params.get("despues") === "grupo" ? "grupo.html" : params.get("despues") === "tema" ? "tema.html" : elegido.destino;
+      window.location.href = destinoUrl;
+    } catch (err) {
+      mostrarBienvenida(session);
+      document.getElementById("error-bienvenida").innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
   async function init() {
     const { data } = await supabaseClient.auth.getSession();
     document.getElementById("btnSalir").style.display = data.session ? "inline-block" : "none";
@@ -125,6 +269,19 @@
     }
 
     if (data.session) {
+      // La primera vez que alguien entra (recién confirmó su correo) todavía
+      // no sabemos quién es: si es papá, estudiante, maestro/psicólogo o un
+      // adulto aprendiendo por su cuenta. Preguntarlo una sola vez nos deja
+      // mandarlo a la pantalla correcta y, sobre todo, pedirle la versión
+      // adecuada del quiz de inteligencias — antes siempre se pedía la de
+      // "el papá describe a su hijo", aunque quien contestara fuera un
+      // adolescente o un adulto.
+      const tipo = await obtenerTipoUsuario(data.session);
+      if (tipo === null) {
+        mostrarBienvenida(data.session);
+        return;
+      }
+
       if (params.get("despues") === "curso" && params.get("slug") && params.get("comprar") !== "creditos") {
         window.location.href = `curso.html?slug=${encodeURIComponent(params.get("slug"))}`;
         return;
