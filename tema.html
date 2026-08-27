@@ -39,7 +39,21 @@
   h3 { font-family: 'Grandstander', sans-serif; color: var(--bosque); font-size: 0.98rem; margin: 16px 0 8px; }
   p.ayuda { color: #4A6A85; margin: 0 0 16px; }
   label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
-  input, select { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  input, select, textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  textarea { resize: vertical; min-height: 76px; line-height: 1.45; }
+  .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
+  .zona-foto input[type="file"] { display: none; }
+  .zona-foto .btn-foto {
+    display: inline-block; background: var(--hielo); border: 2px solid var(--menta); color: var(--bosque);
+    padding: 9px 18px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  }
+  .miniaturas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+  .miniatura { position: relative; width: 74px; height: 74px; border-radius: 10px; overflow: hidden; border: 2px solid var(--linea); }
+  .miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .miniatura button {
+    position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.62); color: #fff; border: none; font-size: 0.72rem; line-height: 1; cursor: pointer; padding: 0;
+  }
   button.primario {
     width: 100%; background: var(--profundo); color: #fff; border: none; padding: 14px; border-radius: 999px;
     font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 16px;
@@ -58,6 +72,48 @@
   .barra-perfil-fill { height: 100%; background: var(--aqua); border-radius: 999px; }
   .barra-perfil-fill.dominante { background: var(--profundo); }
   .barra-perfil-pct { flex: 0 0 32px; text-align: right; font-size: 0.78rem; color: #4A6A85; }
+  /* ── Quiz de perfil ── */
+  .quiz-pregunta { border: 2px solid var(--linea); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .quiz-enunciado { font-weight: 700; font-size: 0.92rem; margin: 0 0 10px; line-height: 1.4; }
+  .quiz-opciones { display: grid; gap: 6px; }
+  .quiz-opcion {
+    display: flex; align-items: center; gap: 9px; text-align: left; width: 100%;
+    background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 9px 12px;
+    font-family: inherit; font-size: 0.9rem; color: var(--tinta); cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .quiz-opcion:hover { border-color: var(--cielo); background: var(--hielo); }
+  .quiz-marca {
+    flex-shrink: 0; width: 26px; height: 22px; border-radius: 999px; background: var(--linea);
+    font-size: 0.68rem; font-weight: 800; color: #5b7d99;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .quiz-opcion.primaria { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .quiz-opcion.primaria .quiz-marca { background: var(--profundo); color: #fff; }
+  .quiz-opcion.secundaria { border-color: var(--menta); background: #E7FBF3; }
+  .quiz-opcion.secundaria .quiz-marca { background: var(--menta); color: #fff; }
+
+  /* ── Resultado del perfil ── */
+  .perfil-principales { display: grid; gap: 10px; }
+  .perfil-principal { display: flex; align-items: center; gap: 12px; border: 2px solid; border-radius: 14px; padding: 12px 14px; background: #fff; }
+  .perfil-principal strong { display: block; font-size: 1rem; color: var(--profundo); font-family: 'Grandstander', sans-serif; }
+  .perfil-icono {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+  }
+  .perfil-icono.chico { width: 30px; height: 30px; font-size: 0.9rem; margin-bottom: 6px; }
+  .perfil-tipo-chico { display: block; font-size: 0.76rem; color: #5b7d99; margin-top: 1px; }
+  .chip-secundaria { background: var(--hielo); border: 1px solid var(--linea); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; color: #4A6A85; }
+  .detalle-quiz { margin-top: 14px; }
+  .detalle-quiz summary { cursor: pointer; font-size: 0.85rem; color: #5b7d99; font-weight: 700; }
+  .rejilla-ajuste { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .opcion-ajuste {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 11px;
+    font-family: inherit; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-ajuste strong { display: block; font-size: 0.86rem; color: var(--profundo); line-height: 1.25; }
+  .opcion-ajuste:hover { border-color: var(--cielo); }
+
   .actividad-preview { background: var(--hielo); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
   .actividad-preview .actividad-preview-tipo { display: inline-block; background: var(--profundo); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
   .actividad-preview p { margin: 0; font-size: 0.9rem; }
@@ -127,6 +183,26 @@
     intrapersonal: "Intrapersonal", naturalista: "Naturalista",
   };
 
+  // Mismo sistema de color por inteligencia que usa la landing, para que
+  // el perfil se lea igual en todo el producto.
+  const COLOR_INTELIGENCIA = {
+    linguistica: "#F97066", logico_matematica: "#F5A524", espacial: "#7C6FE0",
+    musical: "#EC7BC0", kinestesica: "#34D399", interpersonal: "#60A5FA",
+    intrapersonal: "#7DD3FC", naturalista: "#84CC16",
+  };
+
+  const ICONO_INTELIGENCIA = {
+    linguistica: "📖", logico_matematica: "🔢", espacial: "🎨", musical: "♪",
+    kinestesica: "🏃", interpersonal: "👥", intrapersonal: "💭", naturalista: "🌿",
+  };
+
+  const COMO_APRENDE = {
+    linguistica: "Leyendo y contando", logico_matematica: "Con lógica y pasos",
+    espacial: "Viendo e imaginando", musical: "Con ritmo y sonido",
+    kinestesica: "Moviéndose y haciendo", interpersonal: "Con otras personas",
+    intrapersonal: "A su ritmo, en calma", naturalista: "Explorando y clasificando",
+  };
+
   let sesionActual = null;
   let ultimoContenido = null;
   let ultimoTemaId = null;
@@ -191,6 +267,16 @@
         <select id="perfil-input"><option value="">Balanceado (sin perfil específico)</option></select>
         <label>Tema</label>
         <input type="text" id="tema-input" placeholder="Ej. Las fracciones, La Revolución Mexicana, El sistema solar…">
+        <label>¿Algo específico que quieras que incluya? (opcional)</label>
+        <textarea id="detalles-input" placeholder="Ej. Solo la parte de fracciones equivalentes, o: es para el examen del viernes y vieron hasta la página 40."></textarea>
+        <p class="ayuda" style="margin:2px 0 0; font-size:0.8rem;">Entre más nos digas, más se parece el material a lo que están viendo en clase.</p>
+        <label>Foto del resumen o apuntes (opcional)</label>
+        <div class="zona-foto">
+          <label class="btn-foto" for="fotos-input">📷 Subir foto</label>
+          <input type="file" id="fotos-input" accept="image/*" multiple>
+          <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu resumen.</p>
+          <div class="miniaturas" id="miniaturas-fotos"></div>
+        </div>
         <label>Nivel</label>
         <select id="nivel-input">
           ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
@@ -211,6 +297,9 @@
       </div>
     `;
     document.getElementById("btn-generar").addEventListener("click", generarTema);
+    document.getElementById("fotos-input").addEventListener("change", alElegirFotos);
+    fotosSeleccionadas = [];
+    pintarMiniaturas();
     cargarPerfiles();
     cargarHistorial();
   }
@@ -269,6 +358,16 @@
     }
   }
 
+  // ── Quiz de perfil de aprendizaje ───────────────────────────────────────
+  // Estado del quiz en curso: por cada pregunta, qué eligió como primera y
+  // (opcionalmente) como segunda opción. Se guardan TIPOS, no índices,
+  // porque el backend ahora baraja el orden de las opciones en cada
+  // pregunta para no sesgar el resultado hacia las primeras de la lista.
+  let respuestasQuiz = {};
+  let preguntasQuiz = [];
+  let resultadoQuiz = null;
+  let ajusteManual = null;
+
   async function mostrarQuizPerfil() {
     const cont = document.getElementById("zona-perfiles");
     cont.innerHTML = `
@@ -277,107 +376,309 @@
       <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
     `;
 
+    respuestasQuiz = {};
+    resultadoQuiz = null;
+    ajusteManual = null;
+
     const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=ninos`);
     const data = await res.json();
+    preguntasQuiz = data.preguntas || [];
 
-    document.getElementById("preguntas-perfil").innerHTML =
-      data.preguntas
-        .map(
-          (p, i) => `
-      <div style="margin-bottom:14px;">
-        <p style="font-weight:700; margin-bottom:6px; font-size:0.92rem;">${i + 1}. ${escapeHtml(p.pregunta)}</p>
-        <select id="pregunta-perfil-${p.id}" style="width:100%; padding:10px; border:2px solid var(--linea); border-radius:10px;">
-          <option value="">Elige una opción…</option>
-          ${p.opciones.map((op, idx) => `<option value="${idx}">${escapeHtml(op)}</option>`).join("")}
-        </select>
-      </div>`
-        )
-        .join("") +
-      `<button class="primario" id="btn-guardar-perfil">Guardar perfil</button>
-       <button class="secundario" style="width:100%;" id="btn-cancelar-perfil">Cancelar</button>`;
+    document.getElementById("preguntas-perfil").innerHTML = `
+      <div class="aviso" style="margin-bottom:14px;">
+        Elige la opción que <strong>más</strong> se le parece. Si dudas entre dos, márcalas las dos — la segunda cuenta un poco menos y nos ayuda a afinar el resultado.
+      </div>
+      ${preguntasQuiz.map((p, i) => pintarPreguntaQuiz(p, i)).join("")}
+      <div id="aviso-confiabilidad"></div>
+      <button class="primario" id="btn-guardar-perfil">Ver resultado</button>
+      <button class="secundario" style="width:100%;" id="btn-cancelar-perfil">Cancelar</button>
+    `;
 
-    document.getElementById("btn-guardar-perfil").addEventListener("click", () => enviarQuizPerfil(data.preguntas));
+    conectarOpcionesQuiz();
+    document.getElementById("btn-guardar-perfil").addEventListener("click", calcularPerfilQuiz);
     document.getElementById("btn-cancelar-perfil").addEventListener("click", cargarPerfiles);
   }
 
-  async function enviarQuizPerfil(preguntas) {
+  function pintarPreguntaQuiz(p, i) {
+    return `
+      <div class="quiz-pregunta" data-pregunta="${p.id}">
+        <p class="quiz-enunciado">${i + 1}. ${escapeHtml(p.pregunta)}</p>
+        <div class="quiz-opciones">
+          ${p.opciones
+            .map(
+              (op) => `
+            <button type="button" class="quiz-opcion" data-pregunta="${p.id}" data-tipo="${escapeHtml(op.tipo)}">
+              <span class="quiz-marca"></span>${escapeHtml(op.texto)}
+            </button>`
+            )
+            .join("")}
+        </div>
+      </div>`;
+  }
+
+  function conectarOpcionesQuiz() {
+    document.querySelectorAll(".quiz-opcion").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.pregunta;
+        const tipo = btn.dataset.tipo;
+        const r = respuestasQuiz[id] || { primaria: null, secundaria: null };
+
+        if (r.primaria === tipo) {
+          // Quitar la primera: la segunda (si hay) sube a primera.
+          r.primaria = r.secundaria;
+          r.secundaria = null;
+        } else if (r.secundaria === tipo) {
+          r.secundaria = null;
+        } else if (!r.primaria) {
+          r.primaria = tipo;
+        } else {
+          r.secundaria = tipo;
+        }
+
+        respuestasQuiz[id] = r;
+        refrescarPregunta(id);
+      });
+    });
+  }
+
+  function refrescarPregunta(id) {
+    const r = respuestasQuiz[id] || {};
+    document.querySelectorAll(`.quiz-opcion[data-pregunta="${id}"]`).forEach((btn) => {
+      const tipo = btn.dataset.tipo;
+      const marca = btn.querySelector(".quiz-marca");
+      btn.classList.toggle("primaria", r.primaria === tipo);
+      btn.classList.toggle("secundaria", r.secundaria === tipo);
+      marca.textContent = r.primaria === tipo ? "1ª" : r.secundaria === tipo ? "2ª" : "";
+    });
+  }
+
+  /**
+   * Misma regla que usa el backend (`evaluarConfiabilidad`), pero aplicada
+   * antes de mandar: si claramente no se contestó pensando, no tiene caso
+   * gastar uno de los espacios de perfil del plan en un resultado que no
+   * significa nada.
+   */
+  function revisarConfiabilidad(respuestas) {
+    const primarias = respuestas.map((r) => r.primaria).filter(Boolean);
+    const distintos = new Set(primarias).size;
+    if (distintos === 1) return "siempre_lo_mismo";
+    if (distintos === 2 && primarias.length >= 10) return "muy_poca_variedad";
+    return null;
+  }
+
+  async function calcularPerfilQuiz(forzar) {
     const nombre = document.getElementById("nombre-perfil-input").value.trim();
+    const avisoCont = document.getElementById("aviso-confiabilidad");
+    avisoCont.innerHTML = "";
+
     if (!nombre) {
-      alert("Escribe un nombre para este perfil.");
+      avisoCont.innerHTML = `<div class="error">Escribe un nombre para este perfil.</div>`;
       return;
     }
+
     const respuestas = [];
-    for (const p of preguntas) {
-      const valor = document.getElementById(`pregunta-perfil-${p.id}`).value;
-      if (valor === "") {
-        alert("Responde todas las preguntas antes de continuar.");
+    for (const p of preguntasQuiz) {
+      const r = respuestasQuiz[p.id];
+      if (!r || !r.primaria) {
+        avisoCont.innerHTML = `<div class="error">Falta contestar la pregunta ${p.id}. Elige al menos una opción en cada una.</div>`;
         return;
       }
-      respuestas.push(parseInt(valor, 10));
+      respuestas.push(r);
+    }
+
+    if (forzar !== true) {
+      const motivo = revisarConfiabilidad(respuestas);
+      if (motivo) {
+        avisoCont.innerHTML = `
+          <div class="error">
+            <strong>El resultado no va a ser muy útil así.</strong><br>
+            ${
+              motivo === "siempre_lo_mismo"
+                ? "Elegiste la misma opción en todas las preguntas."
+                : "Casi todas tus respuestas fueron de dos tipos nada más."
+            }
+            Vale más la pena contestarlo con calma — son 12 preguntas rápidas.
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="secundario" style="margin:0; width:auto;" id="btn-rehacer-quiz">Contestar de nuevo</button>
+              <button class="secundario" style="margin:0; width:auto;" id="btn-forzar-quiz">Usarlo de todos modos</button>
+            </div>
+          </div>`;
+        document.getElementById("btn-rehacer-quiz").addEventListener("click", mostrarQuizPerfil);
+        document.getElementById("btn-forzar-quiz").addEventListener("click", () => calcularPerfilQuiz(true));
+        avisoCont.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ nombre, respuestas }),
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/aprendizaje/calcular`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ respuestas }),
+        },
+        document.getElementById("zona-perfiles"),
+        "Calculando el perfil…"
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
-      mostrarResultadoPerfil(nombre, data);
+      if (!res.ok) throw new Error(data.error || "No se pudo calcular el perfil.");
+
+      resultadoQuiz = { nombre, respuestas, data };
+      ajusteManual = null;
+      mostrarResultadoPerfil();
     } catch (err) {
-      alert("Error: " + err.message);
+      avisoCont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
 
   /**
-   * Preview del perfil recién calculado, antes de volver a la lista de
-   * perfiles — el backend (POST /api/aprendizaje/perfiles) ya regresaba
-   * `porcentajes`, `perfil_dominante` y `actividades_sugeridas` pero el
-   * frontend los descartaba. Mostrarlos aquí le da a quien hace el quiz
-   * una razón tangible para confiar en el resultado antes de generar (y
-   * gastar) su primer tema.
+   * Resultado del quiz, ANTES de guardarlo. Dos cosas a propósito:
+   *
+   * 1. No se muestran los 8 porcentajes al frente. Salen de 12 respuestas,
+   *    así que un "33%" sugiere una precisión que el test no tiene; se
+   *    destacan las 2 principales, las siguientes 2 en chico, y el detalle
+   *    numérico queda detrás de un "ver detalle" para quien lo quiera.
+   * 2. Se puede ajustar. Quien contesta conoce a su hijo mucho mejor que
+   *    12 preguntas — si el resultado no le suena, lo corrige y ese es el
+   *    perfil que se guarda.
    */
-  function mostrarResultadoPerfil(nombre, data) {
+  function mostrarResultadoPerfil() {
+    const { nombre, data } = resultadoQuiz;
     const cont = document.getElementById("zona-perfiles");
+    const principales = ajusteManual || data.perfil_dominante || [];
+    const secundarias = (data.secundarias || []).filter((t) => !principales.includes(t));
     const porcentajes = data.porcentajes || {};
-    const dominantes = data.perfil_dominante || [];
-    const actividades = data.actividades_sugeridas || [];
 
-    const filasBarras = Object.entries(porcentajes)
+    const tarjeta = (tipo) => `
+      <div class="perfil-principal" style="border-color:${COLOR_INTELIGENCIA[tipo] || "#ccc"};">
+        <span class="perfil-icono" style="background:${COLOR_INTELIGENCIA[tipo] || "#ccc"};">${ICONO_INTELIGENCIA[tipo] || "•"}</span>
+        <div>
+          <strong>${escapeHtml(COMO_APRENDE[tipo] || "")}</strong>
+          <span class="perfil-tipo-chico">${escapeHtml(ETIQUETAS_INTELIGENCIA[tipo] || tipo)}</span>
+        </div>
+      </div>`;
+
+    const filasDetalle = Object.entries(porcentajes)
       .sort((a, b) => b[1] - a[1])
       .map(
         ([tipo, pct]) => `
       <div class="barra-perfil-fila">
         <span class="barra-perfil-label">${escapeHtml(ETIQUETAS_INTELIGENCIA[tipo] || tipo)}</span>
-        <div class="barra-perfil-track"><div class="barra-perfil-fill${dominantes.includes(tipo) ? " dominante" : ""}" style="width:${pct}%"></div></div>
+        <div class="barra-perfil-track"><div class="barra-perfil-fill${principales.includes(tipo) ? " dominante" : ""}" style="width:${pct}%"></div></div>
         <span class="barra-perfil-pct">${pct}%</span>
-      </div>
-    `
-      )
-      .join("");
-
-    const actividadesHtml = actividades
-      .map(
-        (a) => `
-      <div class="actividad-preview">
-        <span class="actividad-preview-tipo">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.tipo] || a.tipo)}</span>
-        <p>${escapeHtml(a.actividad || "")}</p>
-      </div>
-    `
+      </div>`
       )
       .join("");
 
     cont.innerHTML = `
-      <p class="ayuda" style="margin:0 0 10px;">✓ Perfil de <strong>${escapeHtml(nombre)}</strong> guardado.</p>
       <h3 style="margin-top:0;">Así aprende ${escapeHtml(nombre)}</h3>
-      <div style="margin-bottom:14px;">${filasBarras}</div>
-      <h3>Este será el estilo de sus actividades</h3>
-      ${actividadesHtml}
-      <p class="ayuda" style="margin:10px 0 0; font-size:0.82rem;">Cada tema que generes con este perfil se adapta a esto, sin importar de qué trate.</p>
-      <button class="primario" id="btn-continuar-resultado">Continuar</button>
+      <div class="perfil-principales">${principales.map(tarjeta).join("")}</div>
+      ${
+        secundarias.length
+          ? `<p class="ayuda" style="margin:12px 0 6px; font-size:0.85rem;">También le funciona:</p>
+             <div style="display:flex; flex-wrap:wrap; gap:6px;">
+               ${secundarias
+                 .map(
+                   (t) =>
+                     `<span class="chip-secundaria">${ICONO_INTELIGENCIA[t] || "•"} ${escapeHtml(ETIQUETAS_INTELIGENCIA[t] || t)}</span>`
+                 )
+                 .join("")}
+             </div>`
+          : ""
+      }
+      ${ajusteManual ? `<p class="ayuda" style="margin:12px 0 0; font-size:0.82rem;">✏️ Ajustado por ti.</p>` : ""}
+
+      <details class="detalle-quiz">
+        <summary>Ver el detalle del quiz</summary>
+        <div style="margin-top:10px;">${filasDetalle}</div>
+        <p class="ayuda" style="margin:8px 0 0; font-size:0.78rem;">Sale de 12 preguntas — tómalo como una guía de por dónde entrarle, no como una medición exacta.</p>
+      </details>
+
+      <div class="aviso" style="margin-top:16px;">
+        <strong>¿Te suena?</strong> Tú lo conoces mejor que 12 preguntas. Si algo no encaja, ajústalo.
+      </div>
+      <button class="primario" id="btn-confirmar-perfil">Sí, guardar perfil</button>
+      <button class="secundario" style="width:100%;" id="btn-ajustar-perfil">Ajustar</button>
+      <button class="secundario" style="width:100%;" id="btn-cancelar-resultado">Cancelar</button>
     `;
-    document.getElementById("btn-continuar-resultado").addEventListener("click", cargarPerfiles);
+
+    document.getElementById("btn-confirmar-perfil").addEventListener("click", guardarPerfilQuiz);
+    document.getElementById("btn-ajustar-perfil").addEventListener("click", mostrarAjustePerfil);
+    document.getElementById("btn-cancelar-resultado").addEventListener("click", cargarPerfiles);
+  }
+
+  function mostrarAjustePerfil() {
+    const { nombre, data } = resultadoQuiz;
+    const cont = document.getElementById("zona-perfiles");
+    let elegidas = (ajusteManual || data.perfil_dominante || []).slice(0, 2);
+
+    const pintar = () => {
+      cont.innerHTML = `
+        <h3 style="margin-top:0;">¿Cómo aprende mejor ${escapeHtml(nombre)}?</h3>
+        <p class="ayuda" style="margin:0 0 12px;">Elige hasta dos. Son las que van a guiar el estilo de sus actividades.</p>
+        <div class="rejilla-ajuste">
+          ${Object.keys(ETIQUETAS_INTELIGENCIA)
+            .map(
+              (t) => `
+            <button type="button" class="opcion-ajuste${elegidas.includes(t) ? " activa" : ""}" data-tipo="${t}"
+              style="${elegidas.includes(t) ? `border-color:${COLOR_INTELIGENCIA[t]}; background:${COLOR_INTELIGENCIA[t]}1A;` : ""}">
+              <span class="perfil-icono chico" style="background:${COLOR_INTELIGENCIA[t]};">${ICONO_INTELIGENCIA[t]}</span>
+              <strong>${escapeHtml(COMO_APRENDE[t])}</strong>
+              <span class="perfil-tipo-chico">${escapeHtml(ETIQUETAS_INTELIGENCIA[t])}</span>
+            </button>`
+            )
+            .join("")}
+        </div>
+        <div id="error-ajuste"></div>
+        <button class="primario" id="btn-aplicar-ajuste">Listo</button>
+        <button class="secundario" style="width:100%;" id="btn-cancelar-ajuste">Regresar sin ajustar</button>
+      `;
+
+      cont.querySelectorAll(".opcion-ajuste").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const t = btn.dataset.tipo;
+          if (elegidas.includes(t)) elegidas = elegidas.filter((x) => x !== t);
+          else if (elegidas.length < 2) elegidas.push(t);
+          else elegidas = [elegidas[1], t]; // reemplaza la más vieja
+          pintar();
+        });
+      });
+
+      document.getElementById("btn-aplicar-ajuste").addEventListener("click", () => {
+        if (!elegidas.length) {
+          document.getElementById("error-ajuste").innerHTML = `<div class="error">Elige al menos una.</div>`;
+          return;
+        }
+        ajusteManual = elegidas.slice();
+        mostrarResultadoPerfil();
+      });
+      document.getElementById("btn-cancelar-ajuste").addEventListener("click", mostrarResultadoPerfil);
+    };
+
+    pintar();
+  }
+
+  async function guardarPerfilQuiz() {
+    const { nombre, respuestas } = resultadoQuiz;
+    const cont = document.getElementById("zona-perfiles");
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/aprendizaje/perfiles`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ nombre, respuestas, dominante_manual: ajusteManual || undefined }),
+        },
+        cont,
+        "Guardando el perfil…"
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
+      cargarPerfiles();
+    } catch (err) {
+      cont.insertAdjacentHTML("beforeend", `<div class="error">${escapeHtml(err.message)}</div>`);
+    }
   }
 
   async function borrarPerfil(perfilId) {
@@ -402,10 +703,81 @@
       .filter(Boolean);
   }
 
+  // ── Fotos de resumen/apuntes ────────────────────────────────────────────
+  // Las fotos de celular son enormes (4-8 MB) y viajan como base64 dentro
+  // del JSON, así que las reducimos en el navegador ANTES de subirlas: el
+  // lado largo se limita a 1400px y se recomprimen como JPEG. Con eso una
+  // foto de apuntes queda en ~200-400 KB y sigue siendo perfectamente
+  // legible para el generador, sin que la subida tarde en datos móviles.
+  const MAX_FOTOS = 3;
+  const LADO_MAX = 1400;
+  let fotosSeleccionadas = [];
+
+  function comprimirImagen(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      lector.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Ese archivo no parece ser una imagen válida."));
+        img.onload = () => {
+          const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * escala);
+          canvas.height = Math.round(img.height * escala);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(file);
+    });
+  }
+
+  function pintarMiniaturas() {
+    const cont = document.getElementById("miniaturas-fotos");
+    if (!cont) return;
+    cont.innerHTML = fotosSeleccionadas
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" data-quitar-foto="${i}" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+    cont.querySelectorAll("[data-quitar-foto]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        fotosSeleccionadas.splice(Number(btn.dataset.quitarFoto), 1);
+        pintarMiniaturas();
+      });
+    });
+  }
+
+  async function alElegirFotos(ev) {
+    const resultado = document.getElementById("resultado-generar");
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = ""; // permite volver a elegir el mismo archivo
+
+    for (const archivo of archivos) {
+      if (fotosSeleccionadas.length >= MAX_FOTOS) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosSeleccionadas.push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      }
+    }
+    pintarMiniaturas();
+  }
+
   async function generarTema() {
     const tema = document.getElementById("tema-input").value.trim();
     const nivel = document.getElementById("nivel-input").value;
     const perfilId = document.getElementById("perfil-input").value || null;
+    const detalles = document.getElementById("detalles-input").value.trim();
     const etiquetas = parsearEtiquetas(document.getElementById("etiquetas-input").value);
     const resultado = document.getElementById("resultado-generar");
     resultado.innerHTML = "";
@@ -415,7 +787,9 @@
       return;
     }
 
-    resultado.innerHTML = `<div class="cargando">Generando material con IA… puede tardar unos segundos.</div>`;
+    resultado.innerHTML = `<div class="cargando">${
+      fotosSeleccionadas.length ? "Leyendo tus fotos y generando" : "Generando"
+    } material con IA… puede tardar unos segundos.</div>`;
 
     try {
       const res = await fetchConReintento(
@@ -423,7 +797,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas }),
+          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas }),
         },
         resultado,
         "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi. No cierres esta página."
@@ -438,6 +812,7 @@
       }
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
+      fotosSeleccionadas = []; // el tema ya se generó; no arrastrar las fotos al siguiente
       mostrarTemaGenerado(data.contenido, data.tema_id, null);
     } catch (err) {
       resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;

@@ -47,6 +47,9 @@
   button.secundario { width: 100%; background: none; border: none; color: #5b7d99; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-decoration: underline; }
   .enlace-chico { display: block; text-align: center; color: #5b7d99; font-size: 0.85rem; margin-top: 14px; cursor: pointer; text-decoration: underline; }
   .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 14px; font-size: 0.9rem; }
+  .segmentado { display: flex; background: var(--hielo); border-radius: 999px; padding: 4px; margin-bottom: 22px; }
+  .segmentado button { flex: 1; border: none; background: none; padding: 10px; border-radius: 999px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.92rem; cursor: pointer; color: #5b7d99; transition: background 0.15s, color 0.15s; }
+  .segmentado button.activo { background: #fff; color: var(--profundo); box-shadow: 0 2px 6px rgba(30,58,138,0.12); }
   .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-bottom: 18px; text-align: center; }
   .creditos-num { font-family: 'Grandstander', sans-serif; font-size: 2.2rem; color: var(--profundo); text-align: center; margin: 4px 0; }
   .creditos-label { text-align: center; color: #4A6A85; margin-bottom: 16px; }
@@ -140,28 +143,40 @@
       }
       mostrarDashboard(data.session);
     } else {
-      mostrarLogin();
+      mostrarLogin("login");
     }
   }
 
-  function mostrarLogin() {
+  // Antes, "Entra a tu cuenta" y "Regístrate" vivían en la misma pantalla
+  // sin distinguirse: al dar clic en "Regístrate" se mandaba el registro
+  // de inmediato pero el título seguía diciendo "Entra a tu cuenta", lo
+  // que hacía parecer que el registro no había funcionado. Ahora es un
+  // selector de dos pestañas (Iniciar sesión / Crear cuenta) que cambia
+  // título, texto de ayuda y botón según el modo — así siempre es claro
+  // en qué pantalla estás antes de dar clic.
+  function mostrarLogin(modo) {
+    const esRegistro = modo === "registro";
     document.getElementById("contenido").innerHTML = `
       <div class="tarjeta">
-        <h1>Entra a tu cuenta</h1>
-        <p class="ayuda">Para generar material personalizado por tema y forma de aprender.</p>
+        <div class="segmentado">
+          <button id="tabLogin" class="${esRegistro ? "" : "activo"}" type="button">Iniciar sesión</button>
+          <button id="tabRegistro" class="${esRegistro ? "activo" : ""}" type="button">Crear cuenta</button>
+        </div>
+        <h1>${esRegistro ? "Crea tu cuenta" : "Entra a tu cuenta"}</h1>
+        <p class="ayuda">${esRegistro ? "Un minuto y ya puedes generar tu primer tema, gratis." : "Para generar material personalizado por tema y forma de aprender."}</p>
         <div id="error-auth"></div>
         <label for="correo">Correo</label>
         <input type="email" id="correo" placeholder="tucorreo@ejemplo.com">
         <label for="contrasena">Contraseña</label>
         <input type="password" id="contrasena" placeholder="Mínimo 6 caracteres">
-        <button class="primario" id="btnEntrar">Entrar</button>
-        <button class="secundario" id="btnCrearCuenta">¿No tienes cuenta? Regístrate</button>
-        <span class="enlace-chico" id="btnOlvide">¿Olvidaste tu contraseña?</span>
+        <button class="primario" id="btnAccion">${esRegistro ? "Crear cuenta" : "Entrar"}</button>
+        ${esRegistro ? "" : `<span class="enlace-chico" id="btnOlvide">¿Olvidaste tu contraseña?</span>`}
       </div>
     `;
-    document.getElementById("btnEntrar").addEventListener("click", () => iniciarSesion(false));
-    document.getElementById("btnCrearCuenta").addEventListener("click", () => iniciarSesion(true));
-    document.getElementById("btnOlvide").addEventListener("click", mostrarOlvideContrasena);
+    document.getElementById("tabLogin").addEventListener("click", () => mostrarLogin("login"));
+    document.getElementById("tabRegistro").addEventListener("click", () => mostrarLogin("registro"));
+    document.getElementById("btnAccion").addEventListener("click", () => iniciarSesion(esRegistro));
+    if (!esRegistro) document.getElementById("btnOlvide").addEventListener("click", mostrarOlvideContrasena);
   }
 
   function mostrarOlvideContrasena() {
@@ -177,7 +192,7 @@
       </div>
     `;
     document.getElementById("btnMandarRecuperacion").addEventListener("click", mandarRecuperacion);
-    document.getElementById("btnRegresarLogin").addEventListener("click", mostrarLogin);
+    document.getElementById("btnRegresarLogin").addEventListener("click", () => mostrarLogin("login"));
   }
 
   async function mandarRecuperacion() {
@@ -205,12 +220,37 @@
           <span class="enlace-chico" id="btnRegresarLogin2">← Regresar a iniciar sesión</span>
         </div>
       `;
-      document.getElementById("btnRegresarLogin2").addEventListener("click", mostrarLogin);
+      document.getElementById("btnRegresarLogin2").addEventListener("click", () => mostrarLogin("login"));
     } catch (err) {
       errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
       btn.disabled = false;
       btn.textContent = "Mandar liga de recuperación";
     }
+  }
+
+  // Supabase Auth regresa sus mensajes de error en inglés y en un tono muy
+  // técnico ("Invalid login credentials") — poco útil para alguien que
+  // apenas está probando la plataforma. Los traducimos a algo accionable,
+  // y en el caso más común (intentar entrar sin tener cuenta todavía) le
+  // señalamos directamente el botón de registro en vez de dejarlo adivinar.
+  function traducirErrorAuth(mensaje, esRegistro) {
+    const m = (mensaje || "").toLowerCase();
+    if (m.includes("invalid login credentials")) {
+      return 'Ese correo o contraseña no coinciden con ninguna cuenta. Si es tu primera vez aquí, dale clic a "Crear cuenta" arriba en vez de "Iniciar sesión".';
+    }
+    if (m.includes("already registered")) {
+      return 'Ya existe una cuenta con ese correo — dale clic a "Iniciar sesión" arriba en vez de "Crear cuenta".';
+    }
+    if (m.includes("email not confirmed")) {
+      return "Todavía no confirmas tu correo. Revisa tu bandeja de entrada (y spam) y confirma tu cuenta antes de entrar.";
+    }
+    if (m.includes("password should be at least")) {
+      return "La contraseña debe tener al menos 6 caracteres.";
+    }
+    if (m.includes("unable to validate email")) {
+      return "Ese correo no parece válido — revisa que esté bien escrito.";
+    }
+    return mensaje;
   }
 
   async function iniciarSesion(esRegistro) {
@@ -232,13 +272,19 @@
       if (error) throw new Error(error.message);
 
       if (esRegistro && !data.session) {
-        errorDiv.innerHTML = `<div class="error">Cuenta creada. Revisa tu correo para confirmarla, luego inicia sesión.</div>`;
+        document.getElementById("contenido").innerHTML = `
+          <div class="tarjeta">
+            <div class="aviso">✓ ¡Cuenta creada! Te mandamos un correo para confirmarla — revisa tu bandeja (y spam), confírmala, y ya puedes entrar.</div>
+            <span class="enlace-chico" id="btnRegresarLogin3">← Regresar a iniciar sesión</span>
+          </div>
+        `;
+        document.getElementById("btnRegresarLogin3").addEventListener("click", () => mostrarLogin("login"));
         return;
       }
 
       init();
     } catch (err) {
-      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(traducirErrorAuth(err.message, esRegistro))}</div>`;
     }
   }
 

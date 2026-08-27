@@ -41,6 +41,19 @@
   label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
   input, select, textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
   textarea { resize: vertical; min-height: 70px; }
+  .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
+  .zona-foto input[type="file"] { display: none; }
+  .zona-foto .btn-foto {
+    display: inline-block; background: var(--hielo); border: 2px solid var(--menta); color: var(--bosque);
+    padding: 9px 18px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  }
+  .miniaturas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+  .miniatura { position: relative; width: 74px; height: 74px; border-radius: 10px; overflow: hidden; border: 2px solid var(--linea); }
+  .miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .miniatura button {
+    position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.62); color: #fff; border: none; font-size: 0.72rem; line-height: 1; cursor: pointer; padding: 0;
+  }
   button.primario {
     background: var(--profundo); color: #fff; border: none; padding: 14px 20px; border-radius: 999px;
     font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 14px;
@@ -218,6 +231,15 @@
           <div id="zona-generar-${g.id}">
             <label>Tema</label>
             <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…">
+            <label>¿Algo específico que quieras que incluya? (opcional)</label>
+            <textarea id="detalles-input-${g.id}" placeholder="Ej. Solo lo que vimos en clase esta semana, o: enfócate en los ejemplos prácticos."></textarea>
+            <label>Foto del temario, resumen o apuntes (opcional)</label>
+            <div class="zona-foto">
+              <label class="btn-foto" for="fotos-input-${g.id}">📷 Subir foto</label>
+              <input type="file" id="fotos-input-${g.id}" accept="image/*" multiple onchange="alElegirFotos('${g.id}', event)">
+              <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu material de clase.</p>
+              <div class="miniaturas" id="miniaturas-fotos-${g.id}"></div>
+            </div>
             <label>Nivel del grupo</label>
             <select id="nivel-input-${g.id}">
               ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
@@ -356,9 +378,81 @@
     }
   }
 
+  // ── Fotos de temario/apuntes ────────────────────────────────────────────
+  // Mismo mecanismo que en tema.html: las fotos de celular pesan varios MB
+  // y viajan como base64 dentro del JSON, así que se reducen a 1400px de
+  // lado y se recomprimen como JPEG antes de subirlas. Aquí se guardan por
+  // grupo, porque en esta pantalla puede haber varias ligas abiertas a la vez.
+  const MAX_FOTOS = 3;
+  const LADO_MAX = 1400;
+  const fotosPorGrupo = {};
+
+  function comprimirImagen(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      lector.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Ese archivo no parece ser una imagen válida."));
+        img.onload = () => {
+          const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * escala);
+          canvas.height = Math.round(img.height * escala);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(file);
+    });
+  }
+
+  function pintarMiniaturas(grupoId) {
+    const cont = document.getElementById(`miniaturas-fotos-${grupoId}`);
+    if (!cont) return;
+    const fotos = fotosPorGrupo[grupoId] || [];
+    cont.innerHTML = fotos
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" onclick="quitarFoto('${grupoId}', ${i})" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+  }
+
+  function quitarFoto(grupoId, indice) {
+    (fotosPorGrupo[grupoId] || []).splice(indice, 1);
+    pintarMiniaturas(grupoId);
+  }
+
+  async function alElegirFotos(grupoId, ev) {
+    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!fotosPorGrupo[grupoId]) fotosPorGrupo[grupoId] = [];
+
+    for (const archivo of archivos) {
+      if (fotosPorGrupo[grupoId].length >= MAX_FOTOS) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosPorGrupo[grupoId].push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      }
+    }
+    pintarMiniaturas(grupoId);
+  }
+
   async function generarTema(grupoId, esPrimerTemaGratis) {
     const tema = document.getElementById(`tema-input-${grupoId}`).value.trim();
     const nivel = document.getElementById(`nivel-input-${grupoId}`).value;
+    const detalles = document.getElementById(`detalles-input-${grupoId}`).value.trim();
+    const imagenes = fotosPorGrupo[grupoId] || [];
     const resultado = document.getElementById(`resultado-generar-${grupoId}`);
     resultado.innerHTML = "";
 
@@ -367,13 +461,15 @@
       return;
     }
 
-    resultado.innerHTML = `<div class="cargando">Generando material con IA… puede tardar unos segundos.</div>`;
+    resultado.innerHTML = `<div class="cargando">${
+      imagenes.length ? "Leyendo tus fotos y generando" : "Generando"
+    } material con IA… puede tardar unos segundos.</div>`;
 
     try {
       const res = await fetch(`${API_BASE}/api/temas/generar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tema, nivel, modo: "grupo" }),
+        body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
@@ -572,6 +668,7 @@
 
       delete pdfCache[grupoId];
       delete contenidoEnEdicion[grupoId];
+      delete fotosPorGrupo[grupoId]; // el tema ya quedó en la liga; no arrastrar las fotos al siguiente
       document.getElementById(`tema-input-${grupoId}`).value = "";
       cargarTemas(grupoId);
       cargarGrupos();
