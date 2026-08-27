@@ -52,18 +52,47 @@
   .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
   .actividad-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .actividad-box .inteligencia { display: inline-block; background: var(--menta); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
-  .trivia-item { border-top: 1px dashed var(--linea); padding: 12px 0; }
-  .trivia-item:first-child { border-top: none; }
-  .opciones { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
-  .opciones li { background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 8px 12px; font-size: 0.92rem; }
+  .barra-perfil-fila { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .barra-perfil-label { flex: 0 0 130px; font-size: 0.8rem; font-weight: 700; color: var(--profundo); }
+  .barra-perfil-track { flex: 1; background: var(--linea); border-radius: 999px; height: 10px; overflow: hidden; }
+  .barra-perfil-fill { height: 100%; background: var(--aqua); border-radius: 999px; }
+  .barra-perfil-fill.dominante { background: var(--profundo); }
+  .barra-perfil-pct { flex: 0 0 32px; text-align: right; font-size: 0.78rem; color: #4A6A85; }
+  .actividad-preview { background: var(--hielo); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .actividad-preview .actividad-preview-tipo { display: inline-block; background: var(--profundo); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
+  .actividad-preview p { margin: 0; font-size: 0.9rem; }
+  .trivia-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fff; }
+  .trivia-item:last-child { margin-bottom: 0; }
+  .trivia-pregunta { display: flex; align-items: flex-start; gap: 10px; font-weight: 700; margin-bottom: 12px; line-height: 1.4; }
+  .trivia-num {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-size: 0.78rem; font-family: 'Grandstander', sans-serif; display: flex; align-items: center; justify-content: center;
+  }
+  .opciones { display: grid; gap: 8px; }
+  .opcion-btn {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 14px;
+    font-family: inherit; font-size: 0.94rem; color: var(--tinta); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-btn:hover:not(:disabled) { border-color: var(--cielo); background: var(--hielo); }
+  .opcion-btn.seleccionada { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
+  .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
+  .opcion-btn:disabled { cursor: default; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: var(--bosque); background: var(--hielo); border-radius: 8px; padding: 8px 12px; }
+  #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .respuestas-toggle { text-align: center; }
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
   .respuestas-box.abierto { display: block; }
-  .historial-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 10px; cursor: pointer; }
+  .historial-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 6px 10px; cursor: pointer; }
   .historial-item:first-child { border-top: none; }
   .historial-item .titulo { font-weight: 700; }
   .historial-item .fecha { color: #4A6A85; font-size: 0.8rem; }
+  .historial-item .etiquetas-item { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+  .etiqueta-badge { display: inline-block; background: var(--hielo); border: 1px solid var(--aqua); color: var(--bosque); font-size: 0.72rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
+  .chip-etiqueta { background: #fff; border: 2px solid var(--linea); color: var(--profundo); font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
+  #buscar-historial { margin-bottom: 8px; }
   .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; cursor: pointer; }
 </style>
 </head>
@@ -103,11 +132,33 @@
   let ultimoTemaId = null;
   let perfilesCache = [];
   let perfilSeleccionadoId = "";
+  let historialCache = [];
+  let etiquetaActiva = "";
 
   function escapeHtml(str) {
     const d = document.createElement("div");
     d.textContent = str || "";
     return d.innerHTML;
+  }
+
+  // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
+  // tarda 30-60s en despertar con la primera petición — esa primera
+  // petición puede fallar con un "Failed to fetch" genérico. Este helper
+  // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    try {
+      return await fetch(url, opciones);
+    } catch (err) {
+      if (cont) {
+        cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        return await fetch(url, opciones);
+      } catch (err2) {
+        throw new Error("El servidor está tardando en responder. Espera unos segundos y vuelve a intentarlo.");
+      }
+    }
   }
 
   async function init() {
@@ -144,11 +195,18 @@
         <select id="nivel-input">
           ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
         </select>
+        <label>Etiquetas (opcional)</label>
+        <input type="text" id="etiquetas-input" placeholder="Ej. Matemáticas, Parcial 1">
+        <p class="ayuda" style="margin:2px 0 0; font-size:0.8rem;">Sepáralas con comas — te ayudan a encontrar este tema después en tu historial.</p>
         <button class="primario" id="btn-generar">Generar material</button>
         <div id="resultado-generar"></div>
       </div>
       <div class="tarjeta">
         <h2>Mis temas anteriores</h2>
+        <div id="filtros-historial" style="display:none; margin-bottom:12px;">
+          <input type="text" id="buscar-historial" placeholder="Buscar por tema o etiqueta…" style="margin-bottom:8px;">
+          <div id="chips-etiquetas" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
         <div id="lista-historial"><div class="cargando">Cargando…</div></div>
       </div>
     `;
@@ -266,10 +324,60 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
-      cargarPerfiles();
+      mostrarResultadoPerfil(nombre, data);
     } catch (err) {
       alert("Error: " + err.message);
     }
+  }
+
+  /**
+   * Preview del perfil recién calculado, antes de volver a la lista de
+   * perfiles — el backend (POST /api/aprendizaje/perfiles) ya regresaba
+   * `porcentajes`, `perfil_dominante` y `actividades_sugeridas` pero el
+   * frontend los descartaba. Mostrarlos aquí le da a quien hace el quiz
+   * una razón tangible para confiar en el resultado antes de generar (y
+   * gastar) su primer tema.
+   */
+  function mostrarResultadoPerfil(nombre, data) {
+    const cont = document.getElementById("zona-perfiles");
+    const porcentajes = data.porcentajes || {};
+    const dominantes = data.perfil_dominante || [];
+    const actividades = data.actividades_sugeridas || [];
+
+    const filasBarras = Object.entries(porcentajes)
+      .sort((a, b) => b[1] - a[1])
+      .map(
+        ([tipo, pct]) => `
+      <div class="barra-perfil-fila">
+        <span class="barra-perfil-label">${escapeHtml(ETIQUETAS_INTELIGENCIA[tipo] || tipo)}</span>
+        <div class="barra-perfil-track"><div class="barra-perfil-fill${dominantes.includes(tipo) ? " dominante" : ""}" style="width:${pct}%"></div></div>
+        <span class="barra-perfil-pct">${pct}%</span>
+      </div>
+    `
+      )
+      .join("");
+
+    const actividadesHtml = actividades
+      .map(
+        (a) => `
+      <div class="actividad-preview">
+        <span class="actividad-preview-tipo">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.tipo] || a.tipo)}</span>
+        <p>${escapeHtml(a.actividad || "")}</p>
+      </div>
+    `
+      )
+      .join("");
+
+    cont.innerHTML = `
+      <p class="ayuda" style="margin:0 0 10px;">✓ Perfil de <strong>${escapeHtml(nombre)}</strong> guardado.</p>
+      <h3 style="margin-top:0;">Así aprende ${escapeHtml(nombre)}</h3>
+      <div style="margin-bottom:14px;">${filasBarras}</div>
+      <h3>Este será el estilo de sus actividades</h3>
+      ${actividadesHtml}
+      <p class="ayuda" style="margin:10px 0 0; font-size:0.82rem;">Cada tema que generes con este perfil se adapta a esto, sin importar de qué trate.</p>
+      <button class="primario" id="btn-continuar-resultado">Continuar</button>
+    `;
+    document.getElementById("btn-continuar-resultado").addEventListener("click", cargarPerfiles);
   }
 
   async function borrarPerfil(perfilId) {
@@ -287,10 +395,18 @@
     }
   }
 
+  function parsearEtiquetas(texto) {
+    return (texto || "")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+  }
+
   async function generarTema() {
     const tema = document.getElementById("tema-input").value.trim();
     const nivel = document.getElementById("nivel-input").value;
     const perfilId = document.getElementById("perfil-input").value || null;
+    const etiquetas = parsearEtiquetas(document.getElementById("etiquetas-input").value);
     const resultado = document.getElementById("resultado-generar");
     resultado.innerHTML = "";
 
@@ -302,11 +418,16 @@
     resultado.innerHTML = `<div class="cargando">Generando material con IA… puede tardar unos segundos.</div>`;
 
     try {
-      const res = await fetch(`${API_BASE}/api/temas/generar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tema, nivel, modo: "individual", perfilId }),
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/generar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas }),
+        },
+        resultado,
+        "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi. No cierres esta página."
+      );
       const data = await res.json();
       if (res.status === 402) {
         resultado.innerHTML = `
@@ -332,28 +453,114 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo cargar tu historial.");
 
-      const temas = data.temas || [];
-      if (temas.length === 0) {
+      historialCache = data.temas || [];
+      etiquetaActiva = "";
+
+      if (historialCache.length === 0) {
+        document.getElementById("filtros-historial").style.display = "none";
         cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado ningún tema.</p>`;
         return;
       }
 
-      cont.innerHTML = temas
-        .map(
-          (t) => `
-        <div class="historial-item" data-id="${t.id}">
-          <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
-          <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
-        </div>
-      `
-        )
-        .join("");
+      // Solo mostramos los filtros si hay al menos una etiqueta usada en
+      // todo el historial — si nadie ha etiquetado nada todavía, no tiene
+      // caso mostrar chips vacíos.
+      const hayEtiquetas = historialCache.some((t) => (t.etiquetas || []).length);
+      document.getElementById("filtros-historial").style.display = historialCache.length > 3 || hayEtiquetas ? "block" : "none";
 
-      cont.querySelectorAll(".historial-item").forEach((el) => {
-        el.addEventListener("click", () => verTemaDelHistorial(el.dataset.id));
-      });
+      document.getElementById("buscar-historial").oninput = renderHistorial;
+      renderChipsEtiquetas();
+      renderHistorial();
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudo cargar tu historial.</div>`;
+    }
+  }
+
+  function renderChipsEtiquetas() {
+    const cont = document.getElementById("chips-etiquetas");
+    const todasEtiquetas = [...new Set(historialCache.flatMap((t) => t.etiquetas || []))].sort();
+    if (!todasEtiquetas.length) {
+      cont.innerHTML = "";
+      return;
+    }
+    cont.innerHTML =
+      `<button type="button" class="chip-etiqueta${etiquetaActiva === "" ? " activa" : ""}" data-etiqueta="">Todas</button>` +
+      todasEtiquetas
+        .map((e) => `<button type="button" class="chip-etiqueta${etiquetaActiva === e ? " activa" : ""}" data-etiqueta="${escapeHtml(e)}">${escapeHtml(e)}</button>`)
+        .join("");
+    cont.querySelectorAll(".chip-etiqueta").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        etiquetaActiva = btn.dataset.etiqueta;
+        renderChipsEtiquetas();
+        renderHistorial();
+      });
+    });
+  }
+
+  function renderHistorial() {
+    const cont = document.getElementById("lista-historial");
+    const busqueda = (document.getElementById("buscar-historial").value || "").trim().toLowerCase();
+
+    const filtrados = historialCache.filter((t) => {
+      const coincideEtiqueta = !etiquetaActiva || (t.etiquetas || []).includes(etiquetaActiva);
+      const textoTema = (t.tema || "").toLowerCase();
+      const textoEtiquetas = (t.etiquetas || []).join(" ").toLowerCase();
+      const coincideBusqueda = !busqueda || textoTema.includes(busqueda) || textoEtiquetas.includes(busqueda);
+      return coincideEtiqueta && coincideBusqueda;
+    });
+
+    if (!filtrados.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">No hay temas que coincidan con tu búsqueda.</p>`;
+      return;
+    }
+
+    cont.innerHTML = filtrados
+      .map(
+        (t) => `
+      <div class="historial-item" data-id="${t.id}">
+        <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
+        <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
+        <span class="etiquetas-item">
+          ${(t.etiquetas || []).map((e) => `<span class="etiqueta-badge">${escapeHtml(e)}</span>`).join("")}
+          <button type="button" class="chip-etiqueta" style="padding:1px 9px; font-size:0.72rem;" data-editar-etiquetas="${t.id}">✏️ Etiquetas</button>
+        </span>
+      </div>
+    `
+      )
+      .join("");
+
+    cont.querySelectorAll(".historial-item .titulo, .historial-item .fecha").forEach((el) => {
+      el.addEventListener("click", () => verTemaDelHistorial(el.closest(".historial-item").dataset.id));
+    });
+    cont.querySelectorAll("[data-editar-etiquetas]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        editarEtiquetas(btn.dataset.editarEtiquetas);
+      });
+    });
+  }
+
+  async function editarEtiquetas(temaId) {
+    const actual = historialCache.find((t) => t.id === temaId);
+    const texto = prompt("Etiquetas separadas por comas (ej. Matemáticas, Parcial 1):", (actual?.etiquetas || []).join(", "));
+    if (texto === null) return; // canceló
+
+    const etiquetas = parsearEtiquetas(texto);
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${temaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ etiquetas }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron guardar las etiquetas.");
+
+      if (actual) actual.etiquetas = data.etiquetas;
+      document.getElementById("filtros-historial").style.display = "block";
+      renderChipsEtiquetas();
+      renderHistorial();
+    } catch (err) {
+      alert("Error: " + err.message);
     }
   }
 
@@ -370,6 +577,50 @@
     } catch (err) {
       document.getElementById("contenido").innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(err.message)}</div></div>`;
     }
+  }
+
+  function normalizarTexto(s) {
+    return (s || "").trim().toLowerCase();
+  }
+
+  function revisarTrivia() {
+    let total = 0;
+    let correctas = 0;
+    document.querySelectorAll(".trivia-item").forEach((item) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          if (normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta)) {
+            btn.classList.add("correcta");
+          } else if (btn === seleccionado) {
+            btn.classList.add("incorrecta");
+          }
+        });
+        if (seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta)) {
+          correctas++;
+        } else if (!seleccionado) {
+          feedback.style.display = "block";
+          feedback.textContent = "No elegiste una respuesta.";
+        }
+      } else if (correcta) {
+        feedback.style.display = "block";
+        feedback.innerHTML = `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+      }
+    });
+
+    const resumen = document.getElementById("trivia-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      resumen.textContent = `Obtuviste ${correctas} de ${total} correctas.`;
+    }
+    const btnRevisar = document.getElementById("btn-revisar-trivia");
+    if (btnRevisar) btnRevisar.style.display = "none";
   }
 
   function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado) {
@@ -402,13 +653,14 @@
     const triviaHtml = (c.trivia || [])
       .map(
         (p, i) => `
-      <div class="trivia-item">
-        <div style="font-weight:700;">${i + 1}. ${escapeHtml(p.pregunta || "")}</div>
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${escapeHtml(p.pregunta || "")}</div>
         ${
           p.opciones?.length
-            ? `<ul class="opciones">${p.opciones.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>`
+            ? `<div class="opciones">${p.opciones.map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join("")}</div>`
             : ""
         }
+        <div class="trivia-feedback" style="display:none;"></div>
       </div>
     `
       )
@@ -453,7 +705,17 @@
 
       ${actividadesHtml ? `<div class="tarjeta"><h2>✏️ Actividad</h2>${actividadesHtml}</div>` : ""}
 
-      ${triviaHtml ? `<div class="tarjeta"><h2>🧠 Trivia</h2>${triviaHtml}</div>` : ""}
+      ${
+        triviaHtml
+          ? `<div class="tarjeta">
+              <h2>🧠 Trivia</h2>
+              <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
+              ${triviaHtml}
+              <div id="trivia-resumen" style="display:none;"></div>
+              <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>
+            </div>`
+          : ""
+      }
 
       ${materialExtraHtml ? `<div class="tarjeta"><h2>📎 Material extra</h2>${materialExtraHtml}</div>` : ""}
 
@@ -467,6 +729,17 @@
     document.getElementById("btn-respuestas").addEventListener("click", () => {
       document.getElementById("caja-respuestas").classList.toggle("abierto");
     });
+
+    document.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    const btnRevisarTrivia = document.getElementById("btn-revisar-trivia");
+    if (btnRevisarTrivia) btnRevisarTrivia.addEventListener("click", revisarTrivia);
 
     let pdfUrlCache = pdfUrlGuardado || null;
     const btnPdf = document.getElementById("btn-pdf");

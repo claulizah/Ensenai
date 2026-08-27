@@ -72,6 +72,15 @@
   .toggle-row { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
   .toggle-row input { width: auto; }
   .divisor { border: none; border-top: 1px dashed var(--linea); margin: 18px 0; }
+  .editor-trivia { background: var(--hielo); border-radius: 14px; padding: 14px; margin: 12px 0; }
+  .pregunta-editable { background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .pregunta-editable:last-of-type { margin-bottom: 0; }
+  .pregunta-editable .fila-top { display: flex; gap: 8px; align-items: flex-start; }
+  .pregunta-editable textarea { flex: 1; min-height: 44px; font-size: 0.92rem; }
+  .fila-opcion { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .fila-opcion input[type="radio"] { width: auto; flex-shrink: 0; }
+  .fila-opcion input[type="text"] { padding: 8px 10px; font-size: 0.9rem; }
+  .fila-opcion.correcta input[type="text"] { border-color: var(--menta); }
 </style>
 </head>
 <body>
@@ -100,11 +109,36 @@
   ];
 
   let sesionActual = null;
+  // Contenido recién generado por grupo, editable antes de compartirlo con
+  // la liga (el profesional puede ajustar la trivia). Se mutan aquí en vez
+  // de en `data.contenido` directamente para poder re-renderizar el editor
+  // sin perder el resto del material (resumen, actividades, etc.).
+  const contenidoEnEdicion = {};
 
   function escapeHtml(str) {
     const d = document.createElement("div");
     d.textContent = str || "";
     return d.innerHTML;
+  }
+
+  // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
+  // tarda 30-60s en despertar con la primera petición — esa primera
+  // petición puede fallar con un "Failed to fetch" genérico. Este helper
+  // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    try {
+      return await fetch(url, opciones);
+    } catch (err) {
+      if (cont) {
+        cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        return await fetch(url, opciones);
+      } catch (err2) {
+        throw new Error("El servidor está tardando en responder. Espera unos segundos y vuelve a intentarlo.");
+      }
+    }
   }
 
   async function init() {
@@ -224,9 +258,12 @@
     const cont = document.getElementById("zona-suscripcion-grupo");
     if (!cont) return;
     try {
-      const res = await fetch(`${API_BASE}/api/grupos/mi-plan`, {
-        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/grupos/mi-plan`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        cont,
+        "Cargando tu plan…"
+      );
       const plan = await res.json();
       if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
@@ -266,16 +303,24 @@
     const cont = document.getElementById("zona-suscripcion-grupo");
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tipo: "grupo", nivel }),
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/purchases/checkout-suscripcion`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ tipo: "grupo", nivel }),
+        },
+        cont,
+        "Preparando tu pago… (si el servidor estaba dormido, puede tardar unos segundos)"
+      );
       const data = await res.json();
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
       window.location.href = data.checkout_url;
     } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      cont.innerHTML = `
+        <div class="error">${escapeHtml(err.message)}</div>
+        <button class="secundario" style="width:100%;" onclick="suscribirGrupo('${nivel}')">Reintentar</button>
+      `;
     }
   }
 
@@ -333,25 +378,121 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
+      contenidoEnEdicion[grupoId] = data.contenido;
+
       resultado.innerHTML = `
-        <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Revísalo y agrégalo a tu liga.</div>
+        <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Puedes editar la trivia antes de compartirla con tu grupo.</div>
+        <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
         <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${esPrimerTemaGratis ? " (gratis)" : ""}</button>
         <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF)</button>
       `;
+      renderEditorTrivia(grupoId);
       document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
-        agregarTemaAGrupo(grupoId, tema, data.contenido, esPrimerTemaGratis)
+        agregarTemaAGrupo(grupoId, tema, contenidoEnEdicion[grupoId], esPrimerTemaGratis)
       );
       document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, data.contenido, ev.target)
+        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target)
       );
     } catch (err) {
       resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
 
+  /**
+   * Dibuja las preguntas de trivia de `contenidoEnEdicion[grupoId]` como un
+   * formulario editable: texto de la pregunta, opciones (si las tiene) con
+   * un radio para marcar cuál es la correcta, o un campo de respuesta
+   * sugerida si es de tipo abierta/caso. La maestra/profesional puede
+   * ajustar el texto, corregir la respuesta correcta, borrar preguntas que
+   * no le sirvan, o agregar preguntas propias antes de compartir el tema
+   * con su grupo — no requiere volver a generar con IA.
+   */
+  function renderEditorTrivia(grupoId) {
+    const cont = document.getElementById(`editor-trivia-${grupoId}`);
+    if (!cont) return;
+    const trivia = contenidoEnEdicion[grupoId].trivia || [];
+
+    cont.innerHTML =
+      `<p class="ayuda" style="margin:0 0 8px; font-size:0.85rem;">✏️ Trivia (editable)</p>` +
+      trivia
+        .map(
+          (p, i) => `
+      <div class="pregunta-editable">
+        <div class="fila-top">
+          <textarea id="pregunta-texto-${grupoId}-${i}" placeholder="Texto de la pregunta">${escapeHtml(p.pregunta || "")}</textarea>
+          <button type="button" class="secundario chico" id="btn-borrar-pregunta-${grupoId}-${i}" title="Borrar esta pregunta">🗑️</button>
+        </div>
+        ${
+          p.opciones && p.opciones.length
+            ? p.opciones
+                .map(
+                  (op, j) => `
+          <div class="fila-opcion${op === p.respuesta_correcta ? " correcta" : ""}">
+            <input type="radio" name="correcta-${grupoId}-${i}" id="correcta-${grupoId}-${i}-${j}" ${op === p.respuesta_correcta ? "checked" : ""} title="Marcar como correcta">
+            <input type="text" id="opcion-${grupoId}-${i}-${j}" value="${escapeHtml(op)}" placeholder="Opción ${j + 1}">
+          </div>
+        `
+                )
+                .join("")
+            : `
+          <label style="margin:8px 0 4px; font-size:0.82rem;">Respuesta sugerida</label>
+          <input type="text" id="respuesta-abierta-${grupoId}-${i}" value="${escapeHtml(p.respuesta_correcta || "")}" placeholder="Respuesta sugerida">
+        `
+        }
+      </div>
+    `
+        )
+        .join("") +
+      `<button type="button" class="secundario" style="width:100%; margin-top:4px;" id="btn-agregar-pregunta-${grupoId}">+ Agregar pregunta</button>`;
+
+    trivia.forEach((p, i) => {
+      document.getElementById(`pregunta-texto-${grupoId}-${i}`).addEventListener("input", (ev) => {
+        contenidoEnEdicion[grupoId].trivia[i].pregunta = ev.target.value;
+        delete pdfCache[grupoId]; // el PDF ya descargado quedaría desactualizado
+      });
+      document.getElementById(`btn-borrar-pregunta-${grupoId}-${i}`).addEventListener("click", () => {
+        contenidoEnEdicion[grupoId].trivia.splice(i, 1);
+        delete pdfCache[grupoId];
+        renderEditorTrivia(grupoId);
+      });
+      if (p.opciones && p.opciones.length) {
+        p.opciones.forEach((op, j) => {
+          document.getElementById(`opcion-${grupoId}-${i}-${j}`).addEventListener("input", (ev) => {
+            const t = contenidoEnEdicion[grupoId].trivia[i];
+            const eraCorrecta = t.opciones[j] === t.respuesta_correcta;
+            t.opciones[j] = ev.target.value;
+            if (eraCorrecta) t.respuesta_correcta = ev.target.value; // sigue siendo la marcada como correcta
+            delete pdfCache[grupoId];
+          });
+          document.getElementById(`correcta-${grupoId}-${i}-${j}`).addEventListener("change", () => {
+            contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = contenidoEnEdicion[grupoId].trivia[i].opciones[j];
+            delete pdfCache[grupoId];
+          });
+        });
+      } else {
+        document.getElementById(`respuesta-abierta-${grupoId}-${i}`).addEventListener("input", (ev) => {
+          contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = ev.target.value;
+          delete pdfCache[grupoId];
+        });
+      }
+    });
+
+    document.getElementById(`btn-agregar-pregunta-${grupoId}`).addEventListener("click", () => {
+      contenidoEnEdicion[grupoId].trivia.push({
+        pregunta: "",
+        tipo: "opcion",
+        opciones: ["", "", "", ""],
+        respuesta_correcta: "",
+      });
+      delete pdfCache[grupoId];
+      renderEditorTrivia(grupoId);
+    });
+  }
+
   // Cachea la URL del PDF ya generado por grupo, para no volver a generarlo
   // (llamada a IA de por medio) si el profesional ya lo descargó antes de
-  // agregar el tema a su liga.
+  // agregar el tema a su liga. Se invalida (ver renderEditorTrivia) cada
+  // vez que se edita la trivia, para no compartir un PDF desactualizado.
   const pdfCache = {};
 
   async function generarPdfEnServidor(contenido) {
@@ -383,6 +524,18 @@
 
   async function agregarTemaAGrupo(grupoId, titulo, contenido, esPrimerTemaGratis) {
     const resultado = document.getElementById(`resultado-generar-${grupoId}`);
+
+    // Si al editar la trivia se agregó una pregunta y se dejó vacía (sin
+    // texto), la quitamos antes de compartirla — evita que le llegue a los
+    // alumnos/pacientes una tarjeta de pregunta en blanco por descuido. Si
+    // se quitó algo, invalidamos el PDF en caché para que se regenere sin
+    // esa pregunta (si no, el PDF ya descargado la incluiría igual).
+    if (Array.isArray(contenido.trivia)) {
+      const totalAntes = contenido.trivia.length;
+      contenido.trivia = contenido.trivia.filter((p) => (p.pregunta || "").trim());
+      if (contenido.trivia.length !== totalAntes) delete pdfCache[grupoId];
+    }
+
     resultado.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
 
     try {
@@ -418,6 +571,7 @@
       }
 
       delete pdfCache[grupoId];
+      delete contenidoEnEdicion[grupoId];
       document.getElementById(`tema-input-${grupoId}`).value = "";
       cargarTemas(grupoId);
       cargarGrupos();
@@ -428,15 +582,17 @@
 
   async function pagarTema(temaId) {
     try {
-      const res = await fetch(`${API_BASE}/api/grupos/temas/${temaId}/checkout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/grupos/temas/${temaId}/checkout`,
+        { method: "POST", headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
       const data = await res.json();
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
       window.location.href = data.checkout_url;
     } catch (err) {
-      alert("Error: " + err.message);
+      alert(err.message.includes("tardando") ? err.message + " Dale clic de nuevo a 'Pagar y activar'." : "Error: " + err.message);
     }
   }
 
