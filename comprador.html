@@ -87,6 +87,26 @@
     return d.innerHTML;
   }
 
+  // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
+  // tarda 30-60s en despertar con la primera petición — esa primera
+  // petición puede fallar con un "Failed to fetch" genérico. Este helper
+  // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    try {
+      return await fetch(url, opciones);
+    } catch (err) {
+      if (cont) {
+        cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        return await fetch(url, opciones);
+      } catch (err2) {
+        throw new Error("El servidor está tardando en responder. Espera unos segundos y vuelve a intentarlo.");
+      }
+    }
+  }
+
   async function init() {
     const { data } = await supabaseClient.auth.getSession();
     document.getElementById("btnSalir").style.display = data.session ? "inline-block" : "none";
@@ -260,7 +280,12 @@
   async function cargarSuscripcion(session) {
     const cont = document.getElementById("zonaSuscripcion");
     try {
-      const res = await fetch(`${API_BASE}/api/temas/mi-plan`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-plan`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        cont,
+        "Cargando tu plan…"
+      );
       const plan = await res.json();
       if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
@@ -298,16 +323,24 @@
     const cont = document.getElementById("zonaSuscripcion");
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/checkout-suscripcion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ tipo, nivel }),
-      });
+      const res = await fetchConReintento(
+        `${API_BASE}/api/purchases/checkout-suscripcion`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ tipo, nivel }),
+        },
+        cont,
+        "Preparando tu pago… (si el servidor estaba dormido, puede tardar unos segundos)"
+      );
       const data = await res.json();
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
       window.location.href = data.checkout_url;
     } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      cont.innerHTML = `
+        <div class="error">${escapeHtml(err.message)}</div>
+        <button class="secundario" style="width:100%;" onclick="suscribirse(sesionActual, '${tipo}', '${nivel}')">Reintentar</button>
+      `;
     }
   }
 

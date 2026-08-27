@@ -51,10 +51,25 @@
   .tema-card .resumen-corto { color: #4A6A85; font-size: 0.9rem; margin-top: 4px; }
   .actividad-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .actividad-box .inteligencia { display: inline-block; background: var(--menta); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
-  .trivia-item { border-top: 1px dashed var(--linea); padding: 12px 0; }
-  .trivia-item:first-child { border-top: none; }
-  .opciones { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
-  .opciones li { background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 8px 12px; font-size: 0.92rem; }
+  .trivia-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fff; }
+  .trivia-item:last-child { margin-bottom: 0; }
+  .trivia-pregunta { display: flex; align-items: flex-start; gap: 10px; font-weight: 700; margin-bottom: 12px; line-height: 1.4; }
+  .trivia-num {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-size: 0.78rem; font-family: 'Grandstander', sans-serif; display: flex; align-items: center; justify-content: center;
+  }
+  .opciones { display: grid; gap: 8px; }
+  .opcion-btn {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 14px;
+    font-family: inherit; font-size: 0.94rem; color: var(--tinta); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-btn:hover:not(:disabled) { border-color: var(--cielo); background: var(--hielo); }
+  .opcion-btn.seleccionada { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
+  .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
+  .opcion-btn:disabled { cursor: default; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: var(--bosque); background: var(--hielo); border-radius: 8px; padding: 8px 12px; }
+  #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .respuestas-toggle { text-align: center; }
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
@@ -201,6 +216,50 @@
     });
   }
 
+  function normalizarTexto(s) {
+    return (s || "").trim().toLowerCase();
+  }
+
+  function revisarTrivia() {
+    let total = 0;
+    let correctas = 0;
+    document.querySelectorAll(".trivia-item").forEach((item) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          if (normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta)) {
+            btn.classList.add("correcta");
+          } else if (btn === seleccionado) {
+            btn.classList.add("incorrecta");
+          }
+        });
+        if (seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta)) {
+          correctas++;
+        } else if (!seleccionado) {
+          feedback.style.display = "block";
+          feedback.textContent = "No elegiste una respuesta.";
+        }
+      } else if (correcta) {
+        feedback.style.display = "block";
+        feedback.innerHTML = `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+      }
+    });
+
+    const resumen = document.getElementById("trivia-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      resumen.textContent = `Obtuviste ${correctas} de ${total} correctas.`;
+    }
+    const btnRevisar = document.getElementById("btn-revisar-trivia");
+    if (btnRevisar) btnRevisar.style.display = "none";
+  }
+
   function mostrarTema(idx) {
     const tema = temasActuales[idx];
     const c = tema.contenido || {};
@@ -230,13 +289,14 @@
     const triviaHtml = (c.trivia || [])
       .map(
         (p, i) => `
-      <div class="trivia-item">
-        <div style="font-weight:700;">${i + 1}. ${escapeHtml(p.pregunta || "")}</div>
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${escapeHtml(p.pregunta || "")}</div>
         ${
           p.opciones?.length
-            ? `<ul class="opciones">${p.opciones.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>`
+            ? `<div class="opciones">${p.opciones.map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join("")}</div>`
             : ""
         }
+        <div class="trivia-feedback" style="display:none;"></div>
       </div>
     `
       )
@@ -276,11 +336,22 @@
         <h1>📘 ${escapeHtml(c.tema || tema.titulo)}</h1>
         ${c.resumen ? `<p class="ayuda" style="line-height:1.6;">${escapeHtml(c.resumen)}</p>` : ""}
         ${c.esquema_visual ? `<h3>Esquema visual</h3><p style="white-space:pre-line; line-height:1.6; margin:0;">${escapeHtml(c.esquema_visual)}</p>` : ""}
+        ${tema.pdf_url ? `<a href="${escapeHtml(tema.pdf_url)}" target="_blank"><button class="secundario" style="margin-top:14px;">📄 Descargar imprimible (PDF)</button></a>` : ""}
       </div>
 
       ${actividadesHtml ? `<div class="tarjeta"><h2>✏️ Actividad${c.actividades ? "es (elige la de tu tipo de inteligencia)" : ""}</h2>${actividadesHtml}</div>` : ""}
 
-      ${triviaHtml ? `<div class="tarjeta"><h2>🧠 Trivia</h2>${triviaHtml}</div>` : ""}
+      ${
+        triviaHtml
+          ? `<div class="tarjeta">
+              <h2>🧠 Trivia</h2>
+              <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
+              ${triviaHtml}
+              <div id="trivia-resumen" style="display:none;"></div>
+              <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>
+            </div>`
+          : ""
+      }
 
       ${materialExtraHtml ? `<div class="tarjeta"><h2>📎 Material extra</h2>${materialExtraHtml}</div>` : ""}
 
@@ -295,6 +366,17 @@
       const caja = document.getElementById("caja-respuestas");
       caja.classList.toggle("abierto");
     });
+
+    document.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    const btnRevisarTrivia = document.getElementById("btn-revisar-trivia");
+    if (btnRevisarTrivia) btnRevisarTrivia.addEventListener("click", revisarTrivia);
   }
 
   init();
