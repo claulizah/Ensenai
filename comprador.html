@@ -148,7 +148,7 @@
     document.getElementById("contenido").innerHTML = `
       <div class="tarjeta">
         <h1>Entra a tu cuenta</h1>
-        <p class="ayuda">Para comprar y ver tus cursos.</p>
+        <p class="ayuda">Para generar material personalizado por tema y forma de aprender.</p>
         <div id="error-auth"></div>
         <label for="correo">Correo</label>
         <input type="email" id="correo" placeholder="tucorreo@ejemplo.com">
@@ -256,10 +256,6 @@
         <a href="tema.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">Generar tema</button></a>
       </div>
       <div class="tarjeta">
-        <h1 style="text-align:left; font-size:1.1rem;">Mis cursos</h1>
-        <div id="listaCursos"><div class="cargando">Cargando…</div></div>
-      </div>
-      <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">¿Eres maestro/a o psicólogo/a?</h1>
         <p class="ayuda" style="margin:0 0 4px; text-align:left;">Genera material para todo tu grupo y compártelo con una sola liga — tus alumnos o pacientes entran gratis, sin cuenta.</p>
         <a href="grupo.html" style="display:block; text-decoration:none;"><button class="primario" style="margin-top:14px;">🏫 Ir a Mi grupo</button></a>
@@ -267,7 +263,6 @@
     `;
 
     cargarSuscripcion(session);
-    cargarMisCursos(session);
 
     document.getElementById("btnSalir").onclick = async () => {
       await supabaseClient.auth.signOut();
@@ -341,26 +336,6 @@
         <div class="error">${escapeHtml(err.message)}</div>
         <button class="secundario" style="width:100%;" onclick="suscribirse(sesionActual, '${tipo}', '${nivel}')">Reintentar</button>
       `;
-    }
-  }
-
-  async function cargarMisCursos(session) {
-    const cont = document.getElementById("listaCursos");
-    try {
-      const res = await fetch(`${API_BASE}/api/purchases/mis-cursos`, { headers: { Authorization: `Bearer ${session.access_token}` } });
-      const data = await res.json();
-      const cursos = data.cursos || [];
-
-      if (cursos.length === 0) {
-        cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has comprado ningún curso.</p>`;
-        return;
-      }
-
-      cont.innerHTML = cursos
-        .map((c) => `<div class="curso-item"><a href="curso.html?slug=${encodeURIComponent(c.courses?.slug || "")}">${escapeHtml(c.courses?.title || "Curso")}</a></div>`)
-        .join("");
-    } catch (err) {
-      cont.innerHTML = `<div class="error">No se pudieron cargar tus cursos.</div>`;
     }
   }
 
