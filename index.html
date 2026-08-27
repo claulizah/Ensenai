@@ -15,12 +15,12 @@
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
     --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46; --hielo: #F0FDF4;
-    --tinta: #1E3A8A; --linea: #DCEEFC;
+    --tinta: #1E3A8A; --linea: #DCEEFC; --coral: #F97066; --coral-oscuro: #D9553F;
     /* color fijo por inteligencia — reutilizable en todo EnseñAI (quiz, resultados, actividades) */
     --i-linguistica: #F97066; --i-logica: #F5A524; --i-espacial: #7C6FE0; --i-musical: #EC7BC0;
     --i-kinestesica: #34D399; --i-interpersonal: #60A5FA; --i-intrapersonal: #7DD3FC; --i-naturalista: #84CC16;
@@ -28,7 +28,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body {
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Nunito Sans', 'Nunito', sans-serif;
     background: var(--hielo);
     color: var(--tinta);
     line-height: 1.5;
@@ -106,12 +106,16 @@
   .props-section { padding: 40px 0 56px; }
   .props-titulo { text-align: center; font-family: 'Grandstander', sans-serif; font-size: 1.7rem; margin-bottom: 36px; }
   .props-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-  .prop-card { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 24px; box-shadow: 0 3px 0 var(--linea); }
+  .prop-card { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 24px; box-shadow: 0 3px 0 var(--linea); transition: transform .18s, box-shadow .18s; }
+  .prop-card:hover { transform: translateY(-3px); box-shadow: 0 6px 0 var(--linea); }
   .prop-card .num {
     display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
     background: var(--menta); color: #fff; border-radius: 50%; font-family: 'Grandstander', sans-serif;
     font-weight: 700; margin-bottom: 12px;
   }
+  .prop-card:nth-child(2) .num { background: var(--coral); }
+  .prop-card:nth-child(3) .num { background: var(--cielo); }
+  .prop-card:nth-child(4) .num { background: var(--profundo); }
   .prop-card h3 { font-family: 'Grandstander', sans-serif; font-size: 1.08rem; margin-bottom: 8px; color: var(--profundo); }
   .prop-card p { color: #3d5a72; font-size: 0.95rem; }
 
@@ -120,7 +124,9 @@
   .audiencias-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
   .audiencia-card {
     border-radius: 20px; padding: 26px 22px; color: #fff; display: flex; flex-direction: column;
+    transition: transform .18s;
   }
+  .audiencia-card:hover { transform: translateY(-3px); }
   .audiencia-card.papas { background: linear-gradient(150deg, #1E3A8A, #3B5FCB); }
   .audiencia-card.maestros { background: linear-gradient(150deg, #065F46, #0E9B6E); }
   .audiencia-card.adultos { background: linear-gradient(150deg, #7C6FE0, #A78BFA); }
@@ -133,7 +139,8 @@
   /* Precios */
   .precios-section { padding: 10px 0 60px; }
   .precios-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  .precio-card { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 26px 22px; box-shadow: 0 3px 0 var(--linea); text-align: center; }
+  .precio-card { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 26px 22px; box-shadow: 0 3px 0 var(--linea); text-align: center; transition: transform .18s; }
+  .precio-card:hover { transform: translateY(-3px); }
   .precio-card.destacado { border-color: var(--menta); box-shadow: 0 4px 0 var(--menta); position: relative; }
   .precio-card.destacado::before {
     content: "MÁS POPULAR"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
@@ -218,6 +225,7 @@
 <section class="props-section">
   <div class="contenedor">
     <h2 class="props-titulo">Cómo funciona</h2>
+    <p style="text-align:center; color:#4A6A85; margin:-24px 0 32px; font-size:1.02rem;">Cada mente aprende distinto — EnseñAI lo entiende.</p>
     <div class="props-grid">
       <div class="prop-card">
         <div class="num">1</div>
