@@ -70,6 +70,58 @@
   .opcion-btn:disabled { cursor: default; }
   .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: var(--bosque); background: var(--hielo); border-radius: 8px; padding: 8px 12px; }
   #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
+  /* ── Pestañas del material ── */
+  .pestanas { display: flex; gap: 4px; background: var(--hielo); border-radius: 999px; padding: 4px; margin: 14px 0 20px; }
+  .pestana {
+    flex: 1; border: none; background: none; padding: 10px 6px; border-radius: 999px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.86rem; color: #5b7d99;
+    transition: background .15s, color .15s;
+  }
+  .pestana.activa { background: #fff; color: var(--profundo); box-shadow: 0 2px 6px rgba(30,58,138,0.12); }
+  .pestana-num { display: inline-block; background: var(--menta); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.72rem; }
+
+  /* ── Bloques de la pestaña Estudiar ── */
+  .bloque-est { border-left: 4px solid var(--linea); padding: 2px 0 2px 14px; margin-bottom: 18px; }
+  .bloque-est p { margin: 0; line-height: 1.65; font-size: 0.95rem; }
+  .bloque-est.destacado { border-left-color: var(--menta); background: var(--hielo); border-radius: 0 12px 12px 0; padding: 14px 16px; }
+  .bloque-est.destacado p { font-size: 1rem; color: var(--bosque); font-weight: 600; }
+  .bloque-titulo { font-family: 'Grandstander', sans-serif; color: var(--profundo); font-size: 0.98rem; margin: 0 0 6px; }
+  .lista-pasos { margin: 0; padding-left: 20px; }
+  .lista-pasos li { margin-bottom: 7px; line-height: 1.55; font-size: 0.94rem; }
+  .lista-ideas { margin: 0; padding-left: 18px; list-style: none; }
+  .lista-ideas li { margin-bottom: 7px; line-height: 1.5; font-size: 0.94rem; position: relative; }
+  .lista-ideas li::before { content: "▪"; color: var(--menta); position: absolute; left: -14px; font-size: 1.1rem; }
+  .caja-ojo, .caja-truco { border-radius: 12px; padding: 13px 16px; margin-bottom: 16px; }
+  .caja-ojo { background: #FFF7E6; border: 2px solid #FFDFA0; }
+  .caja-truco { background: #F3F0FF; border: 2px solid #D9D2FF; }
+  .caja-ojo strong, .caja-truco strong { display: block; font-size: 0.88rem; margin-bottom: 4px; }
+  .caja-ojo strong { color: #8A6100; } .caja-truco strong { color: #4B3BA8; }
+  .caja-ojo p, .caja-truco p { margin: 0; font-size: 0.93rem; line-height: 1.55; }
+  .bloque-est.plegable { border-left-color: var(--cielo); }
+  .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
+
+  /* ── Ejercicios ── */
+  .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+  .ejercicio-cabeza { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+  .ejercicio-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-family: 'Grandstander', sans-serif; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ejercicio-enunciado { margin: 0; font-weight: 700; line-height: 1.5; font-size: 0.95rem; }
+  .btn-pista, .btn-solucion {
+    border: 2px solid var(--linea); background: #fff; border-radius: 999px; padding: 7px 16px;
+    font-family: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; color: #5b7d99; margin-right: 6px;
+  }
+  .btn-solucion { border-color: var(--menta); color: var(--bosque); }
+  .btn-solucion.abierta { background: var(--hielo); }
+  .pista-caja { background: #FFF7E6; border-radius: 10px; padding: 10px 13px; margin-top: 9px; font-size: 0.9rem; color: #8A6100; }
+  .solucion-caja { background: var(--hielo); border-radius: 10px; padding: 13px 15px; margin-top: 10px; }
+  .ejercicio-respuesta {
+    background: var(--menta); color: #fff; border-radius: 8px; padding: 8px 13px; margin-top: 10px;
+    font-weight: 700; font-size: 0.93rem;
+  }
+
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .respuestas-toggle { text-align: center; }
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
@@ -204,7 +256,7 @@
           (t, i) => `
         <div class="tema-card" data-idx="${i}">
           <div class="titulo">📘 ${escapeHtml(t.titulo)}</div>
-          <div class="resumen-corto">${escapeHtml((t.contenido?.resumen || "").slice(0, 110))}${(t.contenido?.resumen || "").length > 110 ? "…" : ""}</div>
+          <div class="resumen-corto">${escapeHtml(textoResumenCorto(t.contenido?.resumen))}</div>
         </div>
       `
         )
@@ -258,6 +310,31 @@
     }
     const btnRevisar = document.getElementById("btn-revisar-trivia");
     if (btnRevisar) btnRevisar.style.display = "none";
+  }
+
+  /**
+   * Los temas creados ANTES del rediseño tienen `resumen` como un string de
+   * texto corrido; los nuevos lo traen partido en secciones. Estas dos
+   * funciones dejan todo en la forma nueva, para que un alumno que abra un
+   * tema viejo de la liga lo siga viendo bien.
+   */
+  function normalizarResumen(resumen) {
+    const vacio = { que_es: "", secciones: [], pasos: [], ideas_clave: [], ojo_aqui: "", truco: "" };
+    if (!resumen) return vacio;
+    if (typeof resumen === "string") return { ...vacio, que_es: resumen };
+    return {
+      que_es: resumen.que_es || "",
+      secciones: Array.isArray(resumen.secciones) ? resumen.secciones.filter((s) => s && (s.titulo || s.texto)) : [],
+      pasos: Array.isArray(resumen.pasos) ? resumen.pasos.filter(Boolean) : [],
+      ideas_clave: Array.isArray(resumen.ideas_clave) ? resumen.ideas_clave.filter(Boolean) : [],
+      ojo_aqui: resumen.ojo_aqui || "",
+      truco: resumen.truco || "",
+    };
+  }
+
+  function textoResumenCorto(resumen) {
+    const t = normalizarResumen(resumen).que_es || "";
+    return t.length > 110 ? t.slice(0, 110) + "…" : t;
   }
 
   function mostrarTema(idx) {
@@ -330,36 +407,137 @@
       ${r.autoevaluacion ? `<h3>Autoevaluación</h3><p style="margin:0;">${escapeHtml(r.autoevaluacion)}</p>` : ""}
     `;
 
+    const res = normalizarResumen(c.resumen);
+    const ejercicios = c.ejercicios || [];
+
+    const estudiarHtml = `
+      ${res.que_es ? `<div class="bloque-est destacado"><p>${escapeHtml(res.que_es)}</p></div>` : ""}
+      ${res.secciones
+        .map(
+          (s) => `
+        <div class="bloque-est">
+          ${s.titulo ? `<h3 class="bloque-titulo">${escapeHtml(s.titulo)}</h3>` : ""}
+          <p>${escapeHtml(s.texto || "")}</p>
+        </div>`
+        )
+        .join("")}
+      ${
+        res.pasos.length
+          ? `<div class="bloque-est"><h3 class="bloque-titulo">🧭 Paso a paso</h3>
+             <ol class="lista-pasos">${res.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol></div>`
+          : ""
+      }
+      ${
+        res.ideas_clave.length
+          ? `<div class="bloque-est"><h3 class="bloque-titulo">⭐ Lo que no se te puede olvidar</h3>
+             <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${escapeHtml(k)}</li>`).join("")}</ul></div>`
+          : ""
+      }
+      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${escapeHtml(res.ojo_aqui)}</p></div>` : ""}
+      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${escapeHtml(res.truco)}</p></div>` : ""}
+      ${
+        c.esquema_visual
+          ? `<details class="bloque-est plegable"><summary>Ver el esquema completo</summary>
+             <p style="white-space:pre-line; margin-top:8px;">${escapeHtml(c.esquema_visual)}</p></details>`
+          : ""
+      }
+    `;
+
+    const ejerciciosHtml = ejercicios
+      .map(
+        (e, i) => `
+      <div class="ejercicio">
+        <div class="ejercicio-cabeza">
+          <span class="ejercicio-num">${i + 1}</span>
+          <p class="ejercicio-enunciado">${escapeHtml(e.enunciado || "")}</p>
+        </div>
+        ${
+          e.pista
+            ? `<button type="button" class="btn-pista" data-ej="${i}">💡 Ver pista</button>
+               <div class="pista-caja" id="pista-${i}" style="display:none;">${escapeHtml(e.pista)}</div>`
+            : ""
+        }
+        <button type="button" class="btn-solucion" data-ej="${i}">Ver solución</button>
+        <div class="solucion-caja" id="solucion-${i}" style="display:none;">
+          ${(e.pasos || []).length ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ol>` : ""}
+          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${escapeHtml(e.respuesta)}</div>` : ""}
+        </div>
+      </div>`
+      )
+      .join("");
+
+    const practicarHtml = `
+      ${
+        ejerciciosHtml
+          ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>${ejerciciosHtml}`
+          : ""
+      }
+      ${
+        actividadesHtml
+          ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad${c.actividades ? "es (elige la de tu tipo de inteligencia)" : ""}</h2>${actividadesHtml}`
+          : ""
+      }
+      ${!ejerciciosHtml && !actividadesHtml ? `<p class="ayuda">Este tema no trae ejercicios.</p>` : ""}
+    `;
+
+    const repasarHtml = `
+      ${
+        triviaHtml
+          ? `<h2 style="margin-top:0;">🧠 Trivia</h2>
+             <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
+             ${triviaHtml}
+             <div id="trivia-resumen" style="display:none;"></div>
+             <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>`
+          : ""
+      }
+      ${materialExtraHtml ? `<h2 style="margin-top:${triviaHtml ? "24px" : "0"};">📎 Material extra</h2>${materialExtraHtml}` : ""}
+      <div class="respuestas-toggle" style="margin-top:20px;"><button class="secundario" id="btn-respuestas">Ver respuestas</button></div>
+      <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
+    `;
+
+    const nEj = ejercicios.length;
     cont.innerHTML = `
       <a class="volver" href="javascript:void(0)" id="btn-volver">← Volver a la liga</a>
       <div class="tarjeta">
         <h1>📘 ${escapeHtml(c.tema || tema.titulo)}</h1>
-        ${c.resumen ? `<p class="ayuda" style="line-height:1.6;">${escapeHtml(c.resumen)}</p>` : ""}
-        ${c.esquema_visual ? `<h3>Esquema visual</h3><p style="white-space:pre-line; line-height:1.6; margin:0;">${escapeHtml(c.esquema_visual)}</p>` : ""}
-        ${tema.pdf_url ? `<a href="${escapeHtml(tema.pdf_url)}" target="_blank"><button class="secundario" style="margin-top:14px;">📄 Descargar imprimible (PDF)</button></a>` : ""}
-      </div>
-
-      ${actividadesHtml ? `<div class="tarjeta"><h2>✏️ Actividad${c.actividades ? "es (elige la de tu tipo de inteligencia)" : ""}</h2>${actividadesHtml}</div>` : ""}
-
-      ${
-        triviaHtml
-          ? `<div class="tarjeta">
-              <h2>🧠 Trivia</h2>
-              <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
-              ${triviaHtml}
-              <div id="trivia-resumen" style="display:none;"></div>
-              <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>
-            </div>`
-          : ""
-      }
-
-      ${materialExtraHtml ? `<div class="tarjeta"><h2>📎 Material extra</h2>${materialExtraHtml}</div>` : ""}
-
-      <div class="tarjeta">
-        <div class="respuestas-toggle"><button class="secundario" id="btn-respuestas">Ver respuestas</button></div>
-        <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
+        <div class="pestanas">
+          <button class="pestana activa" data-panel="estudiar">📖 Estudiar</button>
+          <button class="pestana" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
+          <button class="pestana" data-panel="repasar">🔁 Repasar</button>
+        </div>
+        <div class="panel" id="panel-estudiar">${estudiarHtml}</div>
+        <div class="panel" id="panel-practicar" style="display:none;">${practicarHtml}</div>
+        <div class="panel" id="panel-repasar" style="display:none;">${repasarHtml}</div>
+        ${tema.pdf_url ? `<a href="${escapeHtml(tema.pdf_url)}" target="_blank" style="text-decoration:none;"><button class="secundario" style="margin-top:18px; width:100%;">📄 Descargar imprimible (PDF)</button></a>` : ""}
       </div>
     `;
+
+    document.querySelectorAll(".pestana").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".pestana").forEach((b) => b.classList.toggle("activa", b === btn));
+        ["estudiar", "practicar", "repasar"].forEach((p) => {
+          document.getElementById("panel-" + p).style.display = p === btn.dataset.panel ? "" : "none";
+        });
+      });
+    });
+
+    document.querySelectorAll(".btn-pista").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("pista-" + btn.dataset.ej);
+        caja.style.display = caja.style.display === "none" ? "block" : "none";
+        btn.textContent = caja.style.display === "none" ? "💡 Ver pista" : "💡 Ocultar pista";
+      });
+    });
+
+    document.querySelectorAll(".btn-solucion").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("solucion-" + btn.dataset.ej);
+        const abierta = caja.style.display !== "none";
+        caja.style.display = abierta ? "none" : "block";
+        btn.textContent = abierta ? "Ver solución" : "Ocultar solución";
+        btn.classList.toggle("abierta", !abierta);
+      });
+    });
 
     document.getElementById("btn-volver").addEventListener("click", mostrarListaTemas);
     document.getElementById("btn-respuestas").addEventListener("click", () => {

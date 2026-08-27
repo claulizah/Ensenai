@@ -41,6 +41,27 @@
   label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
   input, select, textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
   textarea { resize: vertical; min-height: 70px; }
+  .zona-espera { padding: 18px 4px 6px; text-align: center; }
+  .espera-barra { height: 5px; border-radius: 999px; background: var(--linea); overflow: hidden; margin-bottom: 14px; }
+  .espera-barra span {
+    display: block; height: 100%; width: 38%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--cielo), var(--menta));
+    animation: espera-desliza 1.5s ease-in-out infinite;
+  }
+  @keyframes espera-desliza { 0% { transform: translateX(-100%); } 100% { transform: translateX(265%); } }
+  .espera-titulo { color: #4A6A85; font-size: 0.92rem; margin: 0 0 14px; }
+  .tip-caja {
+    display: flex; gap: 12px; text-align: left; align-items: flex-start;
+    background: var(--hielo); border: 2px dashed var(--menta); border-radius: 14px; padding: 14px 16px;
+    animation: tip-aparece .45s ease;
+  }
+  @keyframes tip-aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tip-icono { font-size: 1.15rem; line-height: 1.4; flex-shrink: 0; }
+  .tip-texto { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--bosque); }
+  .tip-puntos { display: flex; gap: 5px; justify-content: center; margin-top: 12px; }
+  .tip-puntos span { width: 6px; height: 6px; border-radius: 50%; background: var(--linea); transition: background .3s; }
+  .tip-puntos span.activo { background: var(--menta); }
+
   .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
   .zona-foto input[type="file"] { display: none; }
   .zona-foto .btn-foto {
@@ -387,6 +408,49 @@
   const LADO_MAX = 1400;
   const fotosPorGrupo = {};
 
+  // ── Tips mientras se genera ─────────────────────────────────────────────
+  // En modo grupo la generación tarda más (son 8 actividades, una por
+  // inteligencia). Estos consejos están escritos para quien da clase o
+  // acompaña, no para un papá — y varios explican POR QUÉ el material viene
+  // como viene, que es la duda más común de un profesional que lo estrena.
+  const TIPS_GRUPO = [
+    "En un salón hay perfiles mezclados. Por eso el material trae una actividad por cada tipo de inteligencia, no una sola para todos.",
+    "No tienes que usar las 8 actividades. Elige dos o tres y reparte según lo que sabes de cada quien.",
+    "Dar actividades distintas no es hacer diferencias: es darle a cada quien una puerta de entrada al mismo tema.",
+    "Antes de compartir el material puedes editar la trivia — corregir, quitar o agregar preguntas propias.",
+    "Repasar el mismo tema tres veces en días distintos fija mucho más que una sesión larga.",
+    "Pedirles que expliquen el tema entre ellos es de las formas más rápidas de detectar quién no lo entendió.",
+    "Releer apuntes se siente productivo pero engaña. Cerrar el cuaderno e intentar recordar es lo que funciona.",
+    "El imprimible en PDF trae hoja de respuestas por separado, para que puedas repartir solo la parte del alumno.",
+  ];
+
+  const tipsIntervalos = {};
+
+  function iniciarTips(grupoId, contenedor, encabezado) {
+    detenerTips(grupoId);
+    let i = 0;
+    const pintar = () => {
+      contenedor.innerHTML = `
+        <div class="zona-espera">
+          <div class="espera-barra"><span></span></div>
+          <p class="espera-titulo">${escapeHtml(encabezado)}</p>
+          <div class="tip-caja">
+            <span class="tip-icono">💡</span>
+            <p class="tip-texto">${escapeHtml(TIPS_GRUPO[i % TIPS_GRUPO.length])}</p>
+          </div>
+          <div class="tip-puntos">${TIPS_GRUPO.slice(0, 6)
+            .map((_, k) => `<span class="${k === i % 6 ? "activo" : ""}"></span>`)
+            .join("")}</div>
+        </div>`;
+    };
+    pintar();
+    tipsIntervalos[grupoId] = setInterval(() => { i++; pintar(); }, 6000);
+  }
+
+  function detenerTips(grupoId) {
+    if (tipsIntervalos[grupoId]) { clearInterval(tipsIntervalos[grupoId]); delete tipsIntervalos[grupoId]; }
+  }
+
   function comprimirImagen(file) {
     return new Promise((resolve, reject) => {
       const lector = new FileReader();
@@ -461,9 +525,11 @@
       return;
     }
 
-    resultado.innerHTML = `<div class="cargando">${
-      imagenes.length ? "Leyendo tus fotos y generando" : "Generando"
-    } material con IA… puede tardar unos segundos.</div>`;
+    iniciarTips(
+      grupoId,
+      resultado,
+      imagenes.length ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…"
+    );
 
     try {
       const res = await fetch(`${API_BASE}/api/temas/generar`, {
@@ -472,6 +538,7 @@
         body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes }),
       });
       const data = await res.json();
+      detenerTips(grupoId);
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
       contenidoEnEdicion[grupoId] = data.contenido;
@@ -490,6 +557,7 @@
         descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target)
       );
     } catch (err) {
+      detenerTips(grupoId);
       resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
