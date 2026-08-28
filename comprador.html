@@ -339,14 +339,6 @@
         return;
       }
 
-      if (params.get("despues") === "curso" && params.get("slug") && params.get("comprar") !== "creditos") {
-        window.location.href = `curso.html?slug=${encodeURIComponent(params.get("slug"))}`;
-        return;
-      }
-      if (params.get("despues") === "paquete" && params.get("slug")) {
-        window.location.href = `paquete.html?slug=${encodeURIComponent(params.get("slug"))}`;
-        return;
-      }
       if (params.get("despues") === "grupo") {
         window.location.href = "grupo.html";
         return;
@@ -395,6 +387,16 @@
     document.getElementById("tabRegistro").addEventListener("click", () => mostrarLogin("registro"));
     document.getElementById("btnAccion").addEventListener("click", () => iniciarSesion(esRegistro));
     if (!esRegistro) document.getElementById("btnOlvide").addEventListener("click", mostrarOlvideContrasena);
+    // Enter en cualquiera de los dos campos hace lo mismo que tocar el botón
+    // — sin esto había que tocar "Entrar"/"Crear cuenta" a mano incluso en
+    // celular, que es la pantalla donde más fricción de un toque de más se
+    // nota (es la primera pantalla real del producto para alguien nuevo).
+    ["correo", "contrasena"].forEach((id) => {
+      document.getElementById(id).addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") iniciarSesion(esRegistro);
+      });
+    });
+    document.getElementById("correo").focus();
   }
 
   function mostrarOlvideContrasena() {
@@ -411,6 +413,10 @@
     `;
     document.getElementById("btnMandarRecuperacion").addEventListener("click", mandarRecuperacion);
     document.getElementById("btnRegresarLogin").addEventListener("click", () => mostrarLogin("login"));
+    document.getElementById("correo-recuperar").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") mandarRecuperacion();
+    });
+    document.getElementById("correo-recuperar").focus();
   }
 
   async function mandarRecuperacion() {

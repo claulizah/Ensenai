@@ -145,6 +145,11 @@
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
   .respuestas-box.abierto { display: block; }
   .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; }
+  footer.pie {
+    max-width: 620px; margin: 24px auto 32px; padding: 0 16px;
+    text-align: center; font-size: 0.78rem; color: #6B87A0;
+  }
+  footer.pie a { color: inherit; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -156,6 +161,11 @@
 <main id="contenido">
   <div class="cargando">Cargando…</div>
 </main>
+
+<footer class="pie">
+  Tu docente o profesional te compartió esta liga. Guardamos tus respuestas para que pueda ver el avance del grupo —
+  consulta el <a href="privacidad.html">aviso de privacidad</a> para más detalle.
+</footer>
 
 <script>
   const API_BASE = "https://ensenai-backend.onrender.com";
@@ -211,6 +221,16 @@
     }
   }
 
+  // Sentinel para "ya se le preguntó y prefirió no dar nombre" (grupos
+  // anónimos) — distinto de "todavía no se le ha preguntado", que es lo que
+  // representa que nombreGuardado() regrese null.
+  const SIN_NOMBRE = "__sin_nombre__";
+
+  function nombreParaEnviar(grupoSlug) {
+    const n = nombreGuardado(grupoSlug);
+    return !n || n === SIN_NOMBRE ? null : n;
+  }
+
   async function init() {
     const cont = document.getElementById("contenido");
     if (!slug) {
@@ -227,33 +247,91 @@
       temasActuales = data.temas || [];
 
       const nombreYaGuardado = nombreGuardado(slug);
-      if (grupoActual.mostrar_nombres && !nombreYaGuardado) {
+      if (!nombreYaGuardado) {
         mostrarPideNombre();
       } else {
-        if (nombreYaGuardado === null) registrarAcceso(null);
         mostrarListaTemas();
       }
     } catch (err) {
-      cont.innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(err.message)}</div></div>`;
+      // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+      // CORS) lanza un TypeError genérico ("Failed to fetch") — no tiene
+      // sentido mostrárselo tal cual a un alumno. Un error de negocio real
+      // (ej. "Liga no encontrada.") sí lo lanzamos nosotros más arriba con
+      // Error(...), así que ese mensaje sí es legible y se muestra tal cual.
+      const mensaje =
+        err instanceof TypeError
+          ? "No pudimos conectar con EnseñAI. Revisa tu internet e intenta de nuevo."
+          : err.message;
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <div class="error">${escapeHtml(mensaje)}</div>
+          <button class="secundario" id="btn-reintentar" style="margin-top:12px;">Reintentar</button>
+        </div>`;
+      const btn = document.getElementById("btn-reintentar");
+      if (btn) btn.addEventListener("click", () => { cont.innerHTML = `<div class="cargando">Cargando…</div>`; init(); });
     }
   }
 
   function mostrarPideNombre() {
+    // En grupos anónimos (mostrar_nombres = false, pensado para psicólogos
+    // con pacientes) igual pedimos un primer nombre o apodo — sirve para
+    // que el profesional distinga las respuestas de cada quien sin saber
+    // quién es en realidad — pero aquí es OPCIONAL: quien prefiera no darlo
+    // puede continuar sin escribir nada.
+    const anonimo = !grupoActual.mostrar_nombres;
+
     document.getElementById("contenido").innerHTML = `
       <div class="tarjeta">
         <h1>👋 Bienvenido/a a "${escapeHtml(grupoActual.nombre)}"</h1>
-        <p class="ayuda">Antes de entrar, dinos tu nombre o apodo (solo la primera vez).</p>
-        <label>Tu nombre o apodo</label>
-        <input type="text" id="input-nombre" placeholder="Ej. Ana, Grupo 3B - Juan…">
+        <p class="ayuda">${
+          anonimo
+            ? "Antes de entrar, si quieres, dinos tu primer nombre o un apodo (sin apellido) — es opcional, y solo sirve para distinguir tus respuestas de las de los demás."
+            : "Antes de entrar, dinos tu nombre o apodo (solo la primera vez)."
+        }</p>
+        <label>${anonimo ? "Tu primer nombre o apodo (opcional)" : "Tu nombre o apodo"}</label>
+        <input type="text" id="input-nombre" placeholder="${anonimo ? "Ej. Ale, Paciente 3…" : "Ej. Ana, Grupo 3B - Juan…"}" autofocus>
+        ${anonimo ? "" : `<div class="error" id="error-nombre" style="display:none;">Escribe tu nombre o apodo para continuar.</div>`}
         <button class="primario" id="btn-continuar">Continuar</button>
+        ${anonimo ? `<button class="secundario" id="btn-omitir" style="margin-top:8px;">Prefiero no darlo</button>` : ""}
       </div>
     `;
-    document.getElementById("btn-continuar").addEventListener("click", () => {
-      const nombre = document.getElementById("input-nombre").value.trim();
-      guardarNombre(slug, nombre || "");
-      registrarAcceso(nombre || null);
+    const input = document.getElementById("input-nombre");
+    const error = document.getElementById("error-nombre");
+
+    const continuarSinNombre = () => {
+      guardarNombre(slug, SIN_NOMBRE);
+      registrarAcceso(null);
       mostrarListaTemas();
+    };
+
+    const intentarContinuar = () => {
+      const nombre = input.value.trim();
+      if (!nombre) {
+        if (anonimo) {
+          continuarSinNombre();
+          return;
+        }
+        error.style.display = "block";
+        input.focus();
+        return;
+      }
+      guardarNombre(slug, nombre);
+      registrarAcceso(nombre);
+      mostrarListaTemas();
+    };
+
+    document.getElementById("btn-continuar").addEventListener("click", intentarContinuar);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") intentarContinuar();
     });
+    if (error) {
+      input.addEventListener("input", () => {
+        if (error.style.display !== "none") error.style.display = "none";
+      });
+    }
+    const btnOmitir = document.getElementById("btn-omitir");
+    if (btnOmitir) btnOmitir.addEventListener("click", continuarSinNombre);
+    input.focus();
   }
 
   async function registrarAcceso(nombre) {
@@ -265,6 +343,35 @@
       });
     } catch (err) {
       // no bloquea la experiencia si falla el registro de acceso
+    }
+  }
+
+  /**
+   * Manda el detalle de cómo se contestó la trivia de un tema, para que el
+   * profesional vea qué está fallando (no solo un puntaje). Se llama después
+   * de que "Revisar mis respuestas" ya calificó y mostró todo en pantalla,
+   * así que si esto falla el alumno no se entera ni pierde nada — solo el
+   * profesor se queda sin ese envío en su reporte.
+   *
+   * En grupos anónimos, dar el nombre fue opcional — si la persona lo
+   * omitió, nombreParaEnviar(slug) regresa null (nunca el sentinel interno
+   * SIN_NOMBRE) y el profesor la verá como "Alumno N (anónimo)".
+   *
+   * "indice" identifica la pregunta dentro del arreglo trivia del tema —
+   * el backend lo usa para releer la pregunta real y recalcular "acerto"
+   * él mismo (nunca confía en lo que mandamos aquí); "pregunta",
+   * "respuesta_correcta" y "acerto" solo viajan como respaldo por si el
+   * backend no pudiera encontrar la pregunta original.
+   */
+  async function enviarRespuestas(temaId, respuestas) {
+    try {
+      await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(temaId)}/respuestas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombreParaEnviar(slug), respuestas }),
+      });
+    } catch (err) {
+      // no bloquea la experiencia del alumno si falla
     }
   }
 
@@ -317,10 +424,12 @@
   function revisarTrivia() {
     let total = 0;
     let correctas = 0;
+    const detalle = [];
 
-    document.querySelectorAll(".trivia-item").forEach((item) => {
+    Array.from(document.querySelectorAll(".trivia-item")).forEach((item, indice) => {
       item.classList.add("revisado");
       const correcta = item.dataset.correcta || "";
+      const pregunta = item.dataset.pregunta || "";
       const opciones = item.querySelectorAll(".opcion-btn");
       const feedback = item.querySelector(".trivia-feedback");
       const abierta = item.querySelector(".respuesta-abierta");
@@ -356,6 +465,14 @@
           feedback.className = "trivia-feedback";
           feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
         }
+
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: seleccionado ? seleccionado.dataset.valor : null,
+          respuesta_correcta: correcta,
+          acerto: !!acerto,
+        });
       } else {
         if (abierta) abierta.disabled = true;
         const escribio = abierta && abierta.value.trim();
@@ -364,8 +481,22 @@
         feedback.innerHTML =
           (escribio ? "" : "<em>No escribiste nada.</em> ") +
           `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+
+        // respuesta abierta: no se autocalifica, así que acerto queda en
+        // null — el profesor la lee y juzga él mismo.
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: escribio || null,
+          respuesta_correcta: correcta,
+          acerto: null,
+        });
       }
     });
+
+    if (detalle.length && temasActuales[temaAbiertoIdx]) {
+      enviarRespuestas(temasActuales[temaAbiertoIdx].id, detalle);
+    }
 
     const resumen = document.getElementById("trivia-resumen");
     if (resumen && total > 0) {
@@ -690,7 +821,7 @@
     const triviaHtml = (c.trivia || [])
       .map(
         (p, i) => `
-      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}" data-pregunta="${escapeHtml(p.pregunta || "")}">
         <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
         ${
           p.opciones?.length

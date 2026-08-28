@@ -509,6 +509,12 @@
       </div>
     `;
     document.getElementById("btn-generar").addEventListener("click", generarTema);
+    // Enter en el campo "Tema" genera de una vez — es el campo obligatorio
+    // y el primero que se llena; los demás son opcionales, así que no hace
+    // falta seguir tocando "Generar material" a mano en celular.
+    document.getElementById("tema-input").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") generarTema();
+    });
     document.getElementById("fotos-input").addEventListener("change", alElegirFotos);
     fotosSeleccionadas = [];
     pintarMiniaturas();

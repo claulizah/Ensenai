@@ -251,7 +251,7 @@
           <h3>Agregar un tema nuevo</h3>
           <div id="zona-generar-${g.id}">
             <label>Tema</label>
-            <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…">
+            <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…" onkeydown="if (event.key === 'Enter') generarTema('${g.id}', ${g.temas_totales === 0})">
             <label>¿Algo específico que quieras que incluya? (opcional)</label>
             <textarea id="detalles-input-${g.id}" placeholder="Ej. Solo lo que vimos en clase esta semana, o: enfócate en los ejemplos prácticos."></textarea>
             <label>Foto del temario, resumen o apuntes (opcional)</label>
@@ -794,9 +794,10 @@
           ${
             t.pago_status === "pendiente"
               ? `<button class="secundario chico" id="btn-pagar-lista-${t.id}">Pagar</button>`
-              : ""
+              : `<button class="secundario chico" id="btn-respuestas-${t.id}">Ver respuestas</button>`
           }
         </div>
+        ${t.pago_status !== "pendiente" ? `<div id="respuestas-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
       `
         )
         .join("");
@@ -806,8 +807,82 @@
         .forEach((t) => {
           document.getElementById(`btn-pagar-lista-${t.id}`).addEventListener("click", () => pagarTema(t.id));
         });
+
+      temas
+        .filter((t) => t.pago_status !== "pendiente")
+        .forEach((t) => {
+          const btn = document.getElementById(`btn-respuestas-${t.id}`);
+          if (btn) btn.addEventListener("click", () => toggleRespuestas(grupoId, t.id));
+        });
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudieron cargar los temas.</div>`;
+    }
+  }
+
+  /**
+   * Muestra/oculta, por tema, quién contestó la trivia y qué contestó en
+   * cada pregunta — para que el profesional vea en qué está fallando el
+   * grupo, no solo un promedio. En grupos anónimos (mostrar_nombres=false)
+   * el backend nunca guarda nombre, así que aquí simplemente sale como
+   * "Alumno N (anónimo)".
+   */
+  async function toggleRespuestas(grupoId, temaId) {
+    const panel = document.getElementById(`respuestas-${temaId}`);
+    const btn = document.getElementById(`btn-respuestas-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "Ver respuestas";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando respuestas…</div>`;
+    if (btn) btn.textContent = "Ocultar respuestas";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar las respuestas.");
+
+      const respuestas = data.respuestas || [];
+      if (respuestas.length === 0) {
+        panel.innerHTML = `<p class="ayuda" style="margin:8px 0 0;">Todavía nadie ha contestado la trivia de este tema.</p>`;
+        return;
+      }
+
+      panel.innerHTML = respuestas
+        .map((r, i) => {
+          const quien = r.nombre ? escapeHtml(r.nombre) : `Alumno ${i + 1} (anónimo)`;
+          const marca = r.created_at
+            ? new Date(r.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+            : "";
+          const puntaje = r.total_cerradas > 0 ? ` — ${r.aciertos}/${r.total_cerradas} correctas` : "";
+
+          const detallePreguntas = (r.respuestas || [])
+            .map((p) => {
+              const icono = p.acerto === true ? "✅" : p.acerto === false ? "❌" : "✏️";
+              const nota =
+                p.acerto === false
+                  ? ` · Correcta: ${escapeHtml(p.respuesta_correcta || "")}`
+                  : "";
+              return `<div style="margin:6px 0 0; font-size:0.88rem;">
+                <div><strong>${icono} ${escapeHtml(p.pregunta)}</strong></div>
+                <div class="ayuda" style="margin:2px 0 0;">Contestó: ${escapeHtml(p.respuesta || "(sin contestar)")}${nota}</div>
+              </div>`;
+            })
+            .join("");
+
+          return `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+            <div><strong>${quien}</strong>${puntaje} <span class="ayuda">· ${marca}</span></div>
+            ${detallePreguntas}
+          </div>`;
+        })
+        .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
     }
   }
 
