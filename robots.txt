@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /comprador.html
+Disallow: /restablecer.html
+Disallow: /grupo.html
+Disallow: /tema.html
+Disallow: /creador.html
+Disallow: /creator.html
+Disallow: /ventas.html
+Disallow: /paquetes.html
+Disallow: /g.html
+
+Sitemap: https://ensenai.com/sitemap.xml
