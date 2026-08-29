@@ -225,6 +225,11 @@
     header .pill-btn.primario { padding: 9px 14px; font-size: 0.82rem; }
     .precios-tabs { flex-direction: column; align-items: stretch; }
   }
+  @media (max-width: 420px) {
+    header nav { gap: 6px; }
+    header .nav-link { font-size: 0.7rem; white-space: nowrap; }
+    header .pill-btn.primario { padding: 7px 10px; font-size: 0.7rem; white-space: nowrap; }
+  }
 </style>
 <script type="application/ld+json">
 {
@@ -233,6 +238,28 @@
   "name": "EnseñAI",
   "url": "https://ensenai.com",
   "logo": "https://ensenai.com/assets/logo-full.png"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "EnseñAI",
+  "url": "https://ensenai.com",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "Web",
+  "description": "EnseñAI genera resúmenes, trivias y actividades con inteligencia artificial, personalizados según cómo aprende cada quien. Para papás, adolescentes, adultos, maestros y psicólogos en México.",
+  "inLanguage": "es-MX",
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "MXN",
+    "price": "0",
+    "description": "Plan gratuito disponible; planes de pago para uso individual y de grupo."
+  },
+  "audience": {
+    "@type": "Audience",
+    "audienceType": "Padres, maestros, psicólogos, adolescentes y adultos que estudian por su cuenta"
+  }
 }
 </script>
 <script type="application/ld+json">
@@ -290,6 +317,7 @@
   <div class="contenedor fila">
     <a class="marca" href="#"><span>Enseñ<span class="ai">AI</span></span></a>
     <nav>
+      <a class="nav-link" href="blog/">Blog</a>
       <a class="nav-link" href="comprador.html">Iniciar sesión</a>
       <a class="pill-btn primario" href="comprador.html?despues=tema">Empezar gratis</a>
     </nav>
@@ -538,6 +566,8 @@
 <footer>
   <p class="nota">Nos basamos en la teoría de inteligencias múltiples como guía práctica para personalizar el contenido — no es un diagnóstico ni una prueba clínica.</p>
   <div style="margin-bottom:8px;">
+    <a href="blog/" style="color:#5b7d99;">Blog</a>
+    &nbsp;·&nbsp;
     <a href="privacidad.html" style="color:#5b7d99;">Aviso de privacidad</a>
     &nbsp;·&nbsp;
     <a href="terminos.html" style="color:#5b7d99;">Términos y condiciones</a>
