@@ -311,9 +311,7 @@
       if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
       const usoTexto =
-        plan.nivel === "gratis"
-          ? "El primer tema de cada grupo es gratis; los siguientes se pagan sueltos o con un plan."
-          : plan.limite_temas_mes === null
+        plan.limite_temas_mes === null
           ? `${plan.temas_usados_este_mes} temas-grupo cubiertos este mes — sin límite`
           : `${plan.temas_usados_este_mes} de ${plan.limite_temas_mes} temas-grupo cubiertos este mes`;
 
