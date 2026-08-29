@@ -5,12 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EnseñAI — El mismo tema, explicado como tú aprendes</title>
 <meta name="description" content="EnseñAI genera resúmenes, trivias y actividades con IA, personalizados según cómo aprende cada quien. Para papás, adolescentes, adultos, maestros y psicólogos.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://ensenai.com/">
 <meta property="og:title" content="EnseñAI">
 <meta property="og:description" content="El mismo tema, explicado como tu hijo (o tu grupo) realmente aprende.">
 <meta property="og:image" content="https://ensenai.com/assets/logo-full.png">
 <meta property="og:url" content="https://ensenai.com">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="EnseñAI">
+<meta name="twitter:description" content="El mismo tema, explicado como tu hijo (o tu grupo) realmente aprende.">
+<meta name="twitter:image" content="https://ensenai.com/assets/logo-full.png">
 <link rel="icon" type="image/png" href="assets/favicon-32.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -104,6 +110,26 @@
     padding: 8px 16px; border-radius: 999px;
   }
 
+  /* Ejemplo de material */
+  .ejemplo-section { padding: 0 0 56px; }
+  .ejemplo-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 22px; align-items: stretch; }
+  .ejemplo-card { background: #fff; border: 2px solid var(--linea); border-radius: 20px; padding: 26px 24px; box-shadow: 0 3px 0 var(--linea); text-align: left; }
+  .ejemplo-card h3 { font-family: 'Grandstander', sans-serif; font-size: 1.05rem; margin-bottom: 10px; color: var(--profundo); }
+  .ejemplo-etiqueta {
+    display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #7B93A8; background: var(--hielo); border: 1px solid var(--linea); padding: 3px 10px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .ejemplo-resumen p { color: #3d5a72; font-size: 0.92rem; margin-bottom: 10px; }
+  .ejemplo-resumen ul { margin: 0 0 10px 18px; color: #3d5a72; font-size: 0.92rem; }
+  .ejemplo-trivia .pregunta { font-weight: 700; font-size: 0.92rem; margin-bottom: 10px; }
+  .ejemplo-trivia .opcion {
+    display: flex; align-items: center; gap: 8px; border: 2px solid var(--linea); border-radius: 10px;
+    padding: 9px 12px; font-size: 0.88rem; margin-bottom: 8px; color: #2E4A63;
+  }
+  .ejemplo-trivia .opcion.correcta { border-color: var(--menta); background: #E7FBF3; color: var(--bosque); font-weight: 700; }
+  .ejemplo-nota { text-align: center; font-size: 0.85rem; color: #5b7d99; margin-top: 16px; }
+  @media (max-width: 800px) { .ejemplo-grid { grid-template-columns: 1fr; } }
+
   /* Value props */
   .props-section { padding: 40px 0 56px; }
   .props-titulo { text-align: center; font-family: 'Grandstander', sans-serif; font-size: 1.7rem; margin-bottom: 36px; }
@@ -140,6 +166,15 @@
 
   /* Precios */
   .precios-section { padding: 10px 0 60px; }
+  .precios-tabs { display: flex; gap: 10px; justify-content: center; margin-bottom: 28px; }
+  .precios-tab {
+    font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 0.92rem; cursor: pointer;
+    padding: 10px 22px; border-radius: 999px; border: 2px solid var(--linea); background: #fff; color: #4A6A85;
+  }
+  .precios-tab.activo { background: var(--profundo); color: #fff; border-color: var(--profundo); }
+  .precios-grupo { display: none; }
+  .precios-grupo.activo { display: block; }
+  .precios-subtitulo { text-align: center; color: #4A6A85; margin: -18px 0 26px; font-size: 0.95rem; }
   .precios-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
   .precio-card { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 26px 22px; box-shadow: 0 3px 0 var(--linea); text-align: center; transition: transform .18s; }
   .precio-card:hover { transform: translateY(-3px); }
@@ -154,6 +189,21 @@
   .precio-card .monto span { font-size: 0.9rem; color: #4A6A85; font-family: 'Nunito', sans-serif; font-weight: 700; }
   .precio-card .limites { font-size: 0.85rem; color: #4A6A85; margin-top: 10px; line-height: 1.6; }
   .precios-nota { text-align: center; font-size: 0.85rem; color: #5b7d99; margin-top: 20px; }
+
+  /* FAQ */
+  .faq-section { padding: 10px 0 60px; }
+  .faq-lista { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .faq-item { background: #fff; border: 2px solid var(--linea); border-radius: 16px; box-shadow: 0 3px 0 var(--linea); overflow: hidden; }
+  .faq-pregunta {
+    width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 0.98rem; color: var(--profundo);
+    padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .faq-pregunta .icono { transition: transform .2s; color: var(--menta); font-size: 1.2rem; flex-shrink: 0; }
+  .faq-item.abierto .faq-pregunta .icono { transform: rotate(45deg); }
+  .faq-respuesta { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+  .faq-respuesta p { padding: 0 20px 18px; color: #3d5a72; font-size: 0.92rem; margin: 0; }
+  .faq-item.abierto .faq-respuesta { max-height: 240px; }
 
   /* CTA final */
   .cta-final { padding: 56px 0 70px; text-align: center; }
@@ -171,9 +221,68 @@
 
   @media (max-width: 800px) {
     .props-grid, .audiencias-grid, .precios-grid { grid-template-columns: 1fr; }
-    header .nav-link { display: none; }
+    header .nav-link { font-size: 0.8rem; }
+    header .pill-btn.primario { padding: 9px 14px; font-size: 0.82rem; }
+    .precios-tabs { flex-direction: column; align-items: stretch; }
   }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "EnseñAI",
+  "url": "https://ensenai.com",
+  "logo": "https://ensenai.com/assets/logo-full.png"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Esto reemplaza a un psicopedagogo o a una evaluación profesional?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. El cuestionario de inteligencias múltiples es una guía práctica para adaptar el estilo del material — no es una prueba psicométrica ni un diagnóstico clínico. Si eres psicólogo/a, puedes usar el material como recurso de psicoeducación, pero no como instrumento de evaluación."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué cuenta como \"un tema\"?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Un tema es cualquier asunto de tarea o de estudio que le pides a EnseñAI (por ejemplo, \"la fotosíntesis\" o \"fracciones\"). Por cada tema recibes explicación, trivia interactiva y material imprimible — todo junto, no por separado."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Puedo cancelar cuando quiera?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí. Las suscripciones se cobran mes a mes y puedes cancelar cuando quieras — conservas el acceso hasta el final del periodo ya pagado y no te hacemos cobros posteriores."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Mis datos o los de mi hijo/a están seguros?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Los pagos se procesan con Stripe y no almacenamos los datos de tu tarjeta. El detalle completo de qué información guardamos y cómo la usamos está en el aviso de privacidad."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Mis alumnos o pacientes necesitan pagar o crear una cuenta?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Tú generas el material y lo compartes con una sola liga — quien la recibe entra sin cuenta y sin pagar nada."
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -235,6 +344,35 @@
   </div>
 </section>
 
+<section class="ejemplo-section">
+  <div class="contenedor">
+    <h2 class="props-titulo">Así se ve el material</h2>
+    <p style="text-align:center; color:#4A6A85; margin:-24px 0 32px; font-size:1.02rem;">Ejemplo ilustrativo del tipo de material que genera EnseñAI — no es contenido real de un usuario.</p>
+    <div class="ejemplo-grid">
+      <div class="ejemplo-card ejemplo-resumen">
+        <span class="ejemplo-etiqueta">📘 Explicación · estilo espacial</span>
+        <h3>La fotosíntesis</h3>
+        <p>Imagina la hoja como una fábrica solar: capta luz por arriba, absorbe agua por abajo, y por los lados "respira" el aire que necesita.</p>
+        <ul>
+          <li>🔆 Luz solar → entra por las hojas</li>
+          <li>💧 Agua → sube desde la raíz</li>
+          <li>🌬️ CO₂ → entra por poros diminutos</li>
+          <li>🍃 Salida: azúcar (alimento) + oxígeno</li>
+        </ul>
+      </div>
+      <div class="ejemplo-card ejemplo-trivia">
+        <span class="ejemplo-etiqueta">🧠 Trivia · práctica rápida</span>
+        <h3>Pon a prueba lo que aprendiste</h3>
+        <p class="pregunta">1. ¿Qué gas libera la planta durante la fotosíntesis?</p>
+        <div class="opcion">Dióxido de carbono</div>
+        <div class="opcion correcta">✓ Oxígeno</div>
+        <div class="opcion">Nitrógeno</div>
+      </div>
+    </div>
+    <p class="ejemplo-nota">El mismo tema se genera en 8 versiones distintas — una por tipo de inteligencia — más una trivia y material imprimible.</p>
+  </div>
+</section>
+
 <section class="props-section">
   <div class="contenedor">
     <h2 class="props-titulo">Cómo funciona</h2>
@@ -293,24 +431,94 @@
 <section class="precios-section">
   <div class="contenedor">
     <h2 class="props-titulo">Precios simples</h2>
-    <div class="precios-grid">
-      <div class="precio-card">
-        <h3>Gratis</h3>
-        <div class="monto">$0</div>
-        <div class="limites">2 temas al mes<br>Hasta 3 perfiles de aprendizaje</div>
-      </div>
-      <div class="precio-card destacado">
-        <h3>Aprendemos</h3>
-        <div class="monto">$79 <span>MXN/mes</span></div>
-        <div class="limites">20 temas al mes<br>Hasta 3 perfiles</div>
-      </div>
-      <div class="precio-card">
-        <h3>Ilimitado</h3>
-        <div class="monto">$129 <span>MXN/mes</span></div>
-        <div class="limites">Temas ilimitados<br>Hasta 6 perfiles</div>
+    <div class="precios-tabs" role="tablist">
+      <button class="precios-tab activo" id="tab-individual" onclick="mostrarPrecios('individual')">👨‍👩‍👧 Papás, adolescentes y adultos</button>
+      <button class="precios-tab" id="tab-grupo" onclick="mostrarPrecios('grupo')">🏫 Maestros y psicólogos</button>
+    </div>
+
+    <div class="precios-grupo activo" id="precios-individual">
+      <div class="precios-grid">
+        <div class="precio-card">
+          <h3>Gratis</h3>
+          <div class="monto">$0</div>
+          <div class="limites">2 temas al mes<br>Hasta 3 perfiles de aprendizaje</div>
+        </div>
+        <div class="precio-card destacado">
+          <h3>Aprendemos</h3>
+          <div class="monto">$79 <span>MXN/mes</span></div>
+          <div class="limites">20 temas al mes<br>Hasta 3 perfiles</div>
+        </div>
+        <div class="precio-card">
+          <h3>Ilimitado</h3>
+          <div class="monto">$129 <span>MXN/mes</span></div>
+          <div class="limites">Temas ilimitados<br>Hasta 6 perfiles</div>
+        </div>
       </div>
     </div>
-    <p class="precios-nota">Precios individuales (papás, adolescentes, adultos). Maestros y psicólogos tienen sus propios 3 planes por grupo — Gratis, Aprendemos ($109 MXN/mes) e Ilimitado ($159 MXN/mes) — <a href="comprador.html?despues=grupo" style="color:var(--profundo); font-weight:700;">ver planes de grupo</a>.</p>
+
+    <div class="precios-grupo" id="precios-grupo">
+      <p class="precios-subtitulo">Genera el material una vez y compártelo con todo tu grupo por liga — tus alumnos o pacientes no pagan ni necesitan cuenta.</p>
+      <div class="precios-grid">
+        <div class="precio-card">
+          <h3>Gratis</h3>
+          <div class="monto">$0</div>
+          <div class="limites">1 grupo<br>2 temas-grupo al mes</div>
+        </div>
+        <div class="precio-card destacado">
+          <h3>Aprendemos</h3>
+          <div class="monto">$109 <span>MXN/mes</span></div>
+          <div class="limites">20 temas-grupo al mes<br>Hasta 3 grupos</div>
+        </div>
+        <div class="precio-card">
+          <h3>Ilimitado</h3>
+          <div class="monto">$159 <span>MXN/mes</span></div>
+          <div class="limites">Temas-grupo ilimitados<br>Más grupos incluidos</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="precios-nota">Un "tema" = un tema de tarea o de estudio que generas (incluye explicación + trivia + material imprimible). Los límites se reinician cada mes. <a href="terminos.html" style="color:var(--profundo); font-weight:700;">Ver detalles en términos y condiciones</a>.</p>
+  </div>
+</section>
+
+<script>
+  function mostrarPrecios(cual) {
+    document.getElementById('precios-individual').classList.toggle('activo', cual === 'individual');
+    document.getElementById('precios-grupo').classList.toggle('activo', cual === 'grupo');
+    document.getElementById('tab-individual').classList.toggle('activo', cual === 'individual');
+    document.getElementById('tab-grupo').classList.toggle('activo', cual === 'grupo');
+  }
+  function toggleFaq(btn) {
+    const item = btn.closest('.faq-item');
+    item.classList.toggle('abierto');
+  }
+</script>
+
+<section class="faq-section">
+  <div class="contenedor">
+    <h2 class="props-titulo">Preguntas frecuentes</h2>
+    <div class="faq-lista">
+      <div class="faq-item">
+        <button class="faq-pregunta" onclick="toggleFaq(this)">¿Esto reemplaza a un psicopedagogo o a una evaluación profesional?<span class="icono">+</span></button>
+        <div class="faq-respuesta"><p>No. El cuestionario de inteligencias múltiples es una guía práctica para adaptar el estilo del material — no es una prueba psicométrica ni un diagnóstico clínico. Si eres psicólogo/a, puedes usar el material como recurso de psicoeducación, pero no como instrumento de evaluación.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-pregunta" onclick="toggleFaq(this)">¿Qué cuenta como "un tema"?<span class="icono">+</span></button>
+        <div class="faq-respuesta"><p>Un tema es cualquier asunto de tarea o de estudio que le pides a EnseñAI (por ejemplo, "la fotosíntesis" o "fracciones"). Por cada tema recibes explicación, trivia interactiva y material imprimible — todo junto, no por separado.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-pregunta" onclick="toggleFaq(this)">¿Puedo cancelar cuando quiera?<span class="icono">+</span></button>
+        <div class="faq-respuesta"><p>Sí. Las suscripciones se cobran mes a mes y puedes cancelar cuando quieras — conservas el acceso hasta el final del periodo ya pagado y no te hacemos cobros posteriores.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-pregunta" onclick="toggleFaq(this)">¿Mis datos o los de mi hijo/a están seguros?<span class="icono">+</span></button>
+        <div class="faq-respuesta"><p>Los pagos se procesan con Stripe y no almacenamos los datos de tu tarjeta. Puedes ver el detalle completo de qué información guardamos y cómo la usamos en nuestro <a href="privacidad.html" style="color:var(--profundo); font-weight:700;">aviso de privacidad</a>.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-pregunta" onclick="toggleFaq(this)">¿Mis alumnos o pacientes necesitan pagar o crear una cuenta?<span class="icono">+</span></button>
+        <div class="faq-respuesta"><p>No. Tú generas el material y lo compartes con una sola liga — quien la recibe entra sin cuenta y sin pagar nada.</p></div>
+      </div>
+    </div>
   </div>
 </section>
 
