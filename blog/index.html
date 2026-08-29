@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog de EnseñAI — Aprendizaje personalizado, inteligencias múltiples y más</title>
+<meta name="description" content="Artículos para papás, maestros y psicólogos sobre aprendizaje personalizado, inteligencias múltiples y cómo usar IA de forma responsable en la educación.">
+<link rel="canonical" href="https://ensenai.com/blog/">
+<meta property="og:title" content="Blog de EnseñAI">
+<meta property="og:description" content="Artículos para papás, maestros y psicólogos sobre aprendizaje personalizado e inteligencias múltiples.">
+<meta property="og:image" content="https://ensenai.com/assets/logo-full.png">
+<meta property="og:url" content="https://ensenai.com/blog/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="../assets/favicon-32.png">
+<link rel="apple-touch-icon" href="../assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46; --hielo: #F0FDF4;
+    --tinta: #1E3A8A; --linea: #DCEEFC; --coral: #F97066; --coral-oscuro: #D9553F;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Nunito Sans', 'Nunito', sans-serif; background: var(--hielo); color: var(--tinta); line-height: 1.5; }
+  a { color: inherit; }
+  .contenedor { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+  .pill-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem;
+    padding: 14px 26px; border-radius: 999px; border: none; cursor: pointer;
+    text-decoration: none; transition: transform .15s;
+  }
+  .pill-btn:hover { transform: translateY(-1px); }
+  .pill-btn.primario { background: var(--profundo); color: #fff; box-shadow: 0 4px 0 var(--profundo-oscuro); }
+
+  header { background: var(--profundo); color: #fff; padding: 16px 0; position: sticky; top: 0; z-index: 10; }
+  header .fila { display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; text-decoration: none; color: #fff; }
+  .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
+  header nav { display: flex; align-items: center; gap: 10px; }
+  header .nav-link { color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem; opacity: 0.9; }
+  header .nav-link:hover { opacity: 1; }
+  header .pill-btn.primario { background: var(--menta); color: var(--bosque); box-shadow: 0 3px 0 #22a67c; padding: 10px 18px; font-size: 0.9rem; }
+
+  @media (max-width: 480px) {
+    header nav { gap: 6px; }
+    header .nav-link { font-size: 0.7rem; white-space: nowrap; }
+    header .pill-btn.primario { padding: 7px 10px; font-size: 0.7rem; white-space: nowrap; }
+  }
+
+  .intro { padding: 56px 0 20px; text-align: center; }
+  .intro h1 { font-family: 'Grandstander', sans-serif; font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.6rem); margin-bottom: 12px; }
+  .intro p { color: #3d5a72; max-width: 560px; margin: 0 auto; }
+
+  .lista { padding: 30px 0 70px; display: flex; flex-direction: column; gap: 18px; }
+  .articulo-card {
+    background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 24px;
+    box-shadow: 0 3px 0 var(--linea); text-decoration: none; display: block; transition: transform .15s;
+  }
+  .articulo-card:hover { transform: translateY(-2px); }
+  .articulo-card .etiqueta { display: inline-block; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.72rem; color: var(--bosque); background: var(--hielo); padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; }
+  .articulo-card h2 { font-family: 'Grandstander', sans-serif; font-size: 1.25rem; color: var(--profundo); margin-bottom: 8px; }
+  .articulo-card p { color: #3d5a72; font-size: 0.95rem; }
+  .articulo-card .fecha { display: block; margin-top: 12px; font-size: 0.8rem; color: #7B93A8; }
+
+  footer { padding: 30px 0 50px; text-align: center; color: #7B93A8; font-size: 0.85rem; }
+  footer a { color: #5b7d99; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="fila">
+    <a class="marca" href="../"><span>Enseñ<span class="ai">AI</span></span></a>
+    <nav>
+      <a class="nav-link" href="../comprador.html">Iniciar sesión</a>
+      <a class="pill-btn primario" href="../comprador.html?despues=tema">Empezar gratis</a>
+    </nav>
+  </div>
+</header>
+
+<section class="intro">
+  <div class="contenedor">
+    <h1>Blog de EnseñAI</h1>
+    <p>Ideas prácticas para papás, maestros y psicólogos sobre aprendizaje personalizado, inteligencias múltiples, y cómo usar la IA de forma responsable en la educación.</p>
+  </div>
+</section>
+
+<section class="lista">
+  <div class="contenedor">
+    <a class="articulo-card" href="material-psicoeducativo-personalizado-ia.html">
+      <span class="etiqueta">Para psicólogos</span>
+      <h2>Material psicoeducativo personalizado con IA: qué es y cómo usarlo en terapia infantil</h2>
+      <p>Cómo generar hojas de trabajo, actividades y explicaciones a la medida de cada paciente, sin pasar horas armándolas desde cero.</p>
+      <span class="fecha">29 de agosto de 2026</span>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div><a href="../">EnseñAI</a> · <a href="../privacidad.html">Aviso de privacidad</a> · <a href="../terminos.html">Términos y condiciones</a></div>
+</footer>
+
+</body>
+</html>

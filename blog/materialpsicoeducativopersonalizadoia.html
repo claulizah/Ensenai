@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material psicoeducativo personalizado con IA para terapia infantil | EnseñAI</title>
+<meta name="description" content="Qué es el material psicoeducativo personalizado, por qué importa en terapia infantil, y cómo generarlo más rápido con IA sin perder el criterio clínico del profesional.">
+<link rel="canonical" href="https://ensenai.com/blog/material-psicoeducativo-personalizado-ia.html">
+<meta property="og:title" content="Material psicoeducativo personalizado con IA para terapia infantil">
+<meta property="og:description" content="Qué es, por qué importa, y cómo generarlo más rápido sin perder el criterio clínico del profesional.">
+<meta property="og:image" content="https://ensenai.com/assets/logo-full.png">
+<meta property="og:url" content="https://ensenai.com/blog/material-psicoeducativo-personalizado-ia.html">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="../assets/favicon-32.png">
+<link rel="apple-touch-icon" href="../assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Material psicoeducativo personalizado con IA: qué es y cómo usarlo en terapia infantil",
+  "description": "Qué es el material psicoeducativo personalizado, por qué importa en terapia infantil, y cómo generarlo más rápido con IA sin perder el criterio clínico del profesional.",
+  "author": { "@type": "Organization", "name": "EnseñAI" },
+  "publisher": { "@type": "Organization", "name": "EnseñAI", "logo": { "@type": "ImageObject", "url": "https://ensenai.com/assets/logo-full.png" } },
+  "datePublished": "2026-08-29",
+  "dateModified": "2026-08-29",
+  "mainEntityOfPage": "https://ensenai.com/blog/material-psicoeducativo-personalizado-ia.html",
+  "inLanguage": "es-MX"
+}
+</script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46; --hielo: #F0FDF4;
+    --tinta: #1E3A8A; --linea: #DCEEFC; --coral: #F97066;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Nunito Sans', 'Nunito', sans-serif; background: var(--hielo); color: #26374A; line-height: 1.65; }
+  a { color: var(--profundo); }
+  .contenedor { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  header { background: var(--profundo); color: #fff; padding: 16px 0; position: sticky; top: 0; z-index: 10; }
+  header .fila { display: flex; align-items: center; justify-content: space-between; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; text-decoration: none; color: #fff; }
+  .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
+  header nav { display: flex; align-items: center; gap: 10px; }
+  header .nav-link { color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem; opacity: 0.9; }
+  header .pill-btn { display: inline-flex; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.9rem; padding: 10px 18px; border-radius: 999px; text-decoration: none; background: var(--menta); color: var(--bosque); box-shadow: 0 3px 0 #22a67c; }
+
+  @media (max-width: 480px) {
+    header nav { gap: 6px; }
+    header .nav-link { font-size: 0.7rem; white-space: nowrap; }
+    header .pill-btn { padding: 7px 10px; font-size: 0.7rem; white-space: nowrap; }
+  }
+
+  article { padding: 48px 0 20px; }
+  .etiqueta { display: inline-block; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.72rem; color: var(--bosque); background: #fff; padding: 4px 12px; border-radius: 999px; margin-bottom: 16px; }
+  h1 { font-family: 'Grandstander', sans-serif; font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.3rem); color: var(--profundo); margin-bottom: 10px; line-height: 1.25; }
+  .meta { font-size: 0.85rem; color: #7B93A8; margin-bottom: 30px; }
+  h2 { font-family: 'Grandstander', sans-serif; font-size: 1.25rem; color: var(--profundo); margin: 32px 0 12px; }
+  p { margin-bottom: 16px; font-size: 1.02rem; }
+  ul { margin: 0 0 16px 22px; }
+  li { margin-bottom: 8px; }
+  .destacado { background: #fff; border-left: 4px solid var(--menta); border-radius: 4px; padding: 16px 20px; margin: 24px 0; font-size: 0.98rem; }
+  .cta-box { background: linear-gradient(150deg, #1E3A8A, #16296B); color: #fff; border-radius: 20px; padding: 32px 28px; margin: 40px 0; text-align: center; }
+  .cta-box h3 { font-family: 'Grandstander', sans-serif; font-size: 1.3rem; margin-bottom: 10px; }
+  .cta-box p { color: rgba(255,255,255,0.9); margin-bottom: 20px; }
+  .cta-box .pill-btn { display: inline-flex; font-family: 'Grandstander', sans-serif; font-weight: 600; padding: 14px 26px; border-radius: 999px; text-decoration: none; background: var(--menta); color: var(--bosque); box-shadow: 0 4px 0 #22a67c; }
+  .nota-final { font-size: 0.85rem; color: #7B93A8; margin: 30px 0 60px; }
+
+  footer { padding: 30px 0 50px; text-align: center; color: #7B93A8; font-size: 0.85rem; }
+  footer a { color: #5b7d99; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="fila">
+    <a class="marca" href="../"><span>Enseñ<span class="ai">AI</span></span></a>
+    <nav>
+      <a class="nav-link" href="../comprador.html">Iniciar sesión</a>
+      <a class="pill-btn" href="../comprador.html?despues=tema">Empezar gratis</a>
+    </nav>
+  </div>
+</header>
+
+<article>
+  <div class="contenedor">
+    <span class="etiqueta">Para psicólogos</span>
+    <h1>Material psicoeducativo personalizado con IA: qué es y cómo usarlo en terapia infantil</h1>
+    <p class="meta">29 de agosto de 2026 · Lectura de 6 minutos</p>
+
+    <p>Si trabajas con niños o adolescentes en consulta, probablemente ya conoces la diferencia entre entregarle a un paciente una hoja genérica de internet y entregarle algo hecho pensando específicamente en él: en cómo entiende las cosas, en lo que le llama la atención, en el lenguaje que usa. El problema no es que no sepas hacerlo — es que armarlo desde cero, sesión tras sesión, paciente por paciente, se come un tiempo que casi nadie tiene de sobra.</p>
+
+    <p>A eso nos referimos con <strong>material psicoeducativo personalizado</strong>: contenido explicativo, actividades o ejercicios diseñados para que un paciente entienda un tema (una emoción, un hábito, un concepto) de la forma que mejor le funciona a él o ella, no de forma genérica.</p>
+
+    <h2>Por qué la personalización importa en un contexto terapéutico</h2>
+    <p>La teoría de las inteligencias múltiples, propuesta por Howard Gardner, plantea que no todas las personas procesan la información de la misma manera: algunas la retienen mejor con imágenes y esquemas, otras con historias y palabras, otras moviéndose o manipulando algo con las manos. En terapia infantil esto no es un detalle menor — un niño que no conecta con una hoja de texto puede sí conectar con la misma idea explicada como una comparación visual, un juego de roles, o una actividad práctica.</p>
+
+    <p>Esto no reemplaza el criterio clínico del profesional, y tampoco es un diagnóstico ni una prueba: es una guía práctica para decidir <em>cómo</em> presentar un contenido que tú, como profesional, ya decidiste que es el correcto para ese paciente.</p>
+
+    <h2>El reto real: el tiempo</h2>
+    <p>La mayoría de los psicólogos que atienden niños no tienen problema en identificar qué tema trabajar con cada paciente — el cuello de botella está en producir el material: buscar referencias, adaptar el lenguaje a la edad, pensar en una actividad que funcione, y muchas veces diseñarlo de forma distinta para cada paciente de la semana.</p>
+
+    <div class="destacado">Generar un solo recurso personalizado a mano puede tomar entre 30 y 60 minutos. Multiplicado por varios pacientes a la semana, es tiempo que sale directamente de la agenda o del descanso del profesional.</div>
+
+    <h2>Cómo puede ayudar la inteligencia artificial (bien usada)</h2>
+    <p>Aquí es donde una herramienta de IA educativa puede quitarte trabajo repetitivo sin quitarte el control: tú sigues decidiendo el tema y el enfoque, y la IA arma en minutos una primera versión del material — explicación, actividad, y una forma de repasar lo visto — que después ajustas o usas tal cual.</p>
+    <p>Algunas cosas que vale la pena buscar en una herramienta así, si trabajas con pacientes menores de edad:</p>
+    <ul>
+      <li><strong>Que no requiera que el paciente cree una cuenta.</strong> Entrar con solo un link es más simple para un niño y evita fricción innecesaria.</li>
+      <li><strong>Que ofrezca un modo anónimo real.</strong> Para pacientes de psicólogos, poder omitir cualquier nombre — o dar solo un apodo, nunca un nombre completo — es una diferencia importante frente a herramientas pensadas solo para salones de clase.</li>
+      <li><strong>Que te permita ver qué está funcionando y qué no.</strong> Si el material incluye alguna forma de trivia o repaso, poder ver en qué falló el paciente (no solo un puntaje) te da información real para la siguiente sesión.</li>
+      <li><strong>Que sea transparente sobre qué guarda y qué no.</strong> Cualquier plataforma que uses con menores debería explicarte con claridad, en un aviso de privacidad legible, qué datos recaba y por qué.</li>
+    </ul>
+
+    <p>EnseñAI nació para el uso individual (papás generando material para sus hijos), pero también tiene un modo pensado específicamente para profesionales: creas una liga de grupo, decides si pides nombre o no (con opción de solo un apodo, nunca datos completos), compartes un link, y tus pacientes entran sin cuenta. Tú ves el avance — incluyendo el detalle de cómo contestó cada quien — sin exponer más información de la que decidiste pedir.</p>
+
+    <div class="cta-box">
+      <h3>Pruébalo con tu primer grupo, gratis</h3>
+      <p>Tu primer grupo es gratis, con 2 temas al mes para que lo pruebes con tus pacientes. Sin tarjeta, sin compromiso.</p>
+      <a class="pill-btn" href="../comprador.html?despues=grupo">Crear mi primer grupo</a>
+    </div>
+
+    <p class="nota-final">Este artículo es información general y no sustituye el criterio clínico de un profesional de la salud mental. EnseñAI se apoya en la teoría de inteligencias múltiples como guía práctica para personalizar contenido — no es una herramienta de diagnóstico ni una prueba clínica.</p>
+  </div>
+</article>
+
+<footer>
+  <div><a href="./">Blog de EnseñAI</a> · <a href="../">EnseñAI</a> · <a href="../privacidad.html">Aviso de privacidad</a></div>
+</footer>
+
+</body>
+</html>
