@@ -759,31 +759,68 @@
 
   // ── Avatares de los perfiles ────────────────────────────────────────────
   // Se guarda solo el ID (ej. "avatar-03"), nunca la imagen: los archivos
-  // viven en el frontend. Mientras Claudia termina las ilustraciones se usan
-  // estos emojis; cuando estén listas basta con poner los SVG en
-  // assets/avatares/ y cambiar USAR_ILUSTRACIONES a true — sin migración
-  // ni tocar los perfiles ya guardados, porque los IDs son los mismos.
-  const USAR_ILUSTRACIONES = false;
+  // viven en el frontend. Antes este selector iba a ser de animales (zorro,
+  // búho, tortuga...) pero se cambió a caritas de niños ilustradas — set
+  // comprado en Etsy (licencia "comercial pequeño, hasta 100 ventas" — NO
+  // renovada a licencia extendida todavía; hacerlo antes de que las
+  // suscripciones de pago combinadas pasen de ~90). Los archivos viven en
+  // assets/avatares/avatar-01.png … avatar-24.png. Si algún perfil ya
+  // guardado tenía un id de la época de animales (avatar-01..12), no truena:
+  // simplemente ahora ese id apunta a una carita en vez de un emoji.
+  const USAR_ILUSTRACIONES = true;
   const AVATARES = [
-    { id: "avatar-01", emoji: "🦊" }, { id: "avatar-02", emoji: "🐙" },
-    { id: "avatar-03", emoji: "🦉" }, { id: "avatar-04", emoji: "🐢" },
-    { id: "avatar-05", emoji: "🦋" }, { id: "avatar-06", emoji: "🐬" },
-    { id: "avatar-07", emoji: "🦁" }, { id: "avatar-08", emoji: "🐨" },
-    { id: "avatar-09", emoji: "🦜" }, { id: "avatar-10", emoji: "🐝" },
-    { id: "avatar-11", emoji: "🦕" }, { id: "avatar-12", emoji: "🐳" },
+    { id: "avatar-01", file: "avatar-01.png" }, { id: "avatar-02", file: "avatar-02.png" },
+    { id: "avatar-03", file: "avatar-03.png" }, { id: "avatar-04", file: "avatar-04.png" },
+    { id: "avatar-05", file: "avatar-05.png" }, { id: "avatar-06", file: "avatar-06.png" },
+    { id: "avatar-07", file: "avatar-07.png" }, { id: "avatar-08", file: "avatar-08.png" },
+    { id: "avatar-09", file: "avatar-09.png" }, { id: "avatar-10", file: "avatar-10.png" },
+    { id: "avatar-11", file: "avatar-11.png" }, { id: "avatar-12", file: "avatar-12.png" },
+    { id: "avatar-13", file: "avatar-13.png" }, { id: "avatar-14", file: "avatar-14.png" },
+    { id: "avatar-15", file: "avatar-15.png" }, { id: "avatar-16", file: "avatar-16.png" },
+    { id: "avatar-17", file: "avatar-17.png" }, { id: "avatar-18", file: "avatar-18.png" },
+    { id: "avatar-19", file: "avatar-19.png" }, { id: "avatar-20", file: "avatar-20.png" },
+    { id: "avatar-21", file: "avatar-21.png" }, { id: "avatar-22", file: "avatar-22.png" },
+    { id: "avatar-23", file: "avatar-23.png" }, { id: "avatar-24", file: "avatar-24.png" },
   ];
 
-  /** Devuelve el HTML del avatar de un perfil: ilustración si ya existen, si no el emoji, y si no tiene avatar el ícono de su inteligencia. */
+  // Avatares de adultos/adolescentes autodidactas: iniciales sobre un color
+  // llamativo, sacado del mismo set de colores de inteligencias (así se ve
+  // parte del mismo sistema visual). Se calcula del nombre — no requiere
+  // guardar nada nuevo en el backend.
+  const PALETA_INICIALES = Object.values(COLOR_INTELIGENCIA);
+
+  function iniciales(nombre) {
+    const palabras = (nombre || "").trim().split(/\s+/).filter(Boolean);
+    if (palabras.length === 0) return "?";
+    if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase();
+    return (palabras[0][0] + palabras[1][0]).toUpperCase();
+  }
+
+  function colorIniciales(nombre) {
+    const str = (nombre || "").trim() || "?";
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return PALETA_INICIALES[hash % PALETA_INICIALES.length];
+  }
+
+  function htmlAvatarIniciales(nombre, tam = 34) {
+    const estilo = `width:${tam}px; height:${tam}px; background:${colorIniciales(nombre)}; font-family:'Grandstander',sans-serif; font-weight:700; color:#fff; font-size:${Math.round(tam * 0.4)}px;`;
+    return `<span class="avatar-perfil" style="${estilo}">${escapeHtml(iniciales(nombre))}</span>`;
+  }
+
+  /** Devuelve el HTML del avatar de un perfil: iniciales para cuentas de adultos/autodidactas, ilustración de niños si ya existen (o el ícono de su inteligencia) para el resto. */
   function htmlAvatar(perfil, tam = 34) {
+    if (versionQuiz() === "adulto") return htmlAvatarIniciales(perfil?.nombre, tam);
+
     const av = AVATARES.find((a) => a.id === perfil?.avatar);
     const tipo = perfil?.inteligencia_dominante?.[0];
     const fondo = COLOR_INTELIGENCIA[tipo] || "#B9CFE4";
     const estilo = `width:${tam}px; height:${tam}px; background:${fondo}; font-size:${Math.round(tam * 0.5)}px;`;
 
     if (av && USAR_ILUSTRACIONES) {
-      return `<span class="avatar-perfil" style="${estilo}"><img src="assets/avatares/${av.id}.svg" alt=""></span>`;
+      return `<span class="avatar-perfil" style="${estilo}"><img src="assets/avatares/${av.file}" alt=""></span>`;
     }
-    return `<span class="avatar-perfil" style="${estilo}">${av ? av.emoji : ICONO_INTELIGENCIA[tipo] || "🧩"}</span>`;
+    return `<span class="avatar-perfil" style="${estilo}">${ICONO_INTELIGENCIA[tipo] || "🧩"}</span>`;
   }
 
   let avatarElegido = null;
@@ -794,7 +831,7 @@
     cont.innerHTML = AVATARES.map(
       (a) => `
       <button type="button" class="opcion-avatar${avatarElegido === a.id ? " activa" : ""}" data-avatar="${a.id}">
-        ${USAR_ILUSTRACIONES ? `<img src="assets/avatares/${a.id}.svg" alt="">` : a.emoji}
+        <img src="assets/avatares/${a.file}" alt="">
       </button>`
     ).join("");
     cont.querySelectorAll("[data-avatar]").forEach((btn) => {
@@ -821,9 +858,15 @@
           : ""
       }
       <label>Nombre de este perfil</label>
-      <input type="text" id="nombre-perfil-input" value="${existente ? escapeHtml(existente.nombre) : ""}" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
-      <label>Elige un avatar (opcional)</label>
-      <div class="rejilla-avatares" id="selector-avatar"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="text" id="nombre-perfil-input" style="flex:1;" value="${existente ? escapeHtml(existente.nombre) : ""}" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
+        ${versionQuiz() === "adulto" ? `<span id="vista-avatar-iniciales"></span>` : ""}
+      </div>
+      ${
+        versionQuiz() === "adulto"
+          ? ""
+          : `<label>Elige un avatar (opcional)</label><div class="rejilla-avatares" id="selector-avatar"></div>`
+      }
       <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
     `;
 
@@ -831,7 +874,20 @@
     resultadoQuiz = null;
     ajusteManual = null;
     avatarElegido = existente?.avatar || null;
-    pintarSelectorAvatar();
+
+    if (versionQuiz() === "adulto") {
+      // Adultos y adolescentes autodidactas: nada de caritas de niños ni
+      // set de animales — un avatar de iniciales con color llamativo,
+      // calculado del nombre. No se guarda nada nuevo: se recalcula del
+      // campo "nombre" que ya existe, así que no toca el backend.
+      const inputNombre = document.getElementById("nombre-perfil-input");
+      const vista = document.getElementById("vista-avatar-iniciales");
+      const actualizarVista = () => { if (vista) vista.innerHTML = htmlAvatarIniciales(inputNombre.value, 40); };
+      inputNombre.addEventListener("input", actualizarVista);
+      actualizarVista();
+    } else {
+      pintarSelectorAvatar();
+    }
 
     const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
     const data = await res.json();
