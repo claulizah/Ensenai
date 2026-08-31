@@ -139,6 +139,13 @@
     background: var(--menta); color: #fff; border-radius: 8px; padding: 8px 13px; margin-top: 10px;
     font-weight: 700; font-size: 0.93rem;
   }
+  .ejercicio-marcar {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85rem; font-weight: 700;
+    color: var(--bosque); cursor: pointer;
+  }
+  .ejercicio-marcar input { width: 17px; height: 17px; accent-color: var(--menta); cursor: pointer; }
+  .btn-guardar-progreso { width: 100%; margin-top: 4px; }
+  .progreso-aviso { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--bosque); margin-top: 8px; }
 
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .respuestas-toggle { text-align: center; }
@@ -372,6 +379,48 @@
       });
     } catch (err) {
       // no bloquea la experiencia del alumno si falla
+    }
+  }
+
+  /**
+   * "Checkbox ligero" de progreso (31-ago-2026): manda qué ejercicios de la
+   * pestaña "Practicar" quedaron marcados como resueltos, para que el
+   * profesional vea algo de avance sin necesitar fotos. Se puede guardar
+   * más de una vez conforme se van resolviendo más ejercicios — cada click
+   * en "Guardar mi progreso" manda el estado completo de los checkboxes en
+   * ese momento (ver POST .../ejercicios-marcados en routes/grupos.js).
+   */
+  async function guardarEjerciciosMarcados() {
+    const tema = temasActuales[temaAbiertoIdx];
+    const aviso = document.getElementById("progreso-aviso");
+    if (!tema) return;
+
+    const totalCheckboxes = document.querySelectorAll(".chk-ejercicio-resuelto").length;
+    const indices = Array.from(document.querySelectorAll(".chk-ejercicio-resuelto:checked")).map((chk) =>
+      parseInt(chk.dataset.ej, 10)
+    );
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(tema.id)}/ejercicios-marcados`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre: nombreParaEnviar(slug), indices }),
+        }
+      );
+      if (!res.ok) throw new Error();
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = indices.length
+          ? `✓ Guardado — ${indices.length} de ${totalCheckboxes} marcados.`
+          : "Guardado — todavía no marcaste ninguno.";
+      }
+    } catch (err) {
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = "No se pudo guardar tu progreso — intenta de nuevo en un momento.";
+      }
     }
   }
 
@@ -920,6 +969,10 @@
           ${(e.pasos || []).length ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>` : ""}
           ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
         </div>
+        <label class="ejercicio-marcar">
+          <input type="checkbox" class="chk-ejercicio-resuelto" data-ej="${i}">
+          ✓ Ya la resolví
+        </label>
       </div>`
       )
       .join("");
@@ -927,7 +980,9 @@
     const practicarHtml = `
       ${
         ejerciciosHtml
-          ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>${ejerciciosHtml}`
+          ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>${ejerciciosHtml}
+             <button class="secundario btn-guardar-progreso" id="btn-guardar-progreso">💾 Guardar mi progreso</button>
+             <div class="progreso-aviso" id="progreso-aviso" style="display:none;"></div>`
           : ""
       }
       ${
@@ -1013,6 +1068,9 @@
     });
     const btnRevisarTrivia = document.getElementById("btn-revisar-trivia");
     if (btnRevisarTrivia) btnRevisarTrivia.addEventListener("click", revisarTrivia);
+
+    const btnGuardarProgreso = document.getElementById("btn-guardar-progreso");
+    if (btnGuardarProgreso) btnGuardarProgreso.addEventListener("click", guardarEjerciciosMarcados);
   }
 
   init();

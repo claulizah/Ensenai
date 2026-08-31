@@ -94,9 +94,16 @@
   .metrica .label { font-size: 0.72rem; color: #4A6A85; text-transform: uppercase; letter-spacing: 0.02em; }
   .liga-box { display: flex; gap: 8px; align-items: center; background: var(--hielo); border-radius: 10px; padding: 8px 12px; margin: 10px 0; }
   .liga-box input { border: none; background: none; padding: 4px; font-size: 0.9rem; flex: 1; color: var(--bosque); font-weight: 700; }
-  .tema-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 10px; }
+  .tema-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 10px; }
   .tema-item:first-child { border-top: none; }
   .tema-item .titulo { font-weight: 700; flex: 1; }
+  .tema-item .seleccionar { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--menta); cursor: pointer; }
+  .hint-combinar { color: #4A6A85; font-size: 0.85rem; margin: -6px 0 10px; }
+  .barra-combinar { display: flex; flex-direction: column; gap: 10px; background: var(--hielo); border: 2px solid var(--aqua); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-weight: 700; font-size: 0.9rem; }
+  .barra-combinar .fila-principal { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .barra-combinar .acciones { display: flex; gap: 8px; }
+  .toggle-modo-examen { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.85rem; color: var(--profundo); cursor: pointer; }
+  .toggle-modo-examen input { width: 17px; height: 17px; accent-color: #F97066; cursor: pointer; }
   .estado {
     font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.02em;
     white-space: nowrap;
@@ -149,10 +156,31 @@
   // sin perder el resto del material (resumen, actividades, etc.).
   const contenidoEnEdicion = {};
 
+  // Ids de temas ya activos en la liga marcados para juntar en un repaso de
+  // examen (ver combinarTemasGrupo() más abajo), por grupo — un profesional
+  // puede tener varios grupos abiertos en la misma pantalla.
+  const temasSeleccionadosPorGrupo = {};
+  const MAX_TEMAS_COMBINAR = 6;
+  // Modo Examen (misma idea que en tema.html): resumen mínimo, más
+  // ejercicios y un simulador de trivia — pensado para armar una guía de
+  // examen que el profesional comparte con su grupo. Admite más temas de
+  // golpe porque no hay que releerlo, solo practicarlo.
+  const MAX_TEMAS_COMBINAR_EXAMEN = 12;
+  const modoExamenActivoPorGrupo = {};
+
   function escapeHtml(str) {
     const d = document.createElement("div");
     d.textContent = str || "";
     return d.innerHTML;
+  }
+
+  // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+  // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
+  // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  function mensajeErrorAmigable(err) {
+    return err instanceof TypeError
+      ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
+      : err.message;
   }
 
   // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
@@ -202,15 +230,15 @@
   async function cargarGrupos(avisoInicial) {
     const cont = document.getElementById("contenido");
     try {
-      const res = await fetch(`${API_BASE}/api/grupos/mios`, {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/mios`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, cont);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus grupos.");
 
       renderGrupos(data.grupos || [], avisoInicial);
     } catch (err) {
-      cont.innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(err.message)}</div></div>`;
+      cont.innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div></div>`;
     }
   }
 
@@ -265,12 +293,18 @@
             <select id="nivel-input-${g.id}">
               ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
             </select>
+            <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
+              <input type="checkbox" id="enfoque-psico-input-${g.id}">
+              🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
+            </label>
             <button class="primario" onclick="generarTema('${g.id}', ${g.temas_totales === 0})">✨ Generar material</button>
             <div id="resultado-generar-${g.id}"></div>
           </div>
 
           <hr class="divisor">
           <h3>Temas en tu liga</h3>
+          <p class="hint-combinar" id="hint-combinar-${g.id}" style="display:none;">Selecciona dos o más para armar un repaso que los junte a todos antes de un examen.</p>
+          <div id="barra-combinar-${g.id}" class="barra-combinar" style="display:none;"></div>
           <div id="lista-temas-${g.id}"><div class="cargando">Cargando…</div></div>
         </div>
       `
@@ -295,7 +329,7 @@
     cargarSuscripcionGrupo();
   }
 
-  const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Aprendemos", ilimitado: "Ilimitado" };
+  const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
 
   async function cargarSuscripcionGrupo() {
     const cont = document.getElementById("zona-suscripcion-grupo");
@@ -320,7 +354,7 @@
         botones += `<button class="primario" style="margin-top:10px;" id="btn-ilimitado-grupo">Pasar a Ilimitado — $159/mes</button>`;
       }
       if (plan.nivel === "gratis") {
-        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Aprendemos — $109/mes (20 temas-grupo, 3 grupos)</button>`;
+        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Esencial — $109/mes (20 temas-grupo, 3 grupos)</button>`;
       }
 
       cont.innerHTML = `
@@ -359,7 +393,7 @@
       window.location.href = data.checkout_url;
     } catch (err) {
       cont.innerHTML = `
-        <div class="error">${escapeHtml(err.message)}</div>
+        <div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>
         <button class="secundario" style="width:100%;" onclick="suscribirGrupo('${nivel}')">Reintentar</button>
       `;
     }
@@ -383,7 +417,7 @@
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/grupos`, {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
         body: JSON.stringify({ nombre, mostrarNombres }),
@@ -393,7 +427,7 @@
 
       cargarGrupos();
     } catch (err) {
-      resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -504,7 +538,7 @@
       try {
         fotosPorGrupo[grupoId].push(await comprimirImagen(archivo));
       } catch (err) {
-        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
       }
     }
     pintarMiniaturas(grupoId);
@@ -515,6 +549,7 @@
     const nivel = document.getElementById(`nivel-input-${grupoId}`).value;
     const detalles = document.getElementById(`detalles-input-${grupoId}`).value.trim();
     const imagenes = fotosPorGrupo[grupoId] || [];
+    const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
     const resultado = document.getElementById(`resultado-generar-${grupoId}`);
     resultado.innerHTML = "";
 
@@ -530,10 +565,10 @@
     );
 
     try {
-      const res = await fetch(`${API_BASE}/api/temas/generar`, {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/generar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes }),
+        body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes, enfoque }),
       });
       const data = await res.json();
       detenerTips(grupoId);
@@ -545,18 +580,22 @@
         <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Puedes editar la trivia antes de compartirla con tu grupo.</div>
         <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
         <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${esPrimerTemaGratis ? " (gratis)" : ""}</button>
-        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF)</button>
+        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
+        <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
       `;
       renderEditorTrivia(grupoId);
       document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
         agregarTemaAGrupo(grupoId, tema, contenidoEnEdicion[grupoId], esPrimerTemaGratis)
       );
       document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target)
+        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
+      );
+      document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
+        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
       );
     } catch (err) {
       detenerTips(grupoId);
-      resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -610,11 +649,13 @@
     trivia.forEach((p, i) => {
       document.getElementById(`pregunta-texto-${grupoId}-${i}`).addEventListener("input", (ev) => {
         contenidoEnEdicion[grupoId].trivia[i].pregunta = ev.target.value;
-        delete pdfCache[grupoId]; // el PDF ya descargado quedaría desactualizado
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId]; // el PDF ya descargado quedaría desactualizado
       });
       document.getElementById(`btn-borrar-pregunta-${grupoId}-${i}`).addEventListener("click", () => {
         contenidoEnEdicion[grupoId].trivia.splice(i, 1);
         delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
         renderEditorTrivia(grupoId);
       });
       if (p.opciones && p.opciones.length) {
@@ -625,16 +666,19 @@
             t.opciones[j] = ev.target.value;
             if (eraCorrecta) t.respuesta_correcta = ev.target.value; // sigue siendo la marcada como correcta
             delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
           });
           document.getElementById(`correcta-${grupoId}-${i}-${j}`).addEventListener("change", () => {
             contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = contenidoEnEdicion[grupoId].trivia[i].opciones[j];
             delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
           });
         });
       } else {
         document.getElementById(`respuesta-abierta-${grupoId}-${i}`).addEventListener("input", (ev) => {
           contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = ev.target.value;
           delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
         });
       }
     });
@@ -647,6 +691,7 @@
         respuesta_correcta: "",
       });
       delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
       renderEditorTrivia(grupoId);
     });
   }
@@ -655,29 +700,37 @@
   // (llamada a IA de por medio) si el profesional ya lo descargó antes de
   // agregar el tema a su liga. Se invalida (ver renderEditorTrivia) cada
   // vez que se edita la trivia, para no compartir un PDF desactualizado.
+  // Son dos cachés separados porque "con respuestas" y "sin respuestas" son
+  // dos PDFs distintos (URLs distintas) — ver incluirRespuestas más abajo.
   const pdfCache = {};
+  const pdfCacheSinRespuestas = {};
 
-  async function generarPdfEnServidor(contenido) {
-    const res = await fetch(`${API_BASE}/api/temas/pdf`, {
+  async function generarPdfEnServidor(contenido, incluirRespuestas = true) {
+    const res = await fetchConReintento(`${API_BASE}/api/temas/pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-      body: JSON.stringify({ contenido, modo: "grupo" }),
+      body: JSON.stringify({ contenido, modo: "grupo", incluirRespuestas }),
     });
     const data = await res.json();
     if (!data.pdf_url) throw new Error(data.error || "No se pudo generar el PDF.");
     return data.pdf_url;
   }
 
-  async function descargarPdf(grupoId, contenido, btn) {
+  // `incluirRespuestas=false` arma el imprimible "en blanco" pensado para
+  // repartir directo al grupo (mismo contenido, sin la hoja de respuestas
+  // final) — el profesional sigue teniendo la versión con respuestas para
+  // su propio uso con el otro botón.
+  async function descargarPdf(grupoId, contenido, btn, incluirRespuestas = true) {
+    const cache = incluirRespuestas ? pdfCache : pdfCacheSinRespuestas;
     const textoOriginal = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Preparando PDF…";
     try {
-      const pdfUrl = pdfCache[grupoId] || (await generarPdfEnServidor(contenido));
-      pdfCache[grupoId] = pdfUrl;
+      const pdfUrl = cache[grupoId] || (await generarPdfEnServidor(contenido, incluirRespuestas));
+      cache[grupoId] = pdfUrl;
       window.open(pdfUrl, "_blank");
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error: " + mensajeErrorAmigable(err));
     } finally {
       btn.disabled = false;
       btn.textContent = textoOriginal;
@@ -696,6 +749,7 @@
       const totalAntes = contenido.trivia.length;
       contenido.trivia = contenido.trivia.filter((p) => (p.pregunta || "").trim());
       if (contenido.trivia.length !== totalAntes) delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
     }
 
     resultado.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
@@ -713,7 +767,7 @@
         }
       }
 
-      const res = await fetch(`${API_BASE}/api/grupos/${grupoId}/temas`, {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
         body: JSON.stringify({ titulo, contenido, esPrimerTemaGratis, pdfUrl }),
@@ -733,13 +787,14 @@
       }
 
       delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
       delete contenidoEnEdicion[grupoId];
       delete fotosPorGrupo[grupoId]; // el tema ya quedó en la liga; no arrastrar las fotos al siguiente
       document.getElementById(`tema-input-${grupoId}`).value = "";
       cargarTemas(grupoId);
       cargarGrupos();
     } catch (err) {
-      resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -755,7 +810,7 @@
       if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
       window.location.href = data.checkout_url;
     } catch (err) {
-      alert(err.message.includes("tardando") ? err.message + " Dale clic de nuevo a 'Pagar y activar'." : "Error: " + err.message);
+      alert(err.message.includes("tardando") ? err.message + " Dale clic de nuevo a 'Pagar y activar'." : "Error: " + mensajeErrorAmigable(err));
     }
   }
 
@@ -770,32 +825,46 @@
     const cont = document.getElementById(`lista-temas-${grupoId}`);
     if (!cont) return;
     try {
-      const res = await fetch(`${API_BASE}/api/grupos/mios`, {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/mios`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, cont);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudieron cargar los temas.");
       const grupo = (data.grupos || []).find((g) => g.id === grupoId);
       const temas = grupo?.temas || [];
 
+      // Solo se puede juntar temas que ya están activos en la liga — uno
+      // pendiente de pago puede no llegar a activarse nunca.
+      const elegibles = temas.filter((t) => t.pago_status !== "pendiente");
+      temasSeleccionadosPorGrupo[grupoId] = new Set();
+      modoExamenActivoPorGrupo[grupoId] = false;
+      const hint = document.getElementById(`hint-combinar-${grupoId}`);
+      if (hint) hint.style.display = elegibles.length >= 2 ? "block" : "none";
+
       if (temas.length === 0) {
         cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has agregado ningún tema.</p>`;
+        actualizarBarraCombinarGrupo(grupoId);
         return;
       }
+
+      const permiteSeleccion = elegibles.length >= 2;
 
       cont.innerHTML = temas
         .map(
           (t) => `
         <div class="tema-item">
+          ${permiteSeleccion && t.pago_status !== "pendiente" ? `<input type="checkbox" class="seleccionar" data-seleccionar-grupo="${grupoId}" data-seleccionar="${t.id}" title="Seleccionar para armar un repaso">` : ""}
           <span class="titulo">${escapeHtml(t.titulo)}</span>
           <span class="estado ${t.pago_status}">${escapeHtml(ETIQUETAS_ESTADO[t.pago_status] || t.pago_status)}</span>
           ${
             t.pago_status === "pendiente"
               ? `<button class="secundario chico" id="btn-pagar-lista-${t.id}">Pagar</button>`
-              : `<button class="secundario chico" id="btn-respuestas-${t.id}">Ver respuestas</button>`
+              : `<button class="secundario chico" id="btn-respuestas-${t.id}">Ver respuestas</button>
+                 <button class="secundario chico" id="btn-ejercicios-${t.id}">Ver ejercicios</button>`
           }
         </div>
         ${t.pago_status !== "pendiente" ? `<div id="respuestas-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+        ${t.pago_status !== "pendiente" ? `<div id="ejercicios-marcados-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
       `
         )
         .join("");
@@ -811,9 +880,119 @@
         .forEach((t) => {
           const btn = document.getElementById(`btn-respuestas-${t.id}`);
           if (btn) btn.addEventListener("click", () => toggleRespuestas(grupoId, t.id));
+          const btnEj = document.getElementById(`btn-ejercicios-${t.id}`);
+          if (btnEj) btnEj.addEventListener("click", () => toggleEjerciciosMarcados(grupoId, t.id));
         });
+
+      cont.querySelectorAll("[data-seleccionar]").forEach((chk) => {
+        chk.addEventListener("change", () => {
+          const id = chk.dataset.seleccionar;
+          if (chk.checked) temasSeleccionadosPorGrupo[grupoId].add(id);
+          else temasSeleccionadosPorGrupo[grupoId].delete(id);
+          actualizarBarraCombinarGrupo(grupoId);
+        });
+      });
+      actualizarBarraCombinarGrupo(grupoId);
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudieron cargar los temas.</div>`;
+    }
+  }
+
+  /** Muestra u oculta la barra de "Armar repaso" de un grupo según cuántos
+   * de sus temas activos estén marcados — ver el checkbox `data-seleccionar`
+   * en cargarTemas() arriba. */
+  function actualizarBarraCombinarGrupo(grupoId) {
+    const barra = document.getElementById(`barra-combinar-${grupoId}`);
+    if (!barra) return;
+    const seleccionados = temasSeleccionadosPorGrupo[grupoId] || new Set();
+    const n = seleccionados.size;
+
+    if (n < 2) {
+      barra.style.display = "none";
+      barra.innerHTML = "";
+      return;
+    }
+
+    const modoExamen = !!modoExamenActivoPorGrupo[grupoId];
+    const tope = modoExamen ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    const excedido = n > tope;
+    barra.style.display = "flex";
+    barra.innerHTML = `
+      <label class="toggle-modo-examen">
+        <input type="checkbox" id="chk-modo-examen-${grupoId}" ${modoExamen ? "checked" : ""}>
+        🎯 Guía de examen — más ejercicios y un simulador, pensada para compartir con tu grupo (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+      </label>
+      <div class="fila-principal">
+        <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamen ? "una guía de examen" : "un repaso"}` : ""}</span>
+        <div class="acciones">
+          <button type="button" class="secundario chico" id="btn-cancelar-combinar-${grupoId}">Cancelar</button>
+          <button type="button" class="primario chico" id="btn-armar-repaso-${grupoId}"${excedido ? " disabled" : ""}>${modoExamen ? "🎯 Armar guía de examen" : "✨ Armar repaso"}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById(`chk-modo-examen-${grupoId}`).addEventListener("change", (ev) => {
+      modoExamenActivoPorGrupo[grupoId] = ev.target.checked;
+      actualizarBarraCombinarGrupo(grupoId);
+    });
+    document.getElementById(`btn-cancelar-combinar-${grupoId}`).addEventListener("click", () => cargarTemas(grupoId));
+    if (!excedido) {
+      document.getElementById(`btn-armar-repaso-${grupoId}`).addEventListener("click", () => combinarTemasGrupo(grupoId));
+    }
+  }
+
+  /** Junta el contenido de los temas activos marcados en la liga en un solo
+   * material (resumen + trivia combinada), y lo deja en el mismo editor con
+   * el que se revisa cualquier tema recién generado — desde ahí el
+   * profesional lo agrega a su liga como a cualquier otro. Con "Guía de
+   * examen" activo (ver actualizarBarraCombinarGrupo), el resultado se
+   * inclina hacia ejercicios y un simulador de trivia, pensado para
+   * compartirse como guía de repaso antes de un examen. */
+  async function combinarTemasGrupo(grupoId) {
+    const ids = [...(temasSeleccionadosPorGrupo[grupoId] || [])];
+    const modoExamen = !!modoExamenActivoPorGrupo[grupoId];
+    const tope = modoExamen ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    if (ids.length < 2 || ids.length > tope) return;
+
+    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
+    resultado.innerHTML = "";
+    document.getElementById(`barra-combinar-${grupoId}`).style.display = "none";
+    iniciarTips(grupoId, resultado, modoExamen ? "Armando la guía de examen…" : "Juntando los temas y armando el repaso…");
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/combinar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ temaIds: ids, modo: "grupo", enfoque: modoExamen ? "examen" : "estudio" }),
+      });
+      const data = await res.json();
+      detenerTips(grupoId);
+      if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
+
+      contenidoEnEdicion[grupoId] = data.contenido;
+      const titulo = data.contenido.tema || `Repaso de ${ids.length} temas`;
+      modoExamenActivoPorGrupo[grupoId] = false;
+
+      resultado.innerHTML = `
+        <div class="aviso">✓ ${modoExamen ? "Guía de examen armada" : "Repaso armado"}: <strong>${escapeHtml(titulo)}</strong>. Puedes editar la trivia antes de compartirlo con tu grupo.</div>
+        <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
+        <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga</button>
+        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
+        <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
+      `;
+      renderEditorTrivia(grupoId);
+      document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
+        agregarTemaAGrupo(grupoId, titulo, contenidoEnEdicion[grupoId], false)
+      );
+      document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
+        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
+      );
+      document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
+        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
+      );
+    } catch (err) {
+      detenerTips(grupoId);
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      cargarTemas(grupoId);
     }
   }
 
@@ -839,9 +1018,9 @@
     if (btn) btn.textContent = "Ocultar respuestas";
 
     try {
-      const res = await fetch(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, panel);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudieron cargar las respuestas.");
 
@@ -880,7 +1059,59 @@
         })
         .join("");
     } catch (err) {
-      panel.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  /**
+   * Muestra/oculta, por tema, quién marcó qué ejercicios como resueltos en
+   * la pestaña "Practicar" de g.html — la señal ligera (sin fotos) que
+   * probamos antes de invertir en guardar imágenes (ver POST/GET
+   * .../ejercicios-marcados en routes/grupos.js). Mismo patrón que
+   * toggleRespuestas() de arriba, incluido el manejo de nombres en grupos
+   * anónimos.
+   */
+  async function toggleEjerciciosMarcados(grupoId, temaId) {
+    const panel = document.getElementById(`ejercicios-marcados-${temaId}`);
+    const btn = document.getElementById(`btn-ejercicios-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "Ver ejercicios";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando…</div>`;
+    if (btn) btn.textContent = "Ocultar ejercicios";
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/ejercicios-marcados`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, panel);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el progreso.");
+
+      const marcados = data.marcados || [];
+      if (marcados.length === 0) {
+        panel.innerHTML = `<p class="ayuda" style="margin:8px 0 0;">Todavía nadie ha marcado ejercicios resueltos en este tema.</p>`;
+        return;
+      }
+
+      panel.innerHTML = marcados
+        .map((m, i) => {
+          const quien = m.nombre ? escapeHtml(m.nombre) : `Alumno ${i + 1} (anónimo)`;
+          const marca = m.created_at
+            ? new Date(m.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+            : "";
+          const n = (m.indices_resueltos || []).length;
+          return `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+            <div><strong>${quien}</strong> — ${n}/${m.total_ejercicios} ejercicios marcados <span class="ayuda">· ${marca}</span></div>
+          </div>`;
+        })
+        .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 

@@ -109,6 +109,15 @@
     return d.innerHTML;
   }
 
+  // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+  // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
+  // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  function mensajeErrorAmigable(err) {
+    return err instanceof TypeError
+      ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
+      : err.message;
+  }
+
   // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
   // tarda 30-60s en despertar con la primera petición — esa primera
   // petición puede fallar con un "Failed to fetch" genérico. Este helper
@@ -141,10 +150,10 @@
     },
     {
       id: "estudiante",
-      emoji: "🎒",
+      emoji: "📚",
       fondo: "#E7FBF3",
       titulo: "Soy estudiante",
-      sub: "Quiero estudiar mis temas de la escuela a mi manera",
+      sub: "Quiero estudiar mis temas a mi manera",
       destino: "tema.html",
     },
     {
@@ -263,7 +272,7 @@
       window.location.href = destinoUrl;
     } catch (err) {
       mostrarBienvenida(session);
-      document.getElementById("error-bienvenida").innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      document.getElementById("error-bienvenida").innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -292,7 +301,7 @@
         if (res.ok) {
           const plan = await res.json();
           if (plan.nivel && plan.nivel !== "gratis") {
-            const nombre = { aprendemos: "Aprendemos", ilimitado: "Ilimitado" }[plan.nivel] || plan.nivel;
+            const nombre = { aprendemos: "Esencial", ilimitado: "Ilimitado" }[plan.nivel] || plan.nivel;
             mostrarDashboard(session, `✓ ¡Listo! Tu plan ${nombre} ya está activo.`);
             return;
           }
@@ -446,7 +455,7 @@
       `;
       document.getElementById("btnRegresarLogin2").addEventListener("click", () => mostrarLogin("login"));
     } catch (err) {
-      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
       btn.disabled = false;
       btn.textContent = "Mandar liga de recuperación";
     }
@@ -508,7 +517,7 @@
 
       init();
     } catch (err) {
-      errorDiv.innerHTML = `<div class="error">${escapeHtml(traducirErrorAuth(err.message, esRegistro))}</div>`;
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(err instanceof TypeError ? mensajeErrorAmigable(err) : traducirErrorAuth(err.message, esRegistro))}</div>`;
     }
   }
 
@@ -519,6 +528,14 @@
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">Mi plan</h1>
         <div id="zonaSuscripcion"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta">
+        <h1 style="text-align:left; font-size:1.1rem;">🔥 Racha y medallas</h1>
+        <div id="zonaGamificacion"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta">
+        <h1 style="text-align:left; font-size:1.1rem;">🎁 Invita y gana</h1>
+        <div id="zonaReferidos"><div class="cargando">Cargando…</div></div>
       </div>
       <div class="tarjeta">
         <h1 style="text-align:left; font-size:1.1rem;">✨ Genera material sobre un tema</h1>
@@ -533,6 +550,8 @@
     `;
 
     cargarSuscripcion(session);
+    cargarGamificacion(session);
+    cargarReferidos(session);
 
     document.getElementById("btnSalir").onclick = async () => {
       await supabaseClient.auth.signOut();
@@ -540,7 +559,7 @@
     };
   }
 
-  const NOMBRES_NIVEL = { gratis: "Gratis", aprendemos: "Aprendemos", ilimitado: "Ilimitado" };
+  const NOMBRES_NIVEL = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
 
   async function cargarSuscripcion(session) {
     const cont = document.getElementById("zonaSuscripcion");
@@ -554,23 +573,29 @@
       const plan = await res.json();
       if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
 
+      const limiteMostrado = plan.limite_temas_mes_efectivo ?? plan.limite_temas_mes;
       const usoTexto =
         plan.limite_temas_mes === null
           ? `${plan.usados_este_mes} temas generados este mes — sin límite`
-          : `${plan.usados_este_mes} de ${plan.limite_temas_mes} temas este mes`;
+          : `${plan.usados_este_mes} de ${limiteMostrado} temas este mes${plan.boost_bienvenida_activo ? " (con el boost de bienvenida del primer mes)" : ""}`;
+      const bonoTexto =
+        plan.referidos?.bono_disponible > 0
+          ? `<p class="ayuda" style="margin:4px 0 0; text-align:left; font-size:0.85rem;">🎁 Tienes ${plan.referidos.bono_disponible} tema${plan.referidos.bono_disponible === 1 ? "" : "s"} de regalo por invitar — se usan automáticamente cuando se te acabe el límite del mes.</p>`
+          : "";
 
       let botones = "";
       if (plan.nivel !== "ilimitado") {
         botones += `<button class="primario" style="margin-top:10px;" id="btnIlimitado">Pasar a Ilimitado — $129/mes</button>`;
       }
       if (plan.nivel === "gratis") {
-        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btnAprendemos">Pasar a Aprendemos — $79/mes (20 temas, 3 perfiles)</button>`;
+        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btnAprendemos">Pasar a Esencial — $79/mes (20 temas, 3 perfiles)</button>`;
       }
 
       cont.innerHTML = `
         <p class="ayuda" style="margin:0 0 4px; text-align:left;"><strong>Plan ${NOMBRES_NIVEL[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN/mes` : ""}</p>
         <p class="ayuda" style="margin:0 0 4px; text-align:left; font-size:0.85rem;">${escapeHtml(usoTexto)}</p>
-        <p class="ayuda" style="margin:0; text-align:left; font-size:0.85rem;">Hasta ${plan.limite_perfiles} perfil(es) de aprendizaje.</p>
+        ${bonoTexto}
+        <p class="ayuda" style="margin:4px 0 0; text-align:left; font-size:0.85rem;">Hasta ${plan.limite_perfiles} perfil(es) de aprendizaje.</p>
         ${botones}
       `;
       if (document.getElementById("btnIlimitado")) {
@@ -581,6 +606,129 @@
       }
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudo cargar tu plan.</div>`;
+    }
+  }
+
+  // Mismo catálogo que utils/gamificacion.js en el backend (CATALOGO_MEDALLAS)
+  // — es contenido de presentación, no configuración, así que vive aquí
+  // igual de fijo que NOMBRES_NIVEL arriba. Si se agrega una medalla nueva
+  // hay que agregarla en los dos lados.
+  const CATALOGO_MEDALLAS = [
+    { codigo: "primer_paso", nombre: "Primer paso", icono: "🌱", descripcion: "Generaste tu primer tema." },
+    { codigo: "racha_3", nombre: "Racha de 3 días", icono: "🔥", descripcion: "3 días seguidos estudiando." },
+    { codigo: "racha_7", nombre: "Racha de 7 días", icono: "🔥🔥", descripcion: "7 días seguidos estudiando." },
+    { codigo: "racha_30", nombre: "Racha de 30 días", icono: "🔥🔥🔥", descripcion: "30 días seguidos estudiando." },
+    { codigo: "temas_10", nombre: "10 temas", icono: "📚", descripcion: "Generaste 10 temas." },
+    { codigo: "temas_50", nombre: "50 temas", icono: "📚📚", descripcion: "Generaste 50 temas." },
+    { codigo: "examen_1", nombre: "Primer simulacro", icono: "🎯", descripcion: "Armaste tu primer simulacro de examen." },
+    { codigo: "examen_5", nombre: "5 simulacros", icono: "🎯🎯", descripcion: "Armaste 5 simulacros de examen." },
+    { codigo: "etiqueta_1", nombre: "Organizador", icono: "🏷️", descripcion: "Usaste tu primera etiqueta." },
+    { codigo: "trivia_diaria_1", nombre: "Trivia diaria", icono: "🧠", descripcion: "Completaste tu primera trivia diaria." },
+  ];
+
+  async function cargarGamificacion(session) {
+    const cont = document.getElementById("zonaGamificacion");
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-plan`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        cont,
+        "Cargando…"
+      );
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu racha.");
+
+      const g = plan.gamificacion || { racha_actual: 0, racha_record: 0, medallas: [] };
+      const ganadas = new Set(g.medallas || []);
+
+      const medallasHtml = CATALOGO_MEDALLAS.map((m) => {
+        const obtenida = ganadas.has(m.codigo);
+        return `
+          <div title="${escapeHtml(m.descripcion)}" style="text-align:center; padding:8px 4px; border-radius:12px; background:${obtenida ? "#EAF1FE" : "#F4F6F8"};">
+            <div style="font-size:1.6rem; ${obtenida ? "" : "filter:grayscale(1); opacity:0.35;"}">${m.icono}</div>
+            <div style="font-size:0.68rem; margin-top:2px; color:${obtenida ? "var(--profundo)" : "#9AA7B0"}; font-weight:${obtenida ? "700" : "400"};">${escapeHtml(m.nombre)}</div>
+          </div>
+        `;
+      }).join("");
+
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:0 0 4px; text-align:left;"><strong>🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}</strong>${g.racha_record > 0 ? ` · récord: ${g.racha_record}` : ""}</p>
+        <p class="ayuda" style="margin:0 0 12px; text-align:left; font-size:0.85rem;">Genera un tema o haz tu trivia diaria (en tema.html) para mantenerla.</p>
+        <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;">${medallasHtml}</div>
+      `;
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu racha.</div>`;
+    }
+  }
+
+  /**
+   * Programa de referidos (ver utils/referidos.js en el backend): muestra
+   * el código propio para compartir, y un campo para canjear el de alguien
+   * más. Quien invita gana temas de regalo; quien canjea no gana nada
+   * aparte del boost normal de cuenta nueva (ya reflejado arriba en "Mi
+   * plan").
+   */
+  async function cargarReferidos(session) {
+    const cont = document.getElementById("zonaReferidos");
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-plan`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        cont,
+        "Cargando…"
+      );
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu código.");
+
+      const codigo = plan.referidos?.codigo || "";
+
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:0 0 8px; text-align:left; font-size:0.85rem;">Comparte tu código — cada vez que alguien nuevo lo use, ganas un tema de regalo.</p>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+          <input type="text" id="miCodigoReferido" value="${escapeHtml(codigo)}" readonly style="flex:1; font-weight:800; text-align:center; letter-spacing:1px;">
+          <button type="button" class="secundario" id="btnCopiarCodigo" style="white-space:nowrap;">Copiar</button>
+        </div>
+        <label style="font-size:0.85rem;">¿Alguien te compartió un código?</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="text" id="codigoACanjear" placeholder="Ej. MARIAUX8M" style="flex:1;">
+          <button type="button" class="primario" id="btnCanjearCodigo" style="white-space:nowrap;">Canjear</button>
+        </div>
+        <div id="resultadoCanje" style="margin-top:8px;"></div>
+      `;
+
+      document.getElementById("btnCopiarCodigo").addEventListener("click", async () => {
+        const btn = document.getElementById("btnCopiarCodigo");
+        try {
+          await navigator.clipboard.writeText(codigo);
+          btn.textContent = "¡Copiado!";
+          setTimeout(() => (btn.textContent = "Copiar"), 1500);
+        } catch (err) {
+          document.getElementById("miCodigoReferido").select();
+        }
+      });
+
+      document.getElementById("btnCanjearCodigo").addEventListener("click", async () => {
+        const input = document.getElementById("codigoACanjear");
+        const resultado = document.getElementById("resultadoCanje");
+        const codigoIngresado = input.value.trim();
+        if (!codigoIngresado) return;
+        resultado.innerHTML = `<div class="cargando">Canjeando…</div>`;
+        try {
+          const res2 = await fetchConReintento(`${API_BASE}/api/referidos/canjear`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ codigo: codigoIngresado }),
+          }, null, null);
+          const data2 = await res2.json();
+          if (!res2.ok) throw new Error(data2.error || "No se pudo canjear el código.");
+          resultado.innerHTML = `<div class="aviso">✓ ¡Código canjeado!</div>`;
+          input.value = "";
+        } catch (err) {
+          resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+        }
+      });
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu código de referido.</div>`;
     }
   }
 
@@ -603,7 +751,7 @@
       window.location.href = data.checkout_url;
     } catch (err) {
       cont.innerHTML = `
-        <div class="error">${escapeHtml(err.message)}</div>
+        <div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>
         <button class="secundario" style="width:100%;" onclick="suscribirse(sesionActual, '${tipo}', '${nivel}')">Reintentar</button>
       `;
     }

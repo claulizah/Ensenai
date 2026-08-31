@@ -279,6 +279,14 @@
   .historial-item .fecha { color: #4A6A85; font-size: 0.8rem; }
   .historial-item .etiquetas-item { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
   .etiqueta-badge { display: inline-block; background: var(--hielo); border: 1px solid var(--aqua); color: var(--bosque); font-size: 0.72rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
+  .historial-item .seleccionar { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--menta); cursor: pointer; }
+  .hint-combinar { color: #4A6A85; font-size: 0.85rem; margin: -6px 0 10px; }
+  .barra-combinar { display: flex; flex-direction: column; gap: 10px; background: var(--hielo); border: 2px solid var(--aqua); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-weight: 700; font-size: 0.9rem; }
+  .barra-combinar .fila-principal { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .barra-combinar .acciones { display: flex; gap: 8px; }
+  .btn-seleccionar-etiqueta { background: none; border: none; color: var(--profundo); font-weight: 800; font-size: 0.82rem; padding: 2px 0; margin: 4px 0 0; cursor: pointer; font-family: inherit; text-decoration: underline; }
+  .toggle-modo-examen { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.85rem; color: var(--profundo); cursor: pointer; }
+  .toggle-modo-examen input { width: 17px; height: 17px; accent-color: #F97066; cursor: pointer; }
   .chip-etiqueta { background: #fff; border: 2px solid var(--linea); color: var(--profundo); font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
   .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
   #buscar-historial { margin-bottom: 8px; }
@@ -343,6 +351,18 @@
   let perfilSeleccionadoId = "";
   let historialCache = [];
   let etiquetaActiva = "";
+  // Ids de temas del historial marcados para juntar en un repaso de examen
+  // (ver combinarTemas() más abajo). Vive fuera de renderHistorial() para
+  // no perderse cuando la persona busca o filtra por etiqueta.
+  const temasSeleccionados = new Set();
+  const MAX_TEMAS_COMBINAR = 6;
+  // Modo Examen admite más temas de golpe (ej. "todo Matemáticas del primer
+  // parcial") porque el simulacro está pensado para practicar, no para leer
+  // — el backend acepta hasta este mismo número (ver routes/temas.js).
+  const MAX_TEMAS_COMBINAR_EXAMEN = 12;
+  // Se mantiene fuera de actualizarBarraCombinar() para no perderse cada
+  // vez que se vuelve a dibujar la barra al cambiar la selección.
+  let modoExamenActivo = false;
 
   function escapeHtml(str) {
     const d = document.createElement("div");
@@ -367,6 +387,17 @@
     t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
     t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
     return t.replace(/\n/g, "<br>");
+  }
+
+  // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+  // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
+  // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  // Un error de negocio real (los que lanzamos nosotros con Error(...) más
+  // abajo) sí es legible y se muestra tal cual.
+  function mensajeErrorAmigable(err) {
+    return err instanceof TypeError
+      ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
+      : err.message;
   }
 
   // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
@@ -459,6 +490,13 @@
 
   function mostrarFormulario() {
     document.getElementById("contenido").innerHTML = `
+      <div class="tarjeta" id="tarjeta-gamificacion">
+        <div id="zona-gamificacion"><div class="cargando">Cargando…</div></div>
+      </div>
+      <div class="tarjeta" id="tarjeta-mi-progreso">
+        <h2 style="margin-top:0;">📊 Mi progreso</h2>
+        <div id="zona-mi-progreso"><div class="cargando">Cargando…</div></div>
+      </div>
       <div class="tarjeta">
         <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
         <p class="ayuda" style="margin:0 0 10px;">${
@@ -493,6 +531,10 @@
         <select id="nivel-input">
           ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
         </select>
+        <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
+          <input type="checkbox" id="enfoque-psico-input">
+          🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
+        </label>
         <label>Etiquetas (opcional)</label>
         <input type="text" id="etiquetas-input" placeholder="Ej. Matemáticas, Parcial 1">
         <p class="ayuda" style="margin:2px 0 0; font-size:0.8rem;">Sepáralas con comas — te ayudan a encontrar este tema después en tu historial.</p>
@@ -500,11 +542,27 @@
         <div id="resultado-generar"></div>
       </div>
       <div class="tarjeta">
+        <h1>🔍 Revisar un ejercicio</h1>
+        <p class="ayuda">Sube la foto de un ejercicio que ya resolviste a mano y te decimos en qué paso está el error, si lo hay.</p>
+        <label>Foto del ejercicio resuelto</label>
+        <div class="zona-foto">
+          <label class="btn-foto" for="fotos-input-revision">📷 Subir foto</label>
+          <input type="file" id="fotos-input-revision" accept="image/*" multiple>
+          <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos — por ejemplo, varias hojas del mismo ejercicio.</p>
+          <div class="miniaturas" id="miniaturas-fotos-revision"></div>
+        </div>
+        <button class="primario" id="btn-revisar-ejercicio">Revisar mi ejercicio</button>
+        <div id="resultado-revision"></div>
+      </div>
+      <div class="tarjeta">
         <h2>Mis temas anteriores</h2>
+        <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
         <div id="filtros-historial" style="display:none; margin-bottom:12px;">
           <input type="text" id="buscar-historial" placeholder="Buscar por tema o etiqueta…" style="margin-bottom:8px;">
           <div id="chips-etiquetas" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+          <div id="accion-etiqueta"></div>
         </div>
+        <div id="barra-combinar" class="barra-combinar" style="display:none;"></div>
         <div id="lista-historial"><div class="cargando">Cargando…</div></div>
       </div>
     `;
@@ -518,16 +576,318 @@
     document.getElementById("fotos-input").addEventListener("change", alElegirFotos);
     fotosSeleccionadas = [];
     pintarMiniaturas();
+    document.getElementById("fotos-input-revision").addEventListener("change", alElegirFotosRevision);
+    document.getElementById("btn-revisar-ejercicio").addEventListener("click", revisarEjercicio);
+    fotosRevision = [];
+    pintarMiniaturasRevision();
     cargarPerfiles();
     cargarHistorial();
+    cargarGamificacion();
+    cargarMiProgreso();
+  }
+
+  /**
+   * Racha + medallas + trivia diaria — el "gancho para volver" del modo
+   * individual (ver utils/gamificacion.js en el backend). Si algo falla
+   * aquí no debe estorbar el resto de la app: simplemente no se muestra
+   * nada, la persona sigue pudiendo generar temas con normalidad.
+   */
+  let triviaDiariaCargada = false;
+
+  async function cargarGamificacion() {
+    const cont = document.getElementById("zona-gamificacion");
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-plan`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu racha.");
+      renderGamificacion(plan.gamificacion || { racha_actual: 0, racha_record: 0, medallas: [] });
+    } catch (err) {
+      document.getElementById("tarjeta-gamificacion")?.remove(); // no es crítico — mejor ocultarlo que dejar un hueco roto
+    }
+  }
+
+  function renderGamificacion(g) {
+    const cont = document.getElementById("zona-gamificacion");
+    if (!cont) return;
+    cont.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <p id="racha-titulo" style="margin:0; font-weight:800; font-family:'Grandstander',sans-serif; color:var(--profundo); font-size:1.05rem;"></p>
+          <p id="racha-sub" class="ayuda" style="margin:2px 0 0; font-size:0.82rem;"></p>
+        </div>
+        <button type="button" class="secundario" id="btn-abrir-trivia-diaria" style="white-space:nowrap;">🧠 Trivia diaria</button>
+      </div>
+      <div id="zona-trivia-diaria" style="display:none; margin-top:14px;"></div>
+    `;
+    actualizarRachaChip(g);
+    document.getElementById("btn-abrir-trivia-diaria").addEventListener("click", toggleTriviaDiaria);
+  }
+
+  // Actualiza SOLO el texto de la racha, sin volver a crear #zona-trivia-diaria
+  // — se usa después de completar la trivia diaria, cuando esa zona ya trae
+  // las respuestas revisadas y no se debe perder ese estado.
+  function actualizarRachaChip(g) {
+    const titulo = document.getElementById("racha-titulo");
+    const sub = document.getElementById("racha-sub");
+    if (titulo) titulo.textContent = `🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}`;
+    if (sub) {
+      sub.textContent =
+        g.racha_actual > 0
+          ? `Récord: ${g.racha_record} día${g.racha_record === 1 ? "" : "s"}`
+          : "Genera un tema o haz tu trivia diaria para empezar tu racha.";
+    }
+  }
+
+  /**
+   * "Mi progreso" (31-ago-2026): a diferencia de la racha (que mide
+   * actividad), esto mide DOMINIO — qué tema ya se domina y cuál sigue
+   * flojo, usando las respuestas de trivia que se van guardando por tema
+   * (ver enviarRespuestasTrivia y GET /api/temas/mi-progreso). Igual que la
+   * racha, junta el progreso de TODOS los perfiles/hijos de la cuenta —
+   * mis_temas no guarda con cuál se generó cada tema.
+   */
+  async function cargarMiProgreso() {
+    const cont = document.getElementById("zona-mi-progreso");
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-progreso`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar tu progreso.");
+      renderMiProgreso(data);
+    } catch (err) {
+      document.getElementById("tarjeta-mi-progreso")?.remove(); // no es crítico — mejor ocultarlo que dejar un hueco roto
+    }
+  }
+
+  function renderMiProgreso(data) {
+    const cont = document.getElementById("zona-mi-progreso");
+    if (!cont) return;
+    const temas = data.temas || [];
+
+    if (temas.length === 0) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Contesta la trivia de un tema para empezar a ver aquí en qué vas mejor y qué te conviene repasar.</p>`;
+      return;
+    }
+
+    const { promedio_general, total_intentos } = data.resumen || {};
+    const resumenHtml = `
+      <p class="ayuda" style="margin:0 0 12px; font-size:0.85rem;">
+        ${temas.length} tema${temas.length === 1 ? "" : "s"} con trivia contestada
+        ${promedio_general !== null && promedio_general !== undefined ? ` — promedio general: <strong>${promedio_general}%</strong>` : ""}
+        (${total_intentos} intento${total_intentos === 1 ? "" : "s"} en total).
+      </p>
+    `;
+
+    const filasHtml = temas
+      .map((t) => {
+        let tendencia = "";
+        if (t.intentos > 1) {
+          if (t.ultimo_porcentaje > t.primer_porcentaje) tendencia = " · 📈 mejorando";
+          else if (t.ultimo_porcentaje < t.primer_porcentaje) tendencia = " · 📉 bajando";
+          else tendencia = " · ➡️ sin cambio";
+        }
+        return `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px dashed var(--linea, #E3E9EF);">
+          <div style="min-width:0;">
+            <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t.tema)}</div>
+            <div class="ayuda" style="font-size:0.78rem; margin-top:2px;">${t.intentos} intento${t.intentos === 1 ? "" : "s"}${tendencia}</div>
+          </div>
+          <span style="flex-shrink:0; font-weight:800; padding:4px 10px; border-radius:999px; font-size:0.85rem; ${
+            t.necesita_repaso
+              ? "background:#FFF0EC; color:#B3431E;"
+              : "background:var(--hielo); color:var(--bosque);"
+          }">${t.promedio_porcentaje}%${t.necesita_repaso ? " · repasar" : ""}</span>
+        </div>
+      `;
+      })
+      .join("");
+
+    cont.innerHTML = resumenHtml + filasHtml;
+  }
+
+  async function toggleTriviaDiaria() {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    const abrir = zona.style.display === "none";
+    zona.style.display = abrir ? "block" : "none";
+    if (!abrir || triviaDiariaCargada) return;
+
+    zona.innerHTML = `<div class="cargando">Cargando tu trivia de hoy…</div>`;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/trivia-diaria`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar tu trivia diaria.");
+      renderTriviaDiaria(data);
+      triviaDiariaCargada = true;
+    } catch (err) {
+      zona.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  function renderTriviaDiaria(data) {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    if (!data.disponible) {
+      zona.innerHTML = `<p class="ayuda" style="margin:0;">${escapeHtml(
+        data.motivo || "Genera al menos un tema para desbloquear tu trivia diaria."
+      )}</p>`;
+      return;
+    }
+
+    // Mismo patrón visual que la trivia de un tema normal (.trivia-item,
+    // .opcion-btn) — ver mostrarTemaGenerado más abajo — para que se sienta
+    // igual de familiar aunque junte preguntas de varios temas a la vez.
+    const triviaHtml = data.preguntas
+      .map(
+        (p, i) => `
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
+        ${
+          p.opciones?.length
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
+        }
+        <div class="trivia-feedback" style="display:none;"></div>
+        <p class="ayuda" style="margin:6px 0 0; font-size:0.75rem;">De: ${escapeHtml(p.origen_tema || "")}</p>
+      </div>
+    `
+      )
+      .join("");
+
+    zona.innerHTML = `
+      <p class="ayuda" style="margin:0 0 10px; font-size:0.85rem;">Preguntas de tus propios temas — no gasta cupo de tu plan.</p>
+      ${triviaHtml}
+      <div id="trivia-diaria-resumen" style="display:none;"></div>
+      <button type="button" class="primario" id="btn-revisar-trivia-diaria" style="width:100%;">Revisar mis respuestas</button>
+    `;
+    zona.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    document.getElementById("btn-revisar-trivia-diaria").addEventListener("click", revisarTriviaDiaria);
+  }
+
+  async function revisarTriviaDiaria() {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    let total = 0;
+    let correctas = 0;
+
+    zona.querySelectorAll(".trivia-item").forEach((item) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
+        });
+
+        feedback.style.display = "block";
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+      } else {
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") + `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+      }
+    });
+
+    const resumen = document.getElementById("trivia-diaria-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      const pct = correctas / total;
+      const mensaje = pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver mañana.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
+    }
+
+    const btnRevisar = document.getElementById("btn-revisar-trivia-diaria");
+    if (btnRevisar) btnRevisar.style.display = "none";
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/trivia-diaria/completar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ aciertos: correctas, total }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (res.ok && data.gamificacion) {
+        const g = data.gamificacion;
+        const medallasNuevas = g.medallas_nuevas || [];
+        zona.insertAdjacentHTML(
+          "beforeend",
+          `<div class="aviso" style="margin-top:12px;">
+            🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}
+            ${medallasNuevas.length ? "<br>" + medallasNuevas.map((m) => `🏅 ¡Nueva medalla! ${m.icono} ${escapeHtml(m.nombre)}`).join("<br>") : ""}
+          </div>`
+        );
+        actualizarRachaChip(g);
+      }
+    } catch (err) {
+      // si falla no pasa nada — ya vio sus respuestas, solo no se actualiza la racha visualmente
+    }
   }
 
   async function cargarPerfiles() {
     const cont = document.getElementById("zona-perfiles");
     try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles`, {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/perfiles`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, cont);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus perfiles.");
 
@@ -599,7 +959,7 @@
         pintarPerfilActivo();
       }
     } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      cont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -748,7 +1108,7 @@
 
   async function cargarTipoUsuario() {
     try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/mi-tipo`, {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/mi-tipo`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
       });
       if (res.ok) tipoUsuario = (await res.json()).tipo_usuario || null;
@@ -829,8 +1189,8 @@
     const cont = document.getElementById("selector-avatar");
     if (!cont) return;
     cont.innerHTML = AVATARES.map(
-      (a) => `
-      <button type="button" class="opcion-avatar${avatarElegido === a.id ? " activa" : ""}" data-avatar="${a.id}">
+      (a, i) => `
+      <button type="button" class="opcion-avatar${avatarElegido === a.id ? " activa" : ""}" data-avatar="${a.id}" aria-pressed="${avatarElegido === a.id}" aria-label="Avatar ${i + 1}${avatarElegido === a.id ? " (elegido)" : ""}">
         <img src="assets/avatares/${a.file}" alt="">
       </button>`
     ).join("");
@@ -889,7 +1249,7 @@
       pintarSelectorAvatar();
     }
 
-    const res = await fetch(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
+    const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
     const data = await res.json();
     preguntasQuiz = data.preguntas || [];
 
@@ -1037,7 +1397,7 @@
       ajusteManual = null;
       mostrarResultadoPerfil();
     } catch (err) {
-      avisoCont.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      avisoCont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -1188,14 +1548,14 @@
       perfilIdEditando = null;
       cargarPerfiles();
     } catch (err) {
-      cont.insertAdjacentHTML("beforeend", `<div class="error">${escapeHtml(err.message)}</div>`);
+      cont.insertAdjacentHTML("beforeend", `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`);
     }
   }
 
   async function borrarPerfil(perfilId) {
     if (!confirm("¿Borrar este perfil?")) return;
     try {
-      const res = await fetch(`${API_BASE}/api/aprendizaje/perfiles/${perfilId}`, {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/perfiles/${perfilId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
       });
@@ -1203,7 +1563,7 @@
       if (!res.ok) throw new Error(data.error || "No se pudo borrar el perfil.");
       cargarPerfiles();
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error: " + mensajeErrorAmigable(err));
     }
   }
 
@@ -1278,10 +1638,116 @@
       try {
         fotosSeleccionadas.push(await comprimirImagen(archivo));
       } catch (err) {
-        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
       }
     }
     pintarMiniaturas();
+  }
+
+  // ── Revisar un ejercicio resuelto ────────────────────────────────────────
+  // Distinto de las fotos de arriba: aquellas son contexto para GENERAR
+  // material nuevo (apuntes, resumen); estas son de un ejercicio que la
+  // persona ya resolvió, para que le digamos en qué paso se equivocó.
+  // Mismo compresor de imágenes, límite y mecánica de miniaturas.
+  const MAX_FOTOS_REVISION = 3;
+  let fotosRevision = [];
+
+  function pintarMiniaturasRevision() {
+    const cont = document.getElementById("miniaturas-fotos-revision");
+    if (!cont) return;
+    cont.innerHTML = fotosRevision
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" data-quitar-foto-revision="${i}" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+    cont.querySelectorAll("[data-quitar-foto-revision]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        fotosRevision.splice(Number(btn.dataset.quitarFotoRevision), 1);
+        pintarMiniaturasRevision();
+      });
+    });
+  }
+
+  async function alElegirFotosRevision(ev) {
+    const resultado = document.getElementById("resultado-revision");
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = "";
+
+    for (const archivo of archivos) {
+      if (fotosRevision.length >= MAX_FOTOS_REVISION) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS_REVISION} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosRevision.push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      }
+    }
+    pintarMiniaturasRevision();
+  }
+
+  /** Manda las fotos del ejercicio ya resuelto a revisión. Necesita que el
+   * backend tenga POST /api/temas/revisar — mientras no exista, el 404 se
+   * muestra como error amigable en vez de trabarse en silencio. Respuesta
+   * esperada: { veredicto, pasos: [{ numero, correcto, comentario }] }. */
+  async function revisarEjercicio() {
+    const resultado = document.getElementById("resultado-revision");
+    resultado.innerHTML = "";
+
+    if (fotosRevision.length === 0) {
+      resultado.innerHTML = `<div class="error">Sube al menos una foto del ejercicio resuelto.</div>`;
+      return;
+    }
+
+    iniciarTips(resultado, "Revisando tu ejercicio paso por paso…");
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/revisar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ imagenes: fotosRevision }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      detenerTips();
+
+      if (res.status === 402) {
+        resultado.innerHTML = `
+          <div class="error">${escapeHtml(data.error)}</div>
+          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "No se pudo revisar el ejercicio.");
+
+      const pasos = data.pasos || [];
+      resultado.innerHTML = `
+        <div class="aviso">✓ Ejercicio revisado.</div>
+        ${data.veredicto ? `<p style="font-weight:700;">${escapeHtml(data.veredicto)}</p>` : ""}
+        ${pasos
+          .map(
+            (p) => `
+          <div class="trivia-feedback ${p.correcto ? "bien" : "mal"}" style="margin-bottom:8px;">
+            <strong>${p.correcto ? "✓" : "✗"} Paso ${escapeHtml(String(p.numero ?? ""))}:</strong> ${escapeHtml(p.comentario || "")}
+          </div>`
+          )
+          .join("")}
+      `;
+      fotosRevision = [];
+      pintarMiniaturasRevision();
+    } catch (err) {
+      detenerTips();
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
   }
 
   async function generarTema() {
@@ -1290,6 +1756,7 @@
     const perfilId = document.getElementById("perfil-input").value || null;
     const detalles = document.getElementById("detalles-input").value.trim();
     const etiquetas = parsearEtiquetas(document.getElementById("etiquetas-input").value);
+    const enfoque = document.getElementById("enfoque-psico-input")?.checked ? "psicoeducativo" : "escolar";
     const resultado = document.getElementById("resultado-generar");
     resultado.innerHTML = "";
 
@@ -1311,7 +1778,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas }),
+          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas, enfoque }),
         },
         null, // no sobreescribir la zona de tips con el mensaje de reintento
         null
@@ -1328,30 +1795,34 @@
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
       fotosSeleccionadas = []; // el tema ya se generó; no arrastrar las fotos al siguiente
-      mostrarTemaGenerado(data.contenido, data.tema_id, null);
+      mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
     } catch (err) {
       detenerTips();
-      resultado.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
   async function cargarHistorial() {
     const cont = document.getElementById("lista-historial");
     try {
-      const res = await fetch(`${API_BASE}/api/temas/mios`, {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, cont);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo cargar tu historial.");
 
       historialCache = data.temas || [];
       etiquetaActiva = "";
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
 
       if (historialCache.length === 0) {
         document.getElementById("filtros-historial").style.display = "none";
+        document.getElementById("hint-combinar").style.display = "none";
         cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado ningún tema.</p>`;
         return;
       }
+      document.getElementById("hint-combinar").style.display = historialCache.length >= 2 ? "block" : "none";
 
       // Solo mostramos los filtros si hay al menos una etiqueta usada en
       // todo el historial — si nadie ha etiquetado nada todavía, no tiene
@@ -1372,6 +1843,7 @@
     const todasEtiquetas = [...new Set(historialCache.flatMap((t) => t.etiquetas || []))].sort();
     if (!todasEtiquetas.length) {
       cont.innerHTML = "";
+      document.getElementById("accion-etiqueta").innerHTML = "";
       return;
     }
     cont.innerHTML =
@@ -1386,6 +1858,31 @@
         renderHistorial();
       });
     });
+
+    // Botón para marcar de un jalón todos los temas de la etiqueta activa
+    // (ej. "todos los de Matemáticas, Primer Parcial") en vez de marcar uno
+    // por uno — pensado sobre todo para armar un repaso o simulacro grande.
+    const accion = document.getElementById("accion-etiqueta");
+    if (!etiquetaActiva) {
+      accion.innerHTML = "";
+      return;
+    }
+    const idsDeEtiqueta = historialCache.filter((t) => (t.etiquetas || []).includes(etiquetaActiva)).map((t) => t.id);
+    if (idsDeEtiqueta.length < 2) {
+      accion.innerHTML = "";
+      return;
+    }
+    const yaTodosMarcados = idsDeEtiqueta.every((id) => temasSeleccionados.has(id));
+    accion.innerHTML = `<button type="button" class="btn-seleccionar-etiqueta" id="btn-seleccionar-etiqueta">${
+      yaTodosMarcados ? "✓ Los " + idsDeEtiqueta.length + ' de "' + escapeHtml(etiquetaActiva) + '" están seleccionados' : "Seleccionar los " + idsDeEtiqueta.length + ' de "' + escapeHtml(etiquetaActiva) + '"'
+    }</button>`;
+    if (!yaTodosMarcados) {
+      document.getElementById("btn-seleccionar-etiqueta").addEventListener("click", () => {
+        idsDeEtiqueta.forEach((id) => temasSeleccionados.add(id));
+        renderHistorial();
+        renderChipsEtiquetas();
+      });
+    }
   }
 
   function renderHistorial() {
@@ -1405,10 +1902,13 @@
       return;
     }
 
+    const permiteSeleccion = historialCache.length >= 2;
+
     cont.innerHTML = filtrados
       .map(
         (t) => `
       <div class="historial-item" data-id="${t.id}">
+        ${permiteSeleccion ? `<input type="checkbox" class="seleccionar" data-seleccionar="${t.id}" ${temasSeleccionados.has(t.id) ? "checked" : ""} title="Seleccionar para armar un repaso">` : ""}
         <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
         <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
         <span class="etiquetas-item">
@@ -1429,6 +1929,111 @@
         editarEtiquetas(btn.dataset.editarEtiquetas);
       });
     });
+    cont.querySelectorAll("[data-seleccionar]").forEach((chk) => {
+      chk.addEventListener("click", (ev) => ev.stopPropagation());
+      chk.addEventListener("change", () => {
+        const id = chk.dataset.seleccionar;
+        if (chk.checked) temasSeleccionados.add(id);
+        else temasSeleccionados.delete(id);
+        actualizarBarraCombinar();
+        renderChipsEtiquetas(); // refresca "Seleccionar los N de X" si ya quedaron todos marcados
+      });
+    });
+    actualizarBarraCombinar();
+  }
+
+
+
+  /** Muestra u oculta la barra de "Armar repaso" según cuántos temas del
+   * historial estén marcados — ver el checkbox `data-seleccionar` arriba. */
+  function actualizarBarraCombinar() {
+    const barra = document.getElementById("barra-combinar");
+    if (!barra) return;
+    const n = temasSeleccionados.size;
+
+    if (n < 2) {
+      barra.style.display = "none";
+      barra.innerHTML = "";
+      return;
+    }
+
+    const tope = modoExamenActivo ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    const excedido = n > tope;
+    barra.style.display = "flex";
+    barra.innerHTML = `
+      <label class="toggle-modo-examen">
+        <input type="checkbox" id="chk-modo-examen" ${modoExamenActivo ? "checked" : ""}>
+        🎯 Modo Examen — más ejercicios y un simulador, menos resumen (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+      </label>
+      <div class="fila-principal">
+        <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamenActivo ? "un simulacro" : "un repaso"}` : ""}</span>
+        <div class="acciones">
+          <button type="button" class="secundario" id="btn-cancelar-combinar">Cancelar</button>
+          <button type="button" class="primario" id="btn-armar-repaso"${excedido ? " disabled" : ""}>${modoExamenActivo ? "🎯 Armar simulacro" : "✨ Armar repaso"}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("chk-modo-examen").addEventListener("change", (ev) => {
+      modoExamenActivo = ev.target.checked;
+      actualizarBarraCombinar();
+    });
+    document.getElementById("btn-cancelar-combinar").addEventListener("click", () => {
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
+      renderHistorial();
+      renderChipsEtiquetas();
+    });
+    if (!excedido) {
+      document.getElementById("btn-armar-repaso").addEventListener("click", combinarTemas);
+    }
+  }
+
+  /** Junta el contenido de los temas marcados en el historial en un solo
+   * material — pensado para estudiar varios temas juntos antes de un examen.
+   * Con el interruptor "Modo Examen" activo (ver actualizarBarraCombinar),
+   * el resultado se inclina hacia ejercicios y un simulador de trivia en vez
+   * de resumen, y gasta el contador aparte de simulacros del plan (no el de
+   * temas normales) — ver resolverAccesoExamen en routes/temas.js. */
+  async function combinarTemas() {
+    const ids = [...temasSeleccionados];
+    const tope = modoExamenActivo ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    if (ids.length < 2 || ids.length > tope) return;
+
+    const cont = document.getElementById("lista-historial");
+    document.getElementById("barra-combinar").style.display = "none";
+    iniciarTips(cont, modoExamenActivo ? "Armando tu simulacro de examen…" : "Juntando tus temas y armando el repaso…");
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/combinar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ temaIds: ids, enfoque: modoExamenActivo ? "examen" : "estudio" }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      detenerTips();
+
+      if (res.status === 402) {
+        cont.innerHTML = `
+          <div class="error">${escapeHtml(data.error)}</div>
+          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
+
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
+      mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
+    } catch (err) {
+      detenerTips();
+      renderHistorial();
+      cont.insertAdjacentHTML("afterbegin", `<div class="error" style="margin-bottom:10px;">${escapeHtml(mensajeErrorAmigable(err))}</div>`);
+    }
   }
 
   async function editarEtiquetas(temaId) {
@@ -1438,7 +2043,7 @@
 
     const etiquetas = parsearEtiquetas(texto);
     try {
-      const res = await fetch(`${API_BASE}/api/temas/mios/${temaId}`, {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${temaId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
         body: JSON.stringify({ etiquetas }),
@@ -1451,22 +2056,23 @@
       renderChipsEtiquetas();
       renderHistorial();
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error: " + mensajeErrorAmigable(err));
     }
   }
 
   async function verTemaDelHistorial(temaId) {
-    document.getElementById("contenido").innerHTML = `<div class="cargando">Cargando tu tema…</div>`;
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `<div class="cargando">Cargando tu tema…</div>`;
     try {
-      const res = await fetch(`${API_BASE}/api/temas/mios/${temaId}`, {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${temaId}`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
+      }, cont, "Cargando tu tema… el servidor está despertando, puede tardar hasta un minuto la primera vez.");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo cargar el tema.");
 
       mostrarTemaGenerado(data.tema.contenido, data.tema.id, data.tema.pdf_url);
     } catch (err) {
-      document.getElementById("contenido").innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(err.message)}</div></div>`;
+      document.getElementById("contenido").innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div></div>`;
     }
   }
 
@@ -1482,13 +2088,33 @@
    * ("Tu respuesta" / "Correcta") y debajo de cada pregunta sale una línea
    * que dice qué pasó, en vez de dejarlo todo al color.
    */
+  /**
+   * Manda el detalle de cómo se contestó la trivia de un tema del historial
+   * (ver POST /api/temas/mios/:id/respuestas) — alimenta "Mi progreso"
+   * (cargarMiProgreso). No bloquea nada si falla: la persona ya vio su
+   * calificación en pantalla.
+   */
+  async function enviarRespuestasTrivia(temaId, respuestas) {
+    try {
+      await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(temaId)}/respuestas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ respuestas }),
+      });
+    } catch (err) {
+      // no bloquea la experiencia si falla
+    }
+  }
+
   function revisarTrivia() {
     let total = 0;
     let correctas = 0;
+    const detalle = [];
 
-    document.querySelectorAll(".trivia-item").forEach((item) => {
+    document.querySelectorAll(".trivia-item").forEach((item, indice) => {
       item.classList.add("revisado");
       const correcta = item.dataset.correcta || "";
+      const pregunta = item.dataset.pregunta || "";
       const opciones = item.querySelectorAll(".opcion-btn");
       const feedback = item.querySelector(".trivia-feedback");
       const abierta = item.querySelector(".respuesta-abierta");
@@ -1526,6 +2152,14 @@
           feedback.className = "trivia-feedback";
           feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
         }
+
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: seleccionado ? seleccionado.dataset.valor : null,
+          respuesta_correcta: correcta,
+          acerto: !!acerto,
+        });
       } else {
         // Pregunta abierta: no se califica, pero sí se compara con la sugerida.
         if (abierta) abierta.disabled = true;
@@ -1535,8 +2169,19 @@
         feedback.innerHTML =
           (escribio ? "" : "<em>No escribiste nada.</em> ") +
           `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+
+        // abierta: no se autocalifica, así que acerto queda en null — igual
+        // que en el modo grupo (routes/grupos.js).
+        detalle.push({ indice, pregunta, respuesta: escribio || null, respuesta_correcta: correcta, acerto: null });
       }
     });
+
+    // Guarda el resultado en el historial del tema (ver GET /mi-progreso) —
+    // si esto falla, la persona no se entera: ya vio su calificación en
+    // pantalla, esto solo alimenta "Mi progreso" a futuro.
+    if (detalle.length && ultimoTemaId) {
+      enviarRespuestasTrivia(ultimoTemaId, detalle);
+    }
 
     const resumen = document.getElementById("trivia-resumen");
     if (resumen && total > 0) {
@@ -1823,7 +2468,7 @@
     };
   }
 
-  function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado) {
+  function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
     ultimoContenido = contenido;
     ultimoTemaId = temaId;
     const c = contenido;
@@ -1857,7 +2502,7 @@
     const triviaHtml = (c.trivia || [])
       .map(
         (p, i) => `
-      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}" data-pregunta="${escapeHtml(p.pregunta || "")}">
         <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
         ${
           p.opciones?.length
@@ -1999,9 +2644,21 @@
       <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
     `;
 
+    // Racha/medallas nuevas de ESTA generación (ver utils/gamificacion.js) —
+    // solo viene cuando mostrarTemaGenerado se llama justo después de
+    // generar/combinar; al reabrir un tema del historial no aplica.
+    const medallasNuevas = gamificacion?.medallas_nuevas || [];
+    const gamificacionBannerHtml = gamificacion
+      ? `<div class="aviso" style="margin-bottom:14px;">
+          🔥 Racha: ${gamificacion.racha_actual} día${gamificacion.racha_actual === 1 ? "" : "s"}
+          ${medallasNuevas.length ? "<br>" + medallasNuevas.map((m) => `🏅 ¡Nueva medalla! ${m.icono} ${escapeHtml(m.nombre)}`).join("<br>") : ""}
+        </div>`
+      : "";
+
     const nEj = ejercicios.length;
     cont.innerHTML = `
       <a class="volver" id="btn-volver">← Volver</a>
+      ${gamificacionBannerHtml}
       <div class="tarjeta">
         <h1>📘 ${escapeHtml(c.tema || "")}</h1>
         <div class="pestanas">
@@ -2070,7 +2727,7 @@
       btnPdf.disabled = true;
       btnPdf.textContent = "Preparando PDF…";
       try {
-        const res = await fetch(`${API_BASE}/api/temas/pdf`, {
+        const res = await fetchConReintento(`${API_BASE}/api/temas/pdf`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
           body: JSON.stringify({ contenido: ultimoContenido, modo: "individual", temaId: ultimoTemaId }),
@@ -2081,7 +2738,7 @@
         window.open(pdfUrlCache, "_blank");
         btnPdf.textContent = "📄 Descargar imprimible (PDF)";
       } catch (err) {
-        alert("Error: " + err.message);
+        alert("Error: " + mensajeErrorAmigable(err));
         btnPdf.textContent = textoOriginal;
       } finally {
         btnPdf.disabled = false;
