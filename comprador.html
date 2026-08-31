@@ -81,6 +81,38 @@
   .curso-item:first-child { border-top: none; padding-top: 0; }
   .curso-item a { color: var(--profundo); font-weight: 700; text-decoration: none; }
   .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
+
+  /* ── "Invita y gana" (31-ago-2026) ──
+     Antes el código propio vivía en un <input readonly> con "flex:1" junto
+     a un <button class="secundario"> — pero .secundario trae width:100% en
+     su propia regla, y dentro de un flex row eso gana sobre el flex:1 del
+     input (el input queda con flex-basis:0 y absorbe todo el shrink de la
+     fila): el botón terminaba ocupando casi toda la fila y el código se
+     veía colapsado/en blanco. Ahora el código va en su propia cajita (no es
+     un input) y el botón de copiar tiene tamaño de contenido, no 100%. */
+  .caja-codigo {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--hielo); border: 2px dashed var(--aqua); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 18px;
+  }
+  .caja-codigo .codigo-texto {
+    font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.2rem;
+    letter-spacing: 1.5px; color: var(--profundo); word-break: break-all;
+  }
+  .btn-copiar-codigo {
+    flex: 0 0 auto; background: var(--menta); color: #fff; border: none; border-radius: 999px;
+    padding: 9px 16px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.85rem;
+    cursor: pointer; white-space: nowrap;
+  }
+  .separador-referidos {
+    display: flex; align-items: center; gap: 10px; margin: 4px 0 12px;
+    color: #5b7d99; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .separador-referidos::before, .separador-referidos::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
+  .btn-canjear-chico {
+    flex: 0 0 auto; background: var(--profundo); color: #fff; border: none; border-radius: 999px;
+    padding: 0 20px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -683,27 +715,28 @@
       const codigo = plan.referidos?.codigo || "";
 
       cont.innerHTML = `
-        <p class="ayuda" style="margin:0 0 8px; text-align:left; font-size:0.85rem;">Comparte tu código — cada vez que alguien nuevo lo use, ganas un tema de regalo.</p>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
-          <input type="text" id="miCodigoReferido" value="${escapeHtml(codigo)}" readonly style="flex:1; font-weight:800; text-align:center; letter-spacing:1px;">
-          <button type="button" class="secundario" id="btnCopiarCodigo" style="white-space:nowrap;">Copiar</button>
+        <p class="ayuda" style="margin:0 0 12px; text-align:left; font-size:0.85rem;">Comparte tu código — cada vez que alguien nuevo lo use, ganas un tema de regalo. 🎉</p>
+        <div class="caja-codigo">
+          <span class="codigo-texto" id="miCodigoReferido">${escapeHtml(codigo)}</span>
+          <button type="button" class="btn-copiar-codigo" id="btnCopiarCodigo">📋 Copiar</button>
         </div>
-        <label style="font-size:0.85rem;">¿Alguien te compartió un código?</label>
+        <div class="separador-referidos"><span>¿Alguien te compartió un código?</span></div>
         <div style="display:flex; align-items:center; gap:8px;">
           <input type="text" id="codigoACanjear" placeholder="Ej. MARIAUX8M" style="flex:1;">
-          <button type="button" class="primario" id="btnCanjearCodigo" style="white-space:nowrap;">Canjear</button>
+          <button type="button" class="btn-canjear-chico" id="btnCanjearCodigo">Canjear</button>
         </div>
-        <div id="resultadoCanje" style="margin-top:8px;"></div>
+        <div id="resultadoCanje" style="margin-top:10px;"></div>
       `;
 
       document.getElementById("btnCopiarCodigo").addEventListener("click", async () => {
         const btn = document.getElementById("btnCopiarCodigo");
         try {
           await navigator.clipboard.writeText(codigo);
-          btn.textContent = "¡Copiado!";
-          setTimeout(() => (btn.textContent = "Copiar"), 1500);
+          btn.textContent = "✓ ¡Copiado!";
+          setTimeout(() => (btn.textContent = "📋 Copiar"), 1500);
         } catch (err) {
-          document.getElementById("miCodigoReferido").select();
+          // Sin permiso de portapapeles (poco común) — al menos se ve seleccionado.
+          window.getSelection()?.selectAllChildren(document.getElementById("miCodigoReferido"));
         }
       });
 
