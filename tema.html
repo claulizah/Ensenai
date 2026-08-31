@@ -1230,16 +1230,39 @@
     return [...propios, ...TIPS_GENERALES];
   }
 
+  /**
+   * `encabezado` acepta un string fijo (como antes) o un arreglo de etapas
+   * [{ ms, texto }] para que el título vaya cambiando según el tiempo real
+   * transcurrido (31-ago-2026, pedido explícito de la usuaria: "que no se
+   * sienta tan tardado" al generar un tema). No hace la generación más
+   * rápida — el backend sigue tardando lo mismo — pero deja de sentirse
+   * "colgado" mostrando en qué va, en vez de un mismo mensaje fijo todo
+   * el rato. Las etapas son un estimado (no vienen del backend en tiempo
+   * real), así que se pisan un poco optimistas a propósito.
+   */
   function iniciarTips(contenedor, encabezado) {
     detenerTips();
     const tips = armarListaTips();
+    const etapas = Array.isArray(encabezado) ? encabezado : null;
+    const inicio = Date.now();
     let i = 0;
+    let tick = 0;
+
+    const tituloActual = () => {
+      if (!etapas) return encabezado;
+      const transcurrido = Date.now() - inicio;
+      let actual = etapas[0]?.texto || "";
+      for (const etapa of etapas) {
+        if (transcurrido >= etapa.ms) actual = etapa.texto;
+      }
+      return actual;
+    };
 
     const pintar = () => {
       contenedor.innerHTML = `
         <div class="zona-espera">
           <div class="espera-barra"><span></span></div>
-          <p class="espera-titulo">${escapeHtml(encabezado)}</p>
+          <p class="espera-titulo">${escapeHtml(tituloActual())}</p>
           <div class="tip-caja">
             <span class="tip-icono">💡</span>
             <p class="tip-texto">${escapeHtml(tips[i % tips.length])}</p>
@@ -1252,7 +1275,13 @@
     };
 
     pintar();
-    tipsIntervalo = setInterval(() => { i++; pintar(); }, 6000);
+    // Sigue repintando cada 2s (para que el título de etapa se sienta vivo)
+    // pero el tip solo cambia cada 3 repintados (~6s), igual que antes.
+    tipsIntervalo = setInterval(() => {
+      tick++;
+      if (tick % 3 === 0) i++;
+      pintar();
+    }, 2000);
   }
 
   function detenerTips() {
@@ -1935,12 +1964,29 @@
       return;
     }
 
-    iniciarTips(
-      resultado,
-      fotosSeleccionadas.length
-        ? "Leyendo tus fotos y preparando el material…"
-        : "Preparando el material…"
-    );
+    // Etapas estimadas (ver iniciarTips) — el backend hace, en orden: generar
+    // el material completo (explicación + ejercicios + trivia + material
+    // extra) y luego una revisión de calidad que a veces vuelve a generar
+    // desde cero (ver utils/revisorCalidad.js) — por eso a veces tarda más
+    // de lo que canta esta lista; la última etapa se queda fija mientras
+    // eso termina, en vez de dejar el mismo texto fijo desde el segundo 0.
+    const etapasEspera = fotosSeleccionadas.length
+      ? [
+          { ms: 0, texto: "Leyendo tus fotos…" },
+          { ms: 6000, texto: "Armando la explicación de tu tema…" },
+          { ms: 14000, texto: "Armando los ejercicios y la trivia…" },
+          { ms: 23000, texto: "Preparando el material extra (memorama, flashcards, tarjetas)…" },
+          { ms: 33000, texto: "Haciendo una última revisión de calidad…" },
+          { ms: 45000, texto: "Ya casi — puliendo los últimos detalles…" },
+        ]
+      : [
+          { ms: 0, texto: "Leyendo tu tema y armando la explicación…" },
+          { ms: 8000, texto: "Armando los ejercicios y la trivia…" },
+          { ms: 17000, texto: "Preparando el material extra (memorama, flashcards, tarjetas)…" },
+          { ms: 27000, texto: "Haciendo una última revisión de calidad…" },
+          { ms: 39000, texto: "Ya casi — puliendo los últimos detalles…" },
+        ];
+    iniciarTips(resultado, etapasEspera);
 
     try {
       const res = await fetchConReintento(
@@ -2137,7 +2183,7 @@
     barra.innerHTML = `
       <label class="toggle-modo-examen">
         <input type="checkbox" id="chk-modo-examen" ${modoExamenActivo ? "checked" : ""}>
-        🎯 Modo Examen — más ejercicios y un simulador, menos resumen (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+        🎯 Modo Examen — puro simulador de práctica, sin explicación (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
       </label>
       <div class="fila-principal">
         <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamenActivo ? "un simulacro" : "un repaso"}` : ""}</span>
@@ -2902,19 +2948,34 @@
       : "";
 
     const nEj = ejercicios.length;
+
+    // Modo Examen (simulador puro, 31-ago-2026, ver agents/combinarTemas.js)
+    // deja el resumen vacío A PROPÓSITO — sin esto, "Estudiar" se abriría
+    // por default mostrando un panel completamente en blanco. Si no hay
+    // nada que exponer, ni siquiera se muestra esa pestaña, y se arranca
+    // directo en Practicar (o Repasar si el simulador es solo trivia).
+    const resumenVacio =
+      !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
+      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual;
+    const tabInicial = resumenVacio ? (nEj ? "practicar" : "repasar") : "estudiar";
+
     cont.innerHTML = `
       <a class="volver" id="btn-volver">← Volver</a>
       ${gamificacionBannerHtml}
       <div class="tarjeta">
         <h1>📘 ${escapeHtml(c.tema || "")}</h1>
         <div class="pestanas">
-          <button class="pestana activa" data-panel="estudiar">📖 Estudiar</button>
-          <button class="pestana" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
-          <button class="pestana" data-panel="repasar">🔁 Repasar</button>
+          ${
+            resumenVacio
+              ? ""
+              : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
+          }
+          <button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
+          <button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>
         </div>
-        <div class="panel" id="panel-estudiar">${estudiarHtml}</div>
-        <div class="panel" id="panel-practicar" style="display:none;">${practicarHtml}</div>
-        <div class="panel" id="panel-repasar" style="display:none;">${repasarHtml}</div>
+        <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
+        <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
+        <div class="panel" id="panel-repasar" style="${tabInicial === "repasar" ? "" : "display:none;"}">${repasarHtml}</div>
         <button class="secundario" id="btn-pdf" style="margin-top:18px; width:100%;">${pdfUrlGuardado ? "📄 Descargar imprimible (PDF)" : "📄 Generar imprimible (PDF)"}</button>
       </div>
     `;

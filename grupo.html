@@ -161,10 +161,11 @@
   // puede tener varios grupos abiertos en la misma pantalla.
   const temasSeleccionadosPorGrupo = {};
   const MAX_TEMAS_COMBINAR = 6;
-  // Modo Examen (misma idea que en tema.html): resumen mínimo, más
-  // ejercicios y un simulador de trivia — pensado para armar una guía de
-  // examen que el profesional comparte con su grupo. Admite más temas de
-  // golpe porque no hay que releerlo, solo practicarlo.
+  // Modo Examen (misma idea que en tema.html): puro simulador de práctica
+  // (sin resumen, diagrama ni actividad — solo ejercicios y/o trivia, lo
+  // que aplique según el tema) — pensado para armar una guía de examen que
+  // el profesional comparte con su grupo. Admite más temas de golpe porque
+  // no hay que releerlo, solo practicarlo.
   const MAX_TEMAS_COMBINAR_EXAMEN = 12;
   const modoExamenActivoPorGrupo = {};
 
@@ -920,7 +921,7 @@
     barra.innerHTML = `
       <label class="toggle-modo-examen">
         <input type="checkbox" id="chk-modo-examen-${grupoId}" ${modoExamen ? "checked" : ""}>
-        🎯 Guía de examen — más ejercicios y un simulador, pensada para compartir con tu grupo (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+        🎯 Guía de examen — puro simulador de práctica, sin explicación, pensada para compartir con tu grupo (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
       </label>
       <div class="fila-principal">
         <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamen ? "una guía de examen" : "un repaso"}` : ""}</span>

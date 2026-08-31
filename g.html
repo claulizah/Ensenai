@@ -1009,18 +1009,33 @@
     `;
 
     const nEj = ejercicios.length;
+
+    // Modo Examen (simulador puro, 31-ago-2026, ver agents/combinarTemas.js)
+    // deja el resumen vacío A PROPÓSITO — sin esto, "Estudiar" se abriría
+    // por default mostrando un panel completamente en blanco. Si no hay
+    // nada que exponer, ni siquiera se muestra esa pestaña, y se arranca
+    // directo en Practicar (o Repasar si el simulador es solo trivia).
+    const resumenVacio =
+      !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
+      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual;
+    const tabInicial = resumenVacio ? (nEj ? "practicar" : "repasar") : "estudiar";
+
     cont.innerHTML = `
       <a class="volver" href="javascript:void(0)" id="btn-volver">← Volver a la liga</a>
       <div class="tarjeta">
         <h1>📘 ${escapeHtml(c.tema || tema.titulo)}</h1>
         <div class="pestanas">
-          <button class="pestana activa" data-panel="estudiar">📖 Estudiar</button>
-          <button class="pestana" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
-          <button class="pestana" data-panel="repasar">🔁 Repasar</button>
+          ${
+            resumenVacio
+              ? ""
+              : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
+          }
+          <button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
+          <button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>
         </div>
-        <div class="panel" id="panel-estudiar">${estudiarHtml}</div>
-        <div class="panel" id="panel-practicar" style="display:none;">${practicarHtml}</div>
-        <div class="panel" id="panel-repasar" style="display:none;">${repasarHtml}</div>
+        <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
+        <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
+        <div class="panel" id="panel-repasar" style="${tabInicial === "repasar" ? "" : "display:none;"}">${repasarHtml}</div>
         ${tema.pdf_url ? `<a href="${escapeHtml(tema.pdf_url)}" target="_blank" style="text-decoration:none;"><button class="secundario" style="margin-top:18px; width:100%;">📄 Descargar imprimible (PDF)</button></a>` : ""}
       </div>
     `;
