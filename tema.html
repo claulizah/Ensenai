@@ -165,6 +165,13 @@
     background: var(--menta); color: #fff; border-radius: 8px; padding: 8px 13px; margin-top: 10px;
     font-weight: 700; font-size: 0.93rem;
   }
+  .ejercicio-marcar {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85rem; font-weight: 700;
+    color: var(--bosque); cursor: pointer;
+  }
+  .ejercicio-marcar input { width: 17px; height: 17px; accent-color: var(--menta); cursor: pointer; }
+  .btn-guardar-progreso { width: 100%; margin-top: 4px; }
+  .progreso-aviso { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--bosque); margin-top: 8px; }
 
   /* ── Espera con tips ── */
   .zona-espera { padding: 20px 4px 8px; text-align: center; }
@@ -273,13 +280,23 @@
   .respuestas-toggle { text-align: center; }
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
   .respuestas-box.abierto { display: block; }
-  .historial-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 6px 10px; cursor: pointer; }
+  .historial-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--linea); cursor: pointer; }
   .historial-item:first-child { border-top: none; }
   .historial-item .titulo { font-weight: 700; }
-  .historial-item .fecha { color: #4A6A85; font-size: 0.8rem; }
-  .historial-item .etiquetas-item { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+  .historial-item .fecha { color: #4A6A85; font-size: 0.8rem; white-space: nowrap; }
   .etiqueta-badge { display: inline-block; background: var(--hielo); border: 1px solid var(--aqua); color: var(--bosque); font-size: 0.72rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
   .historial-item .seleccionar { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--menta); cursor: pointer; }
+  /* Fila de un tema en "Mis temas anteriores": antes era un solo flex con
+     wrap (checkbox + título + fecha + etiquetas todos como hermanos), lo
+     que en pantallas angostas hacía que la fecha y el título se acomodaran
+     en lugares distintos según qué tan largo fuera el título de cada tema
+     (31-ago-2026). Ahora el checkbox es su propia columna y todo lo demás
+     vive en una sola columna angosta que sí controla su propio wrap. */
+  .historial-item--tema { align-items: flex-start; }
+  .historial-item--tema .seleccionar { margin-top: 3px; }
+  .historial-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .historial-item-linea1 { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; }
+  .historial-item .etiquetas-item { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
   .hint-combinar { color: #4A6A85; font-size: 0.85rem; margin: -6px 0 10px; }
   .barra-combinar { display: flex; flex-direction: column; gap: 10px; background: var(--hielo); border: 2px solid var(--aqua); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-weight: 700; font-size: 0.9rem; }
   .barra-combinar .fila-principal { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -351,6 +368,8 @@
   let perfilSeleccionadoId = "";
   let historialCache = [];
   let etiquetaActiva = "";
+  let progresoCache = null;
+  let etiquetaActivaProgreso = "";
   // Ids de temas del historial marcados para juntar en un repaso de examen
   // (ver combinarTemas() más abajo). Vive fuera de renderHistorial() para
   // no perderse cuando la persona busca o filtra por etiqueta.
@@ -387,6 +406,110 @@
     t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
     t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
     return t.replace(/\n/g, "<br>");
+  }
+
+  /**
+   * Arma una vista imprimible (pestaña nueva + print() automático) para el
+   * material extra en forma de tarjetas — pedido explícito de la usuaria
+   * (31-ago-2026): antes memorama/flashcards solo se veían como un párrafo
+   * de instrucciones, sin forma real de recortarlas. Solo aplica a temas
+   * generados desde este cambio en adelante (ver material_extra[].tarjetas);
+   * los temas viejos del historial siguen mostrando solo el texto.
+   *
+   * - memorama/relacionar: cada par se separa en DOS tarjetas sueltas (una
+   *   con "frente", otra con "reverso") — así funciona de verdad el juego
+   *   de emparejar, no tiene sentido un frente/reverso pegados.
+   * - flashcards/tarjetas: cada elemento es UNA tarjeta con "frente" arriba
+   *   y, si trae "reverso", una línea punteada de doblez y la respuesta
+   *   abajo — para doblar el papel en vez de depender de imprimir a doble
+   *   cara (que en casa casi nunca sale bien alineado).
+   */
+  function imprimirTarjetas(tipo, tarjetasOriginales) {
+    const tarjetas = (tarjetasOriginales || []).filter((t) => t && (t.frente || t.reverso));
+    if (!tarjetas.length) return;
+
+    const esEmparejar = tipo === "memorama" || tipo === "relacionar";
+    let tarjetasHtml = "";
+
+    if (esEmparejar) {
+      const sueltas = [];
+      tarjetas.forEach((t) => {
+        if (t.frente) sueltas.push(t.frente);
+        if (t.reverso) sueltas.push(t.reverso);
+      });
+      tarjetasHtml = sueltas
+        .map((texto) => `<div class="tarjeta-imprimible"><div class="tarjeta-texto">${escapeHtml(texto)}</div></div>`)
+        .join("");
+    } else {
+      tarjetasHtml = tarjetas
+        .map(
+          (t) => `
+        <div class="tarjeta-imprimible tarjeta-doblez">
+          <div class="tarjeta-mitad">${escapeHtml(t.frente || "")}</div>
+          ${
+            t.reverso
+              ? `<div class="tarjeta-linea-doblez">✂️ dobla aquí ✂️</div><div class="tarjeta-mitad tarjeta-reverso">${escapeHtml(t.reverso)}</div>`
+              : ""
+          }
+        </div>`
+        )
+        .join("");
+    }
+
+    const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Tarjetas para imprimir — EnseñAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Nunito', sans-serif; margin: 0; padding: 18px; background: #fff; color: #1E3A8A; }
+  .encabezado { text-align: center; margin-bottom: 16px; }
+  .encabezado h1 { font-family: 'Grandstander', sans-serif; font-size: 1.1rem; margin: 0 0 4px; color: #1E3A8A; }
+  .encabezado p { margin: 0; font-size: 0.82rem; color: #5b7d99; }
+  .rejilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tarjeta-imprimible {
+    border: 2px dashed #7DD3FC; border-radius: 12px; padding: 14px 10px; min-height: 110px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  .tarjeta-texto { font-weight: 700; font-size: 0.95rem; line-height: 1.35; }
+  .tarjeta-doblez { min-height: 190px; padding: 0; justify-content: flex-start; }
+  .tarjeta-mitad { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 14px 10px; font-weight: 700; font-size: 0.95rem; text-align: center; }
+  .tarjeta-reverso { color: #065F46; background: #F0FDF4; border-radius: 0 0 10px 10px; }
+  .tarjeta-linea-doblez { border-top: 1px dashed #7DD3FC; font-size: 0.68rem; color: #5b7d99; text-align: center; padding: 2px 0; }
+  .no-imprimir { text-align: center; margin-bottom: 16px; }
+  .no-imprimir button {
+    font-family: 'Grandstander', sans-serif; font-weight: 600; background: #34D399; color: #fff; border: none;
+    border-radius: 999px; padding: 9px 20px; font-size: 0.9rem; cursor: pointer;
+  }
+  @media print {
+    body { padding: 0; }
+    .no-imprimir { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="no-imprimir"><button onclick="window.print()">🖨️ Imprimir</button></div>
+  <div class="encabezado">
+    <h1>EnseñAI — Tarjetas</h1>
+    <p>${esEmparejar ? "Recorta cada tarjeta y júntalas en pares." : "Recorta cada tarjeta y dóblala por la línea punteada."}</p>
+  </div>
+  <div class="rejilla">${tarjetasHtml}</div>
+</body>
+</html>`;
+
+    const ventana = window.open("", "_blank");
+    if (!ventana) {
+      alert("Tu navegador bloqueó la ventana de impresión — permite ventanas emergentes para ensenai.com e intenta de nuevo.");
+      return;
+    }
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.onload = () => {
+      setTimeout(() => ventana.print(), 300);
+    };
   }
 
   // Un fetch que nunca llegó al servidor (sin internet, backend caído,
@@ -664,30 +787,76 @@
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo cargar tu progreso.");
-      renderMiProgreso(data);
+      progresoCache = data;
+      etiquetaActivaProgreso = ""; // por si se recarga después de generar más temas
+      renderMiProgreso();
     } catch (err) {
       document.getElementById("tarjeta-mi-progreso")?.remove(); // no es crítico — mejor ocultarlo que dejar un hueco roto
     }
   }
 
-  function renderMiProgreso(data) {
-    const cont = document.getElementById("zona-mi-progreso");
+  /**
+   * Filtro por etiqueta dentro de "Mi progreso" (31-ago-2026): en vez de una
+   * racha separada por materia/parcial (que necesitaría una categoría
+   * confiable y las etiquetas son libres y opcionales), se reutiliza la
+   * etiqueta que la persona ya le puso a cada tema — el dato ya viene en
+   * GET /mi-progreso, así que filtrar es puro trabajo del navegador, sin
+   * pedir nada nuevo al backend. Mismo patrón visual (.chip-etiqueta) que
+   * el filtro del historial (renderChipsEtiquetas), con su propia variable
+   * (etiquetaActivaProgreso) para no mezclarse con ese filtro.
+   */
+  function renderChipsEtiquetasProgreso(temasSinFiltrar) {
+    const cont = document.getElementById("chips-etiquetas-progreso");
     if (!cont) return;
-    const temas = data.temas || [];
+    const todasEtiquetas = [...new Set(temasSinFiltrar.flatMap((t) => t.etiquetas || []))].sort();
+    if (!todasEtiquetas.length) {
+      cont.innerHTML = "";
+      return;
+    }
+    cont.innerHTML =
+      `<button type="button" class="chip-etiqueta${etiquetaActivaProgreso === "" ? " activa" : ""}" data-etiqueta="">Todas</button>` +
+      todasEtiquetas
+        .map((e) => `<button type="button" class="chip-etiqueta${etiquetaActivaProgreso === e ? " activa" : ""}" data-etiqueta="${escapeHtml(e)}">${escapeHtml(e)}</button>`)
+        .join("");
+    cont.querySelectorAll(".chip-etiqueta").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        etiquetaActivaProgreso = btn.dataset.etiqueta;
+        renderMiProgreso();
+      });
+    });
+  }
 
-    if (temas.length === 0) {
+  function renderMiProgreso() {
+    const cont = document.getElementById("zona-mi-progreso");
+    if (!cont || !progresoCache) return;
+    const todosLosTemas = progresoCache.temas || [];
+
+    if (todosLosTemas.length === 0) {
       cont.innerHTML = `<p class="ayuda" style="margin:0;">Contesta la trivia de un tema para empezar a ver aquí en qué vas mejor y qué te conviene repasar.</p>`;
       return;
     }
 
-    const { promedio_general, total_intentos } = data.resumen || {};
-    const resumenHtml = `
+    const temas = etiquetaActivaProgreso ? todosLosTemas.filter((t) => (t.etiquetas || []).includes(etiquetaActivaProgreso)) : todosLosTemas;
+
+    // Con un filtro activo, el resumen (promedio, intentos) se recalcula
+    // SOLO sobre los temas de esa etiqueta — "cómo voy en Primer Parcial"
+    // tiene que ser el promedio de Primer Parcial, no el general.
+    const promedio_general = temas.length
+      ? Math.round(temas.reduce((sum, t) => sum + t.promedio_porcentaje, 0) / temas.length)
+      : null;
+    const total_intentos = temas.reduce((sum, t) => sum + t.intentos, 0);
+
+    const chipsHtml = `<div id="chips-etiquetas-progreso" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>`;
+
+    const resumenHtml = temas.length
+      ? `
       <p class="ayuda" style="margin:0 0 12px; font-size:0.85rem;">
         ${temas.length} tema${temas.length === 1 ? "" : "s"} con trivia contestada
-        ${promedio_general !== null && promedio_general !== undefined ? ` — promedio general: <strong>${promedio_general}%</strong>` : ""}
+        ${promedio_general !== null ? ` — promedio${etiquetaActivaProgreso ? ` en "${escapeHtml(etiquetaActivaProgreso)}"` : " general"}: <strong>${promedio_general}%</strong>` : ""}
         (${total_intentos} intento${total_intentos === 1 ? "" : "s"} en total).
       </p>
-    `;
+    `
+      : `<p class="ayuda" style="margin:0 0 12px;">Ningún tema con esa etiqueta tiene trivia contestada todavía.</p>`;
 
     const filasHtml = temas
       .map((t) => {
@@ -713,7 +882,8 @@
       })
       .join("");
 
-    cont.innerHTML = resumenHtml + filasHtml;
+    cont.innerHTML = chipsHtml + resumenHtml + filasHtml;
+    renderChipsEtiquetasProgreso(todosLosTemas);
   }
 
   async function toggleTriviaDiaria() {
@@ -1907,14 +2077,18 @@
     cont.innerHTML = filtrados
       .map(
         (t) => `
-      <div class="historial-item" data-id="${t.id}">
+      <div class="historial-item historial-item--tema" data-id="${t.id}">
         ${permiteSeleccion ? `<input type="checkbox" class="seleccionar" data-seleccionar="${t.id}" ${temasSeleccionados.has(t.id) ? "checked" : ""} title="Seleccionar para armar un repaso">` : ""}
-        <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
-        <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
-        <span class="etiquetas-item">
-          ${(t.etiquetas || []).map((e) => `<span class="etiqueta-badge">${escapeHtml(e)}</span>`).join("")}
-          <button type="button" class="chip-etiqueta" style="padding:1px 9px; font-size:0.72rem;" data-editar-etiquetas="${t.id}">✏️ Etiquetas</button>
-        </span>
+        <div class="historial-item-info">
+          <div class="historial-item-linea1">
+            <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
+            <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
+          </div>
+          <span class="etiquetas-item">
+            ${(t.etiquetas || []).map((e) => `<span class="etiqueta-badge">${escapeHtml(e)}</span>`).join("")}
+            <button type="button" class="chip-etiqueta" style="padding:1px 9px; font-size:0.72rem;" data-editar-etiquetas="${t.id}">✏️ Etiquetas</button>
+          </span>
+        </div>
       </div>
     `
       )
@@ -2103,6 +2277,58 @@
       });
     } catch (err) {
       // no bloquea la experiencia si falla
+    }
+  }
+
+  /**
+   * Checkbox ligero "✓ Ya la resolví" en la pestaña Practicar (31-ago-2026)
+   * — mismo patrón que g.html (modo grupo), pero aquí solo hay una persona,
+   * así que se sobrescribe un solo estado en vez de ir guardando un
+   * historial por cada clic (ver PUT/GET /api/temas/mios/:id/ejercicios-resueltos).
+   */
+  async function cargarEjerciciosResueltos() {
+    if (!ultimoTemaId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(ultimoTemaId)}/ejercicios-resueltos`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.indices_resueltos || []).forEach((i) => {
+        const chk = document.querySelector(`.chk-ejercicio-resuelto[data-ej="${i}"]`);
+        if (chk) chk.checked = true;
+      });
+    } catch (err) {
+      // no es crítico — el checkbox simplemente arranca vacío
+    }
+  }
+
+  async function guardarEjerciciosResueltos() {
+    if (!ultimoTemaId) return;
+    const aviso = document.getElementById("progreso-aviso");
+    const totalCheckboxes = document.querySelectorAll(".chk-ejercicio-resuelto").length;
+    const indices = Array.from(document.querySelectorAll(".chk-ejercicio-resuelto:checked")).map((chk) =>
+      parseInt(chk.dataset.ej, 10)
+    );
+
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(ultimoTemaId)}/ejercicios-resueltos`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ indices }),
+      });
+      if (!res.ok) throw new Error();
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = indices.length
+          ? `✓ Guardado — ${indices.length} de ${totalCheckboxes} marcados.`
+          : "Guardado — todavía no marcaste ninguno.";
+      }
+    } catch (err) {
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = "No se pudo guardar tu progreso — intenta de nuevo en un momento.";
+      }
     }
   }
 
@@ -2518,14 +2744,28 @@
       .join("");
 
     const materialExtraHtml = (c.material_extra || [])
-      .map(
-        (m) => `
+      .map((m, i) => {
+        const tarjetas = Array.isArray(m.tarjetas) ? m.tarjetas.filter((t) => t && (t.frente || t.reverso)) : [];
+        return `
       <div class="material-extra-box">
         <div style="font-weight:700; text-transform:capitalize; margin-bottom:4px;">${escapeHtml(m.tipo || "")}</div>
-        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line;">${formatearTexto(m.contenido || "")}</div>
+        ${
+          m.contenido
+            ? `<div style="font-size:0.92rem; line-height:1.5; white-space:pre-line; margin-bottom:${
+                tarjetas.length ? "10px" : "0"
+              };">${formatearTexto(m.contenido)}</div>`
+            : ""
+        }
+        ${
+          tarjetas.length
+            ? `<button type="button" class="secundario btn-imprimir-tarjetas" data-material-idx="${i}" style="margin:0;">🖨️ Imprimir ${
+                tarjetas.length === 1 ? "tarjeta" : "tarjetas"
+              } (${tarjetas.length})</button>`
+            : ""
+        }
       </div>
-    `
-      )
+    `;
+      })
       .join("");
 
     const r = c.respuestas || {};
@@ -2613,6 +2853,10 @@
           }
           ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
         </div>
+        <label class="ejercicio-marcar">
+          <input type="checkbox" class="chk-ejercicio-resuelto" data-ej="${i}">
+          ✓ Ya la resolví
+        </label>
       </div>`
       )
       .join("");
@@ -2621,7 +2865,9 @@
       ${
         ejerciciosHtml
           ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>
-             ${ejerciciosHtml}`
+             ${ejerciciosHtml}
+             <button class="secundario btn-guardar-progreso" id="btn-guardar-progreso">💾 Guardar mi progreso</button>
+             <div class="progreso-aviso" id="progreso-aviso" style="display:none;"></div>`
           : ""
       }
       ${actividadesHtml ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad</h2>${actividadesHtml}` : ""}
@@ -2704,6 +2950,19 @@
     document.getElementById("btn-respuestas").addEventListener("click", () => {
       document.getElementById("caja-respuestas").classList.toggle("abierto");
     });
+
+    document.querySelectorAll(".btn-imprimir-tarjetas").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const m = (c.material_extra || [])[parseInt(btn.dataset.materialIdx, 10)];
+        if (m) imprimirTarjetas(m.tipo, m.tarjetas);
+      });
+    });
+
+    const btnGuardarProgreso = document.getElementById("btn-guardar-progreso");
+    if (btnGuardarProgreso) {
+      btnGuardarProgreso.addEventListener("click", guardarEjerciciosResueltos);
+      cargarEjerciciosResueltos();
+    }
 
     document.querySelectorAll(".opcion-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
