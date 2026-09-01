@@ -185,7 +185,16 @@
   // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
   // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
   // un reintento genera el material DOS veces.
-  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  const RUTAS_QUE_NO_SE_REINTENTAN = [
+    "/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar",
+    // El PDF también cuesta (llama a la IA y sube a Storage) y adaptar por
+    // inteligencia genera 8 actividades con el modelo.
+    "/api/temas/pdf", "/actividades",
+  ];
+  // Agregar un tema a la liga (POST /api/grupos/<id>/temas) consume cupo del
+  // plan y crea la fila: reintentarlo a ciegas dejaba el tema DUPLICADO en el
+  // grupo. Se detecta aparte porque la ruta lleva el id del grupo en medio.
+  const esAgregarTemaALiga = (url) => /\/api\/grupos\/[^/]+\/temas(\?|$)/.test(url);
   // Un fetch que truena casi de inmediato es "nunca salió" (servidor
   // dormido, sin internet); uno que truena después de un rato pudo haber
   // llegado y seguir procesándose del otro lado.
@@ -194,7 +203,7 @@
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
     const metodo = (opciones?.method || "GET").toUpperCase();
     const esIdempotente = metodo === "GET" || metodo === "HEAD";
-    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r)) || esAgregarTemaALiga(url);
     const t0 = Date.now();
 
     try {

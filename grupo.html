@@ -191,7 +191,16 @@
   // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
   // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
   // un reintento genera el material DOS veces.
-  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  const RUTAS_QUE_NO_SE_REINTENTAN = [
+    "/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar",
+    // El PDF también cuesta (llama a la IA y sube a Storage) y adaptar por
+    // inteligencia genera 8 actividades con el modelo.
+    "/api/temas/pdf", "/actividades",
+  ];
+  // Agregar un tema a la liga (POST /api/grupos/<id>/temas) consume cupo del
+  // plan y crea la fila: reintentarlo a ciegas dejaba el tema DUPLICADO en el
+  // grupo. Se detecta aparte porque la ruta lleva el id del grupo en medio.
+  const esAgregarTemaALiga = (url) => /\/api\/grupos\/[^/]+\/temas(\?|$)/.test(url);
   // Un fetch que truena casi de inmediato es "nunca salió" (servidor
   // dormido, sin internet); uno que truena después de un rato pudo haber
   // llegado y seguir procesándose del otro lado.
@@ -200,7 +209,7 @@
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
     const metodo = (opciones?.method || "GET").toUpperCase();
     const esIdempotente = metodo === "GET" || metodo === "HEAD";
-    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r)) || esAgregarTemaALiga(url);
     const t0 = Date.now();
 
     try {
@@ -610,7 +619,15 @@
       detenerTips(grupoId);
       if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
 
-      contenidoEnEdicion[grupoId] = data.contenido;
+      // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
+      // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
+      // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
+      // alta, sin importar el nivel real del grupo (31-ago-2026).
+      contenidoEnEdicion[grupoId] = { ...data.contenido, nivel, enfoque };
+      // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
+      // "Agregar a mi liga" publica el imprimible equivocado.
+      delete pdfCache[grupoId];
+      delete pdfCacheSinRespuestas[grupoId];
 
       resultado.innerHTML = `
         <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Puedes editar la trivia antes de compartirla con tu grupo.</div>
@@ -1008,7 +1025,9 @@
       detenerTips(grupoId);
       if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
 
-      contenidoEnEdicion[grupoId] = data.contenido;
+      contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: data.contenido?.nivel || null, enfoque: modoExamen ? "examen" : "estudio" };
+      delete pdfCache[grupoId];
+      delete pdfCacheSinRespuestas[grupoId];
       const titulo = data.contenido.tema || `Repaso de ${ids.length} temas`;
       modoExamenActivoPorGrupo[grupoId] = false;
 

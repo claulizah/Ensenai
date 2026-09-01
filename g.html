@@ -1031,7 +1031,21 @@
     const resumenVacio =
       !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
       !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual;
-    const tabInicial = resumenVacio ? (nEj ? "practicar" : "repasar") : "estudiar";
+    // Un simulador puede traer SOLO ejercicios o SOLO trivia. Antes se
+    // pintaban igual las tres pestañas y el alumno abría una vacía
+    // (31-ago-2026): ahora cada pestaña aparece solo si tiene algo dentro.
+    const hayPracticar = !!(ejerciciosHtml || actividadesHtml);
+    // respuestasHtml siempre es una plantilla no vacía, así que se mira el
+    // dato real: si no hay trivia, ni material extra, ni respuestas con
+    // contenido, la pestaña Repasar no aporta nada.
+    const hayRespuestasUtiles = !!(
+      (r.trivia_resuelta || []).length ||
+      String(r.solucion_actividad || "").trim() ||
+      (r.conceptos_clave || []).length ||
+      String(r.autoevaluacion || "").trim()
+    );
+    const hayRepasar = !!(triviaHtml || materialExtraHtml || hayRespuestasUtiles);
+    const tabInicial = !resumenVacio ? "estudiar" : hayPracticar ? "practicar" : "repasar";
 
     cont.innerHTML = `
       <a class="volver" href="javascript:void(0)" id="btn-volver">← Volver a la liga</a>
@@ -1043,8 +1057,16 @@
               ? ""
               : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
           }
-          <button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
-          <button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>
+          ${
+            hayPracticar
+              ? `<button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>`
+              : ""
+          }
+          ${
+            hayRepasar
+              ? `<button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>`
+              : ""
+          }
         </div>
         <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
         <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>

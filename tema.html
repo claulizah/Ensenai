@@ -553,7 +553,16 @@
   // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
   // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
   // un reintento genera el material DOS veces.
-  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  const RUTAS_QUE_NO_SE_REINTENTAN = [
+    "/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar",
+    // El PDF también cuesta (llama a la IA y sube a Storage) y adaptar por
+    // inteligencia genera 8 actividades con el modelo.
+    "/api/temas/pdf", "/actividades",
+  ];
+  // Agregar un tema a la liga (POST /api/grupos/<id>/temas) consume cupo del
+  // plan y crea la fila: reintentarlo a ciegas dejaba el tema DUPLICADO en el
+  // grupo. Se detecta aparte porque la ruta lleva el id del grupo en medio.
+  const esAgregarTemaALiga = (url) => /\/api\/grupos\/[^/]+\/temas(\?|$)/.test(url);
   // Un fetch que truena casi de inmediato es "nunca salió" (servidor
   // dormido, sin internet); uno que truena después de un rato pudo haber
   // llegado y seguir procesándose del otro lado.
@@ -562,7 +571,7 @@
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
     const metodo = (opciones?.method || "GET").toUpperCase();
     const esIdempotente = metodo === "GET" || metodo === "HEAD";
-    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r)) || esAgregarTemaALiga(url);
     const t0 = Date.now();
 
     try {
@@ -1308,32 +1317,45 @@
       return actual;
     };
 
-    const pintar = () => {
-      contenedor.innerHTML = `
-        <div class="zona-espera">
-          <div class="espera-barra"><span></span></div>
-          <p class="espera-titulo">${escapeHtml(tituloActual())}</p>
-          <div class="tip-caja">
-            <span class="tip-icono">💡</span>
-            <p class="tip-texto">${escapeHtml(tips[i % tips.length])}</p>
-          </div>
-          <div class="tip-puntos">${tips
-            .slice(0, Math.min(tips.length, 6))
-            .map((_, k) => `<span class="${k === i % Math.min(tips.length, 6) ? "activo" : ""}"></span>`)
-            .join("")}</div>
-          ${accion ? `<button type="button" class="btn-seguir-navegando" id="btn-accion-espera">${escapeHtml(accion.texto)}</button>` : ""}
-        </div>`;
-      // El repintado borra el botón cada vez, así que se vuelve a conectar.
-      if (accion) document.getElementById("btn-accion-espera")?.addEventListener("click", accion.onClick);
+    // Se dibuja UNA vez y después solo se actualiza el texto. Antes se
+    // reemplazaba todo el innerHTML cada 2 segundos: el botón "seguir
+    // navegando" se destruía y volvía a crearse constantemente, así que un
+    // clic que cayera justo en ese instante se perdía (31-ago-2026).
+    const nPuntos = Math.min(tips.length, 6);
+    contenedor.innerHTML = `
+      <div class="zona-espera">
+        <div class="espera-barra"><span></span></div>
+        <p class="espera-titulo"></p>
+        <div class="tip-caja">
+          <span class="tip-icono">💡</span>
+          <p class="tip-texto"></p>
+        </div>
+        <div class="tip-puntos">${Array.from({ length: nPuntos }, () => "<span></span>").join("")}</div>
+        ${accion ? `<button type="button" class="btn-seguir-navegando" id="btn-accion-espera"></button>` : ""}
+      </div>`;
+
+    const elTitulo = contenedor.querySelector(".espera-titulo");
+    const elTip = contenedor.querySelector(".tip-texto");
+    const elPuntos = [...contenedor.querySelectorAll(".tip-puntos span")];
+    const elAccion = accion ? contenedor.querySelector("#btn-accion-espera") : null;
+    if (elAccion) {
+      elAccion.textContent = accion.texto;
+      elAccion.addEventListener("click", accion.onClick); // se conecta una sola vez
+    }
+
+    const actualizar = () => {
+      if (elTitulo) elTitulo.textContent = tituloActual();
+      if (elTip) elTip.textContent = tips[i % tips.length];
+      elPuntos.forEach((p, k) => p.classList.toggle("activo", k === i % nPuntos));
     };
 
-    pintar();
-    // Sigue repintando cada 2s (para que el título de etapa se sienta vivo)
-    // pero el tip solo cambia cada 3 repintados (~6s), igual que antes.
+    actualizar();
+    // Se refresca cada 2s (para que la etapa se sienta viva) pero el tip
+    // solo cambia cada 3 refrescos (~6s), igual que antes.
     tipsIntervalo = setInterval(() => {
       tick++;
       if (tick % 3 === 0) i++;
-      pintar();
+      actualizar();
     }, 2000);
   }
 
@@ -1356,7 +1378,7 @@
     div.innerHTML = `
       <span class="texto">${escapeHtml(texto)}</span>
       ${accionTexto ? `<button type="button" id="btn-aviso-generacion">${escapeHtml(accionTexto)}</button>` : ""}
-      ${estado === "generando" ? "" : `<button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>`}
+      <button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>
     `;
     document.body.appendChild(div);
     if (accionTexto && onAccion) {
@@ -2097,6 +2119,7 @@
 
     const cuerpo = JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas, enfoque });
     fotosSeleccionadas = []; // ya viajan en el cuerpo; no arrastrarlas al siguiente
+    pintarMiniaturas(); // si no, se quedan las miniaturas de fotos ya enviadas
 
     const promesa = fetchConReintento(
       `${API_BASE}/api/temas/generar`,
@@ -2119,6 +2142,10 @@
         // La zona de tips ya no existe si la persona se fue a otra pantalla.
         const zona = document.getElementById("resultado-generar");
         const inline = !enCurso.minimizada && !!zona;
+        // Si quedó algún aviso flotante (ej. el "espera, ya hay una
+        // generándose" de la guarda), se limpia: si no, se quedaba pegado
+        // abajo de la pantalla sin forma de cerrarlo.
+        if (inline) quitarAvisoGeneracion();
 
         if (res.status === 402) {
           const msg = data.error || "Llegaste al límite de tu plan.";
@@ -2155,6 +2182,7 @@
         const zona = document.getElementById("resultado-generar");
         const msg = mensajeErrorAmigable(err);
         if (enCurso && !enCurso.minimizada && zona) {
+          quitarAvisoGeneracion();
           zona.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
         } else {
           mostrarAvisoGeneracion({ estado: "falla", texto: `"${tema}": ${msg}` });
@@ -2176,19 +2204,26 @@
       temasSeleccionados.clear();
       modoExamenActivo = false;
 
+      // Si la persona navegó a otra pantalla mientras cargaba, estos nodos
+      // ya no existen: sin esta guarda tronaba y el historial no se
+      // refrescaba al terminar una generación en segundo plano.
+      const filtros = document.getElementById("filtros-historial");
+      const hint = document.getElementById("hint-combinar");
+      if (!filtros || !hint || !document.body.contains(cont)) return;
+
       if (historialCache.length === 0) {
-        document.getElementById("filtros-historial").style.display = "none";
-        document.getElementById("hint-combinar").style.display = "none";
+        filtros.style.display = "none";
+        hint.style.display = "none";
         cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado ningún tema.</p>`;
         return;
       }
-      document.getElementById("hint-combinar").style.display = historialCache.length >= 2 ? "block" : "none";
+      hint.style.display = historialCache.length >= 2 ? "block" : "none";
 
       // Solo mostramos los filtros si hay al menos una etiqueta usada en
       // todo el historial — si nadie ha etiquetado nada todavía, no tiene
       // caso mostrar chips vacíos.
       const hayEtiquetas = historialCache.some((t) => (t.etiquetas || []).length);
-      document.getElementById("filtros-historial").style.display = historialCache.length > 3 || hayEtiquetas ? "block" : "none";
+      filtros.style.display = historialCache.length > 3 || hayEtiquetas ? "block" : "none";
 
       document.getElementById("buscar-historial").oninput = renderHistorial;
       renderChipsEtiquetas();
@@ -2478,12 +2513,17 @@
    */
   async function cargarEjerciciosResueltos() {
     if (!ultimoTemaId) return;
+    // Se recuerda de QUÉ tema se pidió: si el usuario alcanza a abrir otro
+    // tema antes de que responda, esta respuesta ya no aplica y marcaría
+    // los checkboxes del tema equivocado (31-ago-2026).
+    const temaPedido = ultimoTemaId;
     try {
-      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(ultimoTemaId)}/ejercicios-resueltos`, {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(temaPedido)}/ejercicios-resueltos`, {
         headers: { Authorization: `Bearer ${sesionActual.access_token}` },
       });
       if (!res.ok) return;
       const data = await res.json();
+      if (temaPedido !== ultimoTemaId) return; // ya estamos viendo otro tema
       (data.indices_resueltos || []).forEach((i) => {
         const chk = document.querySelector(`.chk-ejercicio-resuelto[data-ej="${i}"]`);
         if (chk) chk.checked = true;
@@ -3108,7 +3148,21 @@
     const resumenVacio =
       !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
       !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual;
-    const tabInicial = resumenVacio ? (nEj ? "practicar" : "repasar") : "estudiar";
+    // Un simulador puede traer SOLO ejercicios o SOLO trivia. Antes se
+    // pintaban igual las tres pestañas y el alumno abría una vacía
+    // (31-ago-2026): ahora cada pestaña aparece solo si tiene algo dentro.
+    const hayPracticar = !!(ejerciciosHtml || actividadesHtml);
+    // respuestasHtml siempre es una plantilla no vacía, así que se mira el
+    // dato real: si no hay trivia, ni material extra, ni respuestas con
+    // contenido, la pestaña Repasar no aporta nada.
+    const hayRespuestasUtiles = !!(
+      (r.trivia_resuelta || []).length ||
+      String(r.solucion_actividad || "").trim() ||
+      (r.conceptos_clave || []).length ||
+      String(r.autoevaluacion || "").trim()
+    );
+    const hayRepasar = !!(triviaHtml || materialExtraHtml || hayRespuestasUtiles);
+    const tabInicial = !resumenVacio ? "estudiar" : hayPracticar ? "practicar" : "repasar";
 
     cont.innerHTML = `
       <a class="volver" id="btn-volver">← Volver</a>
@@ -3121,8 +3175,16 @@
               ? ""
               : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
           }
-          <button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>
-          <button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>
+          ${
+            hayPracticar
+              ? `<button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>`
+              : ""
+          }
+          ${
+            hayRepasar
+              ? `<button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>`
+              : ""
+          }
         </div>
         <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
         <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
