@@ -61,6 +61,30 @@
   .tip-puntos { display: flex; gap: 5px; justify-content: center; margin-top: 12px; }
   .tip-puntos span { width: 6px; height: 6px; border-radius: 50%; background: var(--linea); transition: background .3s; }
   .tip-puntos span.activo { background: var(--menta); }
+  .btn-seguir-navegando {
+    background: none; border: none; color: #5b7d99; font-family: inherit; font-weight: 700;
+    font-size: 0.83rem; text-decoration: underline; cursor: pointer; margin-top: 14px;
+  }
+  /* Aviso flotante de "se esta generando en segundo plano" (1-sep-2026):
+     generar material de grupo tarda ~1 min y antes eso secuestraba la
+     pantalla; peor aun, si en ese rato se re-dibujaba #contenido (crear otro
+     grupo, agregar un tema), la generacion terminaba en el vacio. */
+  .aviso-generacion {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 60;
+    display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px);
+    background: #fff; border: 2px solid var(--aqua); border-radius: 999px; padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(30,58,138,0.18);
+    font-size: 0.86rem; font-weight: 700; color: var(--profundo);
+  }
+  .aviso-generacion.listo { border-color: var(--menta); }
+  .aviso-generacion.falla { border-color: #FFC4B5; color: #B94A2E; }
+  .aviso-generacion .texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aviso-generacion button {
+    flex-shrink: 0; border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.82rem;
+    background: var(--menta); color: #fff;
+  }
+  .aviso-generacion button.cerrar { background: none; color: #5b7d99; padding: 7px 4px; font-size: 1rem; }
 
   .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
   .zona-foto input[type="file"] { display: none; }
@@ -364,6 +388,9 @@
 
     grupos.forEach((g) => cargarTemas(g.id));
     cargarSuscripcionGrupo();
+    // Re-dibujar #contenido borra la pantalla de espera y el panel de
+    // material ya generado; aqui se devuelven a su lugar.
+    restaurarEstadoDeGrupos();
   }
 
   const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
@@ -502,30 +529,127 @@
   ];
 
   const tipsIntervalos = {};
+  // Espera viva por grupo. Se guarda aqui (y no solo en el DOM) porque
+  // renderGrupos() reconstruye TODO #contenido: si la pantalla de espera
+  // viviera solo en una referencia a un nodo, al re-dibujar quedaria
+  // huerfana y la generacion terminaria en el vacio — cupo gastado y
+  // material perdido. Ver restaurarEstadoDeGrupos().
+  const esperasActivas = {};
 
-  function iniciarTips(grupoId, contenedor, encabezado) {
+  /**
+   * Pinta la pantalla de espera dentro de #resultado-generar-<grupoId>.
+   * Dos decisiones que importan:
+   *  - el contenedor se resuelve por id en cada tick, nunca por una
+   *    referencia capturada, para que sobreviva a un re-dibujo;
+   *  - se pinta UNA vez y despues solo se actualiza textContent — repintar
+   *    el innerHTML cada 6s se comia los clics en "Seguir navegando"
+   *    (el mismo problema que ya se corrigio en tema.html).
+   */
+  function iniciarTips(grupoId, encabezado, accion) {
     detenerTips(grupoId);
     let i = 0;
-    const pintar = () => {
-      contenedor.innerHTML = `
+
+    const pintarBase = () => {
+      const cont = document.getElementById(`resultado-generar-${grupoId}`);
+      if (!cont) return null;
+      cont.innerHTML = `
         <div class="zona-espera">
           <div class="espera-barra"><span></span></div>
-          <p class="espera-titulo">${escapeHtml(encabezado)}</p>
+          <p class="espera-titulo"></p>
           <div class="tip-caja">
             <span class="tip-icono">💡</span>
-            <p class="tip-texto">${escapeHtml(TIPS_GRUPO[i % TIPS_GRUPO.length])}</p>
+            <p class="tip-texto"></p>
           </div>
-          <div class="tip-puntos">${TIPS_GRUPO.slice(0, 6)
-            .map((_, k) => `<span class="${k === i % 6 ? "activo" : ""}"></span>`)
-            .join("")}</div>
+          <div class="tip-puntos">${TIPS_GRUPO.slice(0, 6).map(() => `<span></span>`).join("")}</div>
+          ${accion ? `<button type="button" class="btn-seguir-navegando">${escapeHtml(accion.texto)}</button>` : ""}
         </div>`;
+      const zona = cont.querySelector(".zona-espera");
+      if (accion) zona.querySelector(".btn-seguir-navegando").addEventListener("click", accion.onClick);
+      return zona;
     };
-    pintar();
-    tipsIntervalos[grupoId] = setInterval(() => { i++; pintar(); }, 6000);
+
+    const actualizar = () => {
+      if (esperasActivas[grupoId] && esperasActivas[grupoId].minimizada) return;
+      const cont = document.getElementById(`resultado-generar-${grupoId}`);
+      if (!cont) return;
+      const zona = cont.querySelector(".zona-espera") || pintarBase();
+      if (!zona) return;
+      zona.querySelector(".espera-titulo").textContent = encabezado;
+      zona.querySelector(".tip-texto").textContent = TIPS_GRUPO[i % TIPS_GRUPO.length];
+      [...zona.querySelectorAll(".tip-puntos span")].forEach((s, k) => s.classList.toggle("activo", k === i % 6));
+    };
+
+    esperasActivas[grupoId] = { minimizada: false, actualizar };
+    actualizar();
+    tipsIntervalos[grupoId] = setInterval(() => { i++; actualizar(); }, 6000);
   }
 
   function detenerTips(grupoId) {
     if (tipsIntervalos[grupoId]) { clearInterval(tipsIntervalos[grupoId]); delete tipsIntervalos[grupoId]; }
+    delete esperasActivas[grupoId];
+  }
+
+  // ── Generacion en segundo plano ────────────────────────────────
+  // Generar material de grupo tarda ~1 min. Antes, si en ese rato la maestra
+  // creaba otro grupo o agregaba un tema (ambos llaman a cargarGrupos →
+  // renderGrupos), se re-dibujaba todo #contenido y la generacion terminaba
+  // escribiendo en un nodo ya desconectado: el cupo se gastaba y el material
+  // no aparecia por ningun lado. Ahora hay una sola generacion a la vez, la
+  // espera se restaura tras cualquier re-dibujo, y este aviso flotante avisa
+  // cuando el material esta listo.
+  let generacionEnCurso = null;
+
+  function quitarAvisoGeneracion() {
+    document.getElementById("aviso-generacion")?.remove();
+  }
+
+  function mostrarAvisoGeneracion({ estado, texto, accionTexto, onAccion }) {
+    quitarAvisoGeneracion();
+    const div = document.createElement("div");
+    div.className = `aviso-generacion${estado === "listo" ? " listo" : estado === "falla" ? " falla" : ""}`;
+    div.id = "aviso-generacion";
+    div.innerHTML = `
+      <span class="texto">${escapeHtml(texto)}</span>
+      ${accionTexto ? `<button type="button" id="btn-aviso-generacion">${escapeHtml(accionTexto)}</button>` : ""}
+      <button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>
+    `;
+    document.body.appendChild(div);
+    if (accionTexto && onAccion) {
+      document.getElementById("btn-aviso-generacion").addEventListener("click", () => {
+        quitarAvisoGeneracion();
+        onAccion();
+      });
+    }
+    document.getElementById("btn-cerrar-aviso")?.addEventListener("click", quitarAvisoGeneracion);
+  }
+
+  // Si aun asi cierra la pestana, el backend termina; pero el material se
+  // queda sin agregar a la liga, asi que conviene avisar antes.
+  window.addEventListener("beforeunload", (ev) => {
+    if (!generacionEnCurso) return;
+    ev.preventDefault();
+    ev.returnValue = "";
+  });
+
+  /** Deja la generacion corriendo y libera la pantalla. */
+  function minimizarGeneracion() {
+    if (!generacionEnCurso) return;
+    const { grupoId, titulo } = generacionEnCurso;
+    generacionEnCurso.minimizada = true;
+    if (esperasActivas[grupoId]) esperasActivas[grupoId].minimizada = true;
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (zona) zona.innerHTML = "";
+    mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${titulo}"…` });
+  }
+
+  /** true si hay que abortar porque ya hay una generacion corriendo. */
+  function hayGeneracionEnCurso() {
+    if (!generacionEnCurso) return false;
+    mostrarAvisoGeneracion({
+      estado: "generando",
+      texto: `⏳ Espera — "${generacionEnCurso.titulo}" todavia se esta generando`,
+    });
+    return true;
   }
 
   function comprimirImagen(file) {
@@ -590,66 +714,114 @@
   }
 
   async function generarTema(grupoId, esPrimerTemaGratis) {
+    // Una sola generacion a la vez: con dos corriendo, la segunda pisaria la
+    // pantalla de espera de la primera y se gastaria cupo doble.
+    if (hayGeneracionEnCurso()) return;
+
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!zona) return;
     const tema = document.getElementById(`tema-input-${grupoId}`).value.trim();
     const nivel = document.getElementById(`nivel-input-${grupoId}`).value;
     const detalles = document.getElementById(`detalles-input-${grupoId}`).value.trim();
     const imagenes = fotosPorGrupo[grupoId] || [];
     const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
-    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
-    resultado.innerHTML = "";
+    zona.innerHTML = "";
 
     if (!tema) {
-      resultado.innerHTML = `<div class="error">Escribe sobre qué tema quieres generar material.</div>`;
+      zona.innerHTML = `<div class="error">Escribe sobre qué tema quieres generar material.</div>`;
       return;
     }
 
+    // El material anterior de este grupo (si no se agrego a la liga) ya no
+    // aplica: si no se olvida, restaurarEstadoDeGrupos lo resucitaria encima
+    // de la pantalla de espera.
+    olvidarGenerado(grupoId);
+
     iniciarTips(
       grupoId,
-      resultado,
-      imagenes.length ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…"
+      imagenes.length ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…",
+      { texto: "Seguir navegando mientras se genera →", onClick: minimizarGeneracion }
     );
 
-    try {
-      const res = await fetchConReintento(`${API_BASE}/api/temas/generar`, {
+    const promesa = fetchConReintento(
+      `${API_BASE}/api/temas/generar`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
         body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes, enfoque }),
+      },
+      null, // no sobreescribir la zona de espera con el mensaje de reintento
+      null
+    ).then(async (res) => ({ res, data: await res.json() }));
+
+    generacionEnCurso = { grupoId, titulo: tema, promesa, minimizada: false };
+
+    // Se lee ANTES de vaciar generacionEnCurso, porque el .then puede lanzar
+    // y caer al .catch cuando ya no hay a quien preguntarle si se minimizo.
+    let minimizada = false;
+    const cerrar = () => {
+      if (generacionEnCurso) minimizada = generacionEnCurso.minimizada;
+      generacionEnCurso = null;
+      detenerTips(grupoId);
+    };
+
+    promesa
+      .then(({ res, data }) => {
+        cerrar();
+        if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
+
+        // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
+        // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
+        // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
+        // alta, sin importar el nivel real del grupo (31-ago-2026).
+        contenidoEnEdicion[grupoId] = { ...data.contenido, nivel, enfoque };
+        // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
+        // "Agregar a mi liga" publica el imprimible equivocado.
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+        metaGenerado[grupoId] = {
+          encabezado: "Material generado",
+          titulo: data.contenido?.tema || tema,
+          esPrimerTemaGratis,
+        };
+        avisarMaterialListo(grupoId, minimizada);
+      })
+      .catch((err) => {
+        cerrar();
+        avisarFalloGeneracion(grupoId, minimizada, tema, mensajeErrorAmigable(err));
       });
-      const data = await res.json();
-      detenerTips(grupoId);
-      if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
+  }
 
-      // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
-      // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
-      // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
-      // alta, sin importar el nivel real del grupo (31-ago-2026).
-      contenidoEnEdicion[grupoId] = { ...data.contenido, nivel, enfoque };
-      // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
-      // "Agregar a mi liga" publica el imprimible equivocado.
-      delete pdfCache[grupoId];
-      delete pdfCacheSinRespuestas[grupoId];
-
-      resultado.innerHTML = `
-        <div class="aviso">✓ Material generado: <strong>${escapeHtml(data.contenido.tema || tema)}</strong>. Puedes editar la trivia antes de compartirla con tu grupo.</div>
-        <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
-        <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${esPrimerTemaGratis ? " (gratis)" : ""}</button>
-        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
-        <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
-      `;
-      renderEditorTrivia(grupoId);
-      document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
-        agregarTemaAGrupo(grupoId, tema, contenidoEnEdicion[grupoId], esPrimerTemaGratis)
-      );
-      document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
-      );
-      document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
-      );
-    } catch (err) {
-      detenerTips(grupoId);
-      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+  /** Cierre comun de generarTema y combinarTemasGrupo: si la persona sigue
+   *  viendo la zona del grupo, el panel se pinta ahi; si se fue a otro lado
+   *  (o se re-dibujo la pagina), no se la saca de donde este — solo se le
+   *  avisa con el globito flotante, y el material queda guardado. */
+  function avisarMaterialListo(grupoId, minimizada) {
+    const hayZona = !!document.getElementById(`resultado-generar-${grupoId}`);
+    if (!minimizada && hayZona) {
+      quitarAvisoGeneracion();
+      pintarResultadoGenerado(grupoId);
+      return;
     }
+    mostrarAvisoGeneracion({
+      estado: "listo",
+      texto: `✨ "${metaGenerado[grupoId].titulo}" ya está listo`,
+      accionTexto: "Verlo",
+      onAccion: () => {
+        pintarResultadoGenerado(grupoId);
+        document.getElementById(`resultado-generar-${grupoId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+    });
+  }
+
+  function avisarFalloGeneracion(grupoId, minimizada, titulo, msg) {
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!minimizada && zona) {
+      quitarAvisoGeneracion();
+      zona.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+      return;
+    }
+    mostrarAvisoGeneracion({ estado: "falla", texto: `"${titulo}": ${msg}` });
   }
 
   /**
@@ -790,9 +962,64 @@
     }
   }
 
-  async function agregarTemaAGrupo(grupoId, titulo, contenido, esPrimerTemaGratis) {
-    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
+  /** La zona de resultado de un grupo SIEMPRE se resuelve por id en el
+   *  momento de usarla: renderGrupos() reconstruye #contenido entero, asi
+   *  que una referencia guardada de antes puede estar ya desconectada del
+   *  documento (escribirle no rompe nada, pero no se ve). */
+  const zonaGenerar = (grupoId) => document.getElementById(`resultado-generar-${grupoId}`);
 
+  // Todo lo que hace falta para volver a pintar el panel de "material
+  // generado" despues de un re-dibujo, sin volver a llamar a la IA. El
+  // contenido en si vive en contenidoEnEdicion[grupoId]; aqui solo va lo
+  // que el panel necesita para armarse (titulo, encabezado, si es gratis).
+  const metaGenerado = {};
+
+  function pintarResultadoGenerado(grupoId) {
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    const meta = metaGenerado[grupoId];
+    const contenido = contenidoEnEdicion[grupoId];
+    if (!zona || !meta || !contenido) return;
+
+    zona.innerHTML = `
+      <div class="aviso">✓ ${escapeHtml(meta.encabezado)}: <strong>${escapeHtml(meta.titulo)}</strong>. Puedes editar la trivia antes de compartirlo con tu grupo.</div>
+      <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
+      <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${meta.esPrimerTemaGratis ? " (gratis)" : ""}</button>
+      <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
+      <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
+    `;
+    renderEditorTrivia(grupoId);
+    document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
+      agregarTemaAGrupo(grupoId, meta.titulo, contenidoEnEdicion[grupoId], meta.esPrimerTemaGratis)
+    );
+    document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
+      descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
+    );
+    document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
+      descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
+    );
+  }
+
+  /** El material de este grupo ya se uso (o se descarto): se olvida entero,
+   *  incluidos los PDFs cacheados, para que un re-dibujo no lo resucite. */
+  function olvidarGenerado(grupoId) {
+    delete contenidoEnEdicion[grupoId];
+    delete metaGenerado[grupoId];
+    delete pdfCache[grupoId];
+    delete pdfCacheSinRespuestas[grupoId];
+  }
+
+  /** Tras re-dibujar #contenido, devuelve a su lugar lo que estaba en vuelo:
+   *  la pantalla de espera de una generacion en curso, o el panel de un
+   *  material ya generado que todavia no se agrega a la liga. */
+  function restaurarEstadoDeGrupos() {
+    Object.keys(esperasActivas).forEach((gid) => esperasActivas[gid].actualizar());
+    Object.keys(metaGenerado).forEach((gid) => {
+      if (esperasActivas[gid]) return; // se esta regenerando: manda la espera
+      pintarResultadoGenerado(gid);
+    });
+  }
+
+  async function agregarTemaAGrupo(grupoId, titulo, contenido, esPrimerTemaGratis) {
     // Si al editar la trivia se agregó una pregunta y se dejó vacía (sin
     // texto), la quitamos antes de compartirla — evita que le llegue a los
     // alumnos/pacientes una tarjeta de pregunta en blanco por descuido. Si
@@ -805,7 +1032,8 @@
         delete pdfCacheSinRespuestas[grupoId];
     }
 
-    resultado.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
+    const zonaInicial = zonaGenerar(grupoId);
+    if (zonaInicial) zonaInicial.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
 
     try {
       // Si el profesional ya generó el PDF (o si falla, seguimos sin él —
@@ -829,25 +1057,35 @@
       if (!res.ok) throw new Error(data.error || "No se pudo agregar el tema.");
 
       const tema = data.tema;
-      if (tema.pago_status === "pendiente") {
-        resultado.innerHTML = `
-          <div class="aviso">Tema agregado — falta activarlo con un pago para que tu grupo lo vea.</div>
-          <button class="primario" id="btn-pagar-${tema.id}">💳 Pagar y activar este tema</button>
-        `;
-        document.getElementById(`btn-pagar-${tema.id}`).addEventListener("click", () => pagarTema(tema.id));
-      } else {
-        resultado.innerHTML = `<div class="aviso">✓ ¡Listo! Ya está activo en tu liga.</div>`;
-      }
-
-      delete pdfCache[grupoId];
-        delete pdfCacheSinRespuestas[grupoId];
-      delete contenidoEnEdicion[grupoId];
+      olvidarGenerado(grupoId);
       delete fotosPorGrupo[grupoId]; // el tema ya quedó en la liga; no arrastrar las fotos al siguiente
-      document.getElementById(`tema-input-${grupoId}`).value = "";
-      cargarTemas(grupoId);
-      cargarGrupos();
+
+      // El desenlace se pinta DESPUES del re-dibujo, no antes: cargarGrupos()
+      // reconstruye #contenido y se llevaba por delante el boton de "Pagar y
+      // activar este tema" un instante despues de haberlo pintado.
+      await cargarGrupos();
+
+      const zonaFinal = zonaGenerar(grupoId);
+      if (tema.pago_status === "pendiente") {
+        if (zonaFinal) {
+          zonaFinal.innerHTML = `
+            <div class="aviso">Tema agregado — falta activarlo con un pago para que tu grupo lo vea.</div>
+            <button class="primario" id="btn-pagar-${tema.id}">💳 Pagar y activar este tema</button>
+          `;
+          document.getElementById(`btn-pagar-${tema.id}`).addEventListener("click", () => pagarTema(tema.id));
+        } else {
+          mostrarAvisoGeneracion({ estado: "generando", texto: `"${titulo}" quedó agregado — falta activarlo con un pago` });
+        }
+      } else if (zonaFinal) {
+        zonaFinal.innerHTML = `<div class="aviso">✓ ¡Listo! Ya está activo en tu liga.</div>`;
+      } else {
+        mostrarAvisoGeneracion({ estado: "listo", texto: `✓ "${titulo}" ya está activo en tu liga` });
+      }
     } catch (err) {
-      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      const zonaError = zonaGenerar(grupoId);
+      const msg = mensajeErrorAmigable(err);
+      if (zonaError) zonaError.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+      else mostrarAvisoGeneracion({ estado: "falla", texto: `"${titulo}": ${msg}` });
     }
   }
 
@@ -1005,54 +1243,68 @@
    * inclina hacia ejercicios y un simulador de trivia, pensado para
    * compartirse como guía de repaso antes de un examen. */
   async function combinarTemasGrupo(grupoId) {
+    if (hayGeneracionEnCurso()) return;
+
     const ids = [...(temasSeleccionadosPorGrupo[grupoId] || [])];
     const modoExamen = !!modoExamenActivoPorGrupo[grupoId];
     const tope = modoExamen ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
     if (ids.length < 2 || ids.length > tope) return;
 
-    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
-    resultado.innerHTML = "";
-    document.getElementById(`barra-combinar-${grupoId}`).style.display = "none";
-    iniciarTips(grupoId, resultado, modoExamen ? "Armando la guía de examen…" : "Juntando los temas y armando el repaso…");
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!zona) return;
+    zona.innerHTML = "";
+    const barra = document.getElementById(`barra-combinar-${grupoId}`);
+    if (barra) barra.style.display = "none";
+    olvidarGenerado(grupoId);
 
-    try {
-      const res = await fetchConReintento(`${API_BASE}/api/temas/combinar`, {
+    const tituloProvisional = modoExamen ? `Guía de examen (${ids.length} temas)` : `Repaso de ${ids.length} temas`;
+    iniciarTips(
+      grupoId,
+      modoExamen ? "Armando la guía de examen…" : "Juntando los temas y armando el repaso…",
+      { texto: "Seguir navegando mientras se arma →", onClick: minimizarGeneracion }
+    );
+
+    const promesa = fetchConReintento(
+      `${API_BASE}/api/temas/combinar`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
         body: JSON.stringify({ temaIds: ids, modo: "grupo", enfoque: modoExamen ? "examen" : "estudio" }),
+      },
+      null,
+      null
+    ).then(async (res) => ({ res, data: await res.json() }));
+
+    generacionEnCurso = { grupoId, titulo: tituloProvisional, promesa, minimizada: false };
+
+    let minimizada = false;
+    const cerrar = () => {
+      if (generacionEnCurso) minimizada = generacionEnCurso.minimizada;
+      generacionEnCurso = null;
+      detenerTips(grupoId);
+    };
+
+    promesa
+      .then(({ res, data }) => {
+        cerrar();
+        if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
+
+        contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: data.contenido?.nivel || null, enfoque: modoExamen ? "examen" : "estudio" };
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+        modoExamenActivoPorGrupo[grupoId] = false;
+        metaGenerado[grupoId] = {
+          encabezado: modoExamen ? "Guía de examen armada" : "Repaso armado",
+          titulo: data.contenido?.tema || tituloProvisional,
+          esPrimerTemaGratis: false,
+        };
+        avisarMaterialListo(grupoId, minimizada);
+      })
+      .catch((err) => {
+        cerrar();
+        avisarFalloGeneracion(grupoId, minimizada, tituloProvisional, mensajeErrorAmigable(err));
+        cargarTemas(grupoId); // devuelve la lista de temas a su estado normal
       });
-      const data = await res.json();
-      detenerTips(grupoId);
-      if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
-
-      contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: data.contenido?.nivel || null, enfoque: modoExamen ? "examen" : "estudio" };
-      delete pdfCache[grupoId];
-      delete pdfCacheSinRespuestas[grupoId];
-      const titulo = data.contenido.tema || `Repaso de ${ids.length} temas`;
-      modoExamenActivoPorGrupo[grupoId] = false;
-
-      resultado.innerHTML = `
-        <div class="aviso">✓ ${modoExamen ? "Guía de examen armada" : "Repaso armado"}: <strong>${escapeHtml(titulo)}</strong>. Puedes editar la trivia antes de compartirlo con tu grupo.</div>
-        <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
-        <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga</button>
-        <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
-        <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
-      `;
-      renderEditorTrivia(grupoId);
-      document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
-        agregarTemaAGrupo(grupoId, titulo, contenidoEnEdicion[grupoId], false)
-      );
-      document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
-      );
-      document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
-        descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
-      );
-    } catch (err) {
-      detenerTips(grupoId);
-      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
-      cargarTemas(grupoId);
-    }
   }
 
   /**
