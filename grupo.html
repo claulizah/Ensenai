@@ -108,6 +108,11 @@
   button.chico { padding: 8px 14px; font-size: 0.85rem; margin-top: 0; width: auto; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
   .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
+  /* Campo obligatorio vacio: el aviso va PEGADO al campo. El error suelto
+     al pie del formulario no se relacionaba con nada en celular — ver
+     marcarCampoFaltante(). */
+  .campo-faltante { border-color: #E86A4B !important; background: #FFF6F3 !important; }
+  .error-campo { color: #B94A2E; font-size: 0.85rem; font-weight: 700; margin: 4px 0 2px; }
   .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-bottom: 16px; }
   .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
   .grupo-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
@@ -202,6 +207,40 @@
   // Un fetch que nunca llegó al servidor (sin internet, backend caído,
   // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
   // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  /**
+   * Marca un campo obligatorio vacio: lo pinta, escribe el motivo justo
+   * debajo, lo desplaza a la vista y le pone el cursor dentro.
+   *
+   * Existe porque la validacion pintaba el error al FINAL del formulario,
+   * a media pantalla del campo culpable: en celular se leia "escribe sobre
+   * que tema quieres generar material" sin ver que el campo Tema estaba
+   * vacio, y la gente terminaba escribiendo el tema en Etiquetas
+   * (reporte sep-2026).
+   */
+  function marcarCampoFaltante(campo, mensaje) {
+    if (!campo) return;
+    limpiarCampoFaltante(campo);
+    campo.classList.add("campo-faltante");
+    const aviso = document.createElement("p");
+    aviso.className = "error-campo";
+    aviso.id = `error-campo-${campo.id}`;
+    aviso.textContent = `⚠️ ${mensaje}`;
+    campo.insertAdjacentElement("afterend", aviso);
+    campo.setAttribute("aria-invalid", "true");
+    campo.scrollIntoView({ behavior: "smooth", block: "center" });
+    // El foco va despues del scroll: enfocar primero hace que el navegador
+    // salte de golpe y se pierda el desplazamiento suave.
+    setTimeout(() => campo.focus({ preventScroll: true }), 300);
+    campo.addEventListener("input", () => limpiarCampoFaltante(campo), { once: true });
+  }
+
+  function limpiarCampoFaltante(campo) {
+    if (!campo) return;
+    campo.classList.remove("campo-faltante");
+    campo.removeAttribute("aria-invalid");
+    document.getElementById(`error-campo-${campo.id}`)?.remove();
+  }
+
   function mensajeErrorAmigable(err) {
     return err instanceof TypeError
       ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
@@ -391,6 +430,9 @@
     // Re-dibujar #contenido borra la pantalla de espera y el panel de
     // material ya generado; aqui se devuelven a su lugar.
     restaurarEstadoDeGrupos();
+    // Y si quedo una generacion a medias (se bloqueo el celular, se cerro
+    // la pestana), se retoma en silencio y se avisa cuando este lista.
+    reanudarTrabajoPendiente();
   }
 
   const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
@@ -713,6 +755,172 @@
     pintarMiniaturas(grupoId);
   }
 
+  // ── Trabajo de generacion en segundo plano ─────────────────────────────
+  // Antes esto era UN fetch abierto ~1 minuto. En celular, bloquear la
+  // pantalla o cambiarse de app suspende la pestana y mata esa conexion:
+  // el material se generaba del otro lado pero aqui llegaba un error
+  // (reporte sep-2026). Ahora el POST solo encola y el resultado se recoge
+  // preguntando cada pocos segundos, asi que perder la red no cancela nada.
+  const LS_TRABAJO_GRUPO = "ensenai:trabajo-grupo";
+  const MS_ENTRE_SONDEOS = 3000;
+  const MS_MAX_ESPERA = 8 * 60 * 1000;
+  const MS_VIDA_TRABAJO_RECORDADO = 30 * 60 * 1000;
+
+  let sondeo = null; // { trabajoId, grupoId, titulo, ctx, inicio, timer, activo }
+
+  function nuevaClaveCliente() {
+    try {
+      if (crypto?.randomUUID) return crypto.randomUUID();
+    } catch (err) {
+      /* navegadores viejos: el fallback alcanza */
+    }
+    return `c-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function recordarTrabajo(datos) {
+    try {
+      localStorage.setItem(LS_TRABAJO_GRUPO, JSON.stringify({ ...datos, ts: Date.now() }));
+    } catch (err) {
+      /* modo privado o storage lleno: solo se pierde la reanudacion */
+    }
+  }
+
+  function olvidarTrabajo() {
+    try {
+      localStorage.removeItem(LS_TRABAJO_GRUPO);
+    } catch (err) {
+      /* sin consecuencias */
+    }
+  }
+
+  function trabajoRecordado() {
+    try {
+      const g = JSON.parse(localStorage.getItem(LS_TRABAJO_GRUPO) || "null");
+      if (!g?.trabajoId) return null;
+      if (Date.now() - (g.ts || 0) > MS_VIDA_TRABAJO_RECORDADO) {
+        olvidarTrabajo();
+        return null;
+      }
+      return g;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function detenerSondeo() {
+    if (sondeo?.timer) clearTimeout(sondeo.timer);
+    sondeo = null;
+  }
+
+  /**
+   * Empieza (o retoma) el seguimiento de un trabajo ya encolado.
+   * `mostrarEspera` en false = se retomo al volver a abrir la app: no se le
+   * secuestra la pantalla, solo se le avisa con el globito flotante.
+   */
+  function seguirTrabajo(trabajoId, grupoId, titulo, ctx, { mostrarEspera = true, conFotos = false } = {}) {
+    detenerSondeo();
+    sondeo = { trabajoId, grupoId, titulo, ctx, inicio: Date.now(), timer: null, activo: true };
+    generacionEnCurso = { grupoId, titulo, trabajoId, minimizada: !mostrarEspera };
+    recordarTrabajo({ trabajoId, grupoId, titulo, ctx });
+
+    if (mostrarEspera) {
+      iniciarTips(
+        grupoId,
+        conFotos ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…",
+        { texto: "Seguir navegando mientras se genera →", onClick: minimizarGeneracion }
+      );
+    } else {
+      mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${titulo}"…` });
+    }
+
+    sondearTrabajo();
+  }
+
+  async function sondearTrabajo() {
+    if (!sondeo?.activo) return;
+    const actual = sondeo;
+    try {
+      // fetch pelon a proposito: aqui un error de red es lo ESPERADO
+      // (pantalla bloqueada, elevador, cambio de wifi) y no es un fallo —
+      // se vuelve a preguntar en el siguiente ciclo.
+      const res = await fetch(`${API_BASE}/api/temas/trabajos/${actual.trabajoId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (res.status === 404) {
+        return terminarTrabajoConFallo("No encontramos esa generacion. Vuelve a intentarlo.");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No pudimos consultar tu generacion.");
+      if (!sondeo || sondeo !== actual) return; // se cancelo mientras respondia
+      if (data.estado === "listo") return terminarTrabajoConExito(data.resultado);
+      if (data.estado === "fallido") return terminarTrabajoConFallo(data.error || "No se pudo generar el material.");
+    } catch (err) {
+      /* sin red: se reintenta en el siguiente ciclo, sin molestar */
+    }
+
+    if (!sondeo || sondeo !== actual) return;
+    if (Date.now() - actual.inicio > MS_MAX_ESPERA) {
+      return terminarTrabajoConFallo("Esto esta tardando mas de lo normal. Vuelve a intentarlo en un momento.");
+    }
+    actual.timer = setTimeout(sondearTrabajo, MS_ENTRE_SONDEOS);
+  }
+
+  function terminarTrabajoConExito(data) {
+    const { grupoId, titulo, ctx } = sondeo;
+    const minimizada = !!generacionEnCurso?.minimizada;
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips(grupoId);
+
+    // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
+    // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
+    // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
+    // alta, sin importar el nivel real del grupo (31-ago-2026).
+    contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: ctx.nivel, enfoque: ctx.enfoque };
+    // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
+    // "Agregar a mi liga" publica el imprimible equivocado.
+    delete pdfCache[grupoId];
+    delete pdfCacheSinRespuestas[grupoId];
+    metaGenerado[grupoId] = {
+      encabezado: "Material generado",
+      titulo: data.contenido?.tema || titulo,
+      esPrimerTemaGratis: ctx.esPrimerTemaGratis,
+    };
+    avisarMaterialListo(grupoId, minimizada);
+  }
+
+  function terminarTrabajoConFallo(msg) {
+    const { grupoId, titulo } = sondeo;
+    const minimizada = !!generacionEnCurso?.minimizada;
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips(grupoId);
+    avisarFalloGeneracion(grupoId, minimizada, titulo, msg);
+  }
+
+  // Volver a primer plano (desbloquear el celular, regresar a la pestana)
+  // dispara una consulta inmediata, en vez de esperar el siguiente ciclo.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+  window.addEventListener("online", () => {
+    if (!sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+
+  /** Al abrir la pagina: si quedo un trabajo a medias, se retoma en silencio. */
+  function reanudarTrabajoPendiente() {
+    if (sondeo) return;
+    const g = trabajoRecordado();
+    if (!g) return;
+    seguirTrabajo(g.trabajoId, g.grupoId, g.titulo, g.ctx || {}, { mostrarEspera: false });
+  }
+
   async function generarTema(grupoId, esPrimerTemaGratis) {
     // Una sola generacion a la vez: con dos corriendo, la segunda pisaria la
     // pantalla de espera de la primera y se gastaria cupo doble.
@@ -720,17 +928,22 @@
 
     const zona = document.getElementById(`resultado-generar-${grupoId}`);
     if (!zona) return;
-    const tema = document.getElementById(`tema-input-${grupoId}`).value.trim();
+    const campoTema = document.getElementById(`tema-input-${grupoId}`);
+    const tema = campoTema.value.trim();
     const nivel = document.getElementById(`nivel-input-${grupoId}`).value;
     const detalles = document.getElementById(`detalles-input-${grupoId}`).value.trim();
     const imagenes = fotosPorGrupo[grupoId] || [];
     const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
     zona.innerHTML = "";
 
+    // El mensaje solo vivia al pie del formulario, a media pantalla del
+    // campo vacio: en celular no se veia cual campo faltaba y la gente
+    // acababa escribiendo el tema en Etiquetas (reporte sep-2026).
     if (!tema) {
-      zona.innerHTML = `<div class="error">Escribe sobre qué tema quieres generar material.</div>`;
+      marcarCampoFaltante(campoTema, "Escribe sobre qué tema quieres generar material.");
       return;
     }
+    limpiarCampoFaltante(campoTema);
 
     // El material anterior de este grupo (si no se agrego a la liga) ya no
     // aplica: si no se olvida, restaurarEstadoDeGrupos lo resucitaria encima
@@ -742,54 +955,45 @@
       imagenes.length ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…",
       { texto: "Seguir navegando mientras se genera →", onClick: minimizarGeneracion }
     );
+    // Candado inmediato: entre el POST y la respuesta hay una ventana en
+    // la que un segundo toque pasaria hayGeneracionEnCurso(). El servidor
+    // tambien lo rechaza (409), pero mejor ni llegar ahi.
+    generacionEnCurso = { grupoId, titulo: tema, minimizada: false };
 
-    const promesa = fetchConReintento(
-      `${API_BASE}/api/temas/generar`,
-      {
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/generar-async`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-        body: JSON.stringify({ tema, nivel, modo: "grupo", detalles, imagenes, enfoque }),
-      },
-      null, // no sobreescribir la zona de espera con el mensaje de reintento
-      null
-    ).then(async (res) => ({ res, data: await res.json() }));
+        body: JSON.stringify({
+          tema,
+          nivel,
+          modo: "grupo",
+          detalles,
+          imagenes,
+          enfoque,
+          // Idempotencia: un reintento de la misma peticion no encola —ni
+          // cobra— una segunda generacion.
+          claveCliente: nuevaClaveCliente(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-    generacionEnCurso = { grupoId, titulo: tema, promesa, minimizada: false };
+      // 409 = ya hay una generacion de esta cuenta corriendo (por ejemplo
+      // desde otro dispositivo): se engancha a esa en vez de pelearse.
+      if (res.status === 409 && data.trabajo_id) {
+        seguirTrabajo(data.trabajo_id, grupoId, tema, { nivel, enfoque, esPrimerTemaGratis }, { conFotos: imagenes.length > 0 });
+        return;
+      }
+      if (!res.ok || !data.trabajo_id) throw new Error(data.error || "No se pudo generar el material.");
 
-    // Se lee ANTES de vaciar generacionEnCurso, porque el .then puede lanzar
-    // y caer al .catch cuando ya no hay a quien preguntarle si se minimizo.
-    let minimizada = false;
-    const cerrar = () => {
-      if (generacionEnCurso) minimizada = generacionEnCurso.minimizada;
+      fotosPorGrupo[grupoId] = []; // ya viajan en el cuerpo
+      pintarMiniaturas(grupoId);
+      seguirTrabajo(data.trabajo_id, grupoId, tema, { nivel, enfoque, esPrimerTemaGratis }, { conFotos: imagenes.length > 0 });
+    } catch (err) {
       generacionEnCurso = null;
       detenerTips(grupoId);
-    };
-
-    promesa
-      .then(({ res, data }) => {
-        cerrar();
-        if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
-
-        // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
-        // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
-        // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
-        // alta, sin importar el nivel real del grupo (31-ago-2026).
-        contenidoEnEdicion[grupoId] = { ...data.contenido, nivel, enfoque };
-        // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
-        // "Agregar a mi liga" publica el imprimible equivocado.
-        delete pdfCache[grupoId];
-        delete pdfCacheSinRespuestas[grupoId];
-        metaGenerado[grupoId] = {
-          encabezado: "Material generado",
-          titulo: data.contenido?.tema || tema,
-          esPrimerTemaGratis,
-        };
-        avisarMaterialListo(grupoId, minimizada);
-      })
-      .catch((err) => {
-        cerrar();
-        avisarFalloGeneracion(grupoId, minimizada, tema, mensajeErrorAmigable(err));
-      });
+      avisarFalloGeneracion(grupoId, false, tema, mensajeErrorAmigable(err));
+    }
   }
 
   /** Cierre comun de generarTema y combinarTemasGrupo: si la persona sigue
