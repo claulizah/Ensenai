@@ -186,6 +186,9 @@
     linguistica: "Lingüística", logico_matematica: "Lógico-matemática", espacial: "Espacial",
     musical: "Musical", kinestesica: "Corporal-kinestésica", interpersonal: "Interpersonal",
     intrapersonal: "Intrapersonal", naturalista: "Naturalista",
+    // Actividad única pensada para todo el grupo (31-ago-2026): así sale
+    // ahora por default en modo grupo, en vez de las 8 de la tabla.
+    todas: "Para todo el grupo",
   };
 
   function escapeHtml(str) {
@@ -846,8 +849,14 @@
     const c = tema.contenido || {};
     const cont = document.getElementById("contenido");
 
-    const actividadesHtml = c.actividades
-      ? c.actividades
+    // Igual que en tema.html: una actividad vacía (Modo Examen deja la
+    // actividad en blanco a propósito) no debe pintar un recuadro vacío
+    // bajo el título "Actividad" (31-ago-2026).
+    const tieneContenido = (a) => !!a && (String(a.titulo || "").trim() || String(a.instrucciones || "").trim());
+    const actividadesConTexto = Array.isArray(c.actividades) ? c.actividades.filter(tieneContenido) : [];
+
+    const actividadesHtml = actividadesConTexto.length
+      ? actividadesConTexto
           .map(
             (a) => `
         <div class="actividad-box">
@@ -858,7 +867,7 @@
       `
           )
           .join("")
-      : c.actividad
+      : tieneContenido(c.actividad)
       ? `
         <div class="actividad-box">
           <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
@@ -987,7 +996,11 @@
       }
       ${
         actividadesHtml
-          ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad${c.actividades ? "es (elige la de tu tipo de inteligencia)" : ""}</h2>${actividadesHtml}`
+          ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad${
+              (c.actividades || []).filter((a) => a && a.inteligencia !== "todas").length > 1
+                ? "es (elige la de tu tipo de inteligencia)"
+                : ""
+            }</h2>${actividadesHtml}`
           : ""
       }
       ${!ejerciciosHtml && !actividadesHtml ? `<p class="ayuda">Este tema no trae ejercicios.</p>` : ""}

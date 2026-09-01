@@ -82,6 +82,34 @@
   .curso-item a { color: var(--profundo); font-weight: 700; text-decoration: none; }
   .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
 
+  /* ── Medallas (31-ago-2026) ──
+     Antes cada medalla iba con estilos inline y sin alto fijo: en celular
+     los nombres largos ("Racha de 30 días") ocupaban tres renglones y las
+     filas quedaban disparejas. Ahora son más chicas, de alto parejo, y el
+     nombre se corta a dos renglones. */
+  /* grid-auto-rows:1fr deja las dos filas del mismo alto pase lo que pase. */
+  /* minmax(0,1fr): sin el 0, una medalla con ícono ancho ensancha su columna
+     y las 5 quedan de distinto tamaño. */
+  .rejilla-medallas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .medalla {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    min-height: 58px; text-align: center; padding: 7px 3px; border-radius: 10px; background: #F4F6F8;
+  }
+  .medalla.ganada { background: #EAF1FE; }
+  /* Varias medallas usan DOS emojis ("📚📚", "🎯🎯"): sin nowrap se partían en
+     dos renglones y esa fila crecía al doble. Alto fijo + nowrap las empareja. */
+  .medalla .icono {
+    font-size: 1.05rem; line-height: 1.3; height: 1.4rem; white-space: nowrap; overflow: hidden;
+    filter: grayscale(1); opacity: 0.35;
+  }
+  .medalla.ganada .icono { filter: none; opacity: 1; }
+  .medalla .nombre {
+    font-size: 0.58rem; line-height: 1.15; margin-top: 3px; color: #9AA7B0; font-weight: 400;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .medalla.ganada .nombre { color: var(--profundo); font-weight: 700; }
+
+
   /* ── "Invita y gana" (31-ago-2026) ──
      Antes el código propio vivía en un <input readonly> con "flex:1" junto
      a un <button class="secundario"> — pero .secundario trae width:100% en
@@ -703,9 +731,9 @@
       const medallasHtml = CATALOGO_MEDALLAS.map((m) => {
         const obtenida = ganadas.has(m.codigo);
         return `
-          <div title="${escapeHtml(m.descripcion)}" style="text-align:center; padding:8px 4px; border-radius:12px; background:${obtenida ? "#EAF1FE" : "#F4F6F8"};">
-            <div style="font-size:1.6rem; ${obtenida ? "" : "filter:grayscale(1); opacity:0.35;"}">${m.icono}</div>
-            <div style="font-size:0.68rem; margin-top:2px; color:${obtenida ? "var(--profundo)" : "#9AA7B0"}; font-weight:${obtenida ? "700" : "400"};">${escapeHtml(m.nombre)}</div>
+          <div class="medalla${obtenida ? " ganada" : ""}" title="${escapeHtml(m.descripcion)}">
+            <div class="icono">${m.icono}</div>
+            <div class="nombre">${escapeHtml(m.nombre)}</div>
           </div>
         `;
       }).join("");
@@ -713,7 +741,7 @@
       cont.innerHTML = `
         <p class="ayuda" style="margin:0 0 4px; text-align:left;"><strong>🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}</strong>${g.racha_record > 0 ? ` · récord: ${g.racha_record}` : ""}</p>
         <p class="ayuda" style="margin:0 0 12px; text-align:left; font-size:0.85rem;">Genera un tema o haz tu trivia diaria (en tema.html) para mantenerla.</p>
-        <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;">${medallasHtml}</div>
+        <div class="rejilla-medallas">${medallasHtml}</div>
       `;
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudo cargar tu racha.</div>`;

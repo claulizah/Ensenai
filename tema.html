@@ -2890,8 +2890,15 @@
     const c = contenido;
     const cont = document.getElementById("contenido");
 
-    const actividadesHtml = c.actividades
-      ? c.actividades
+    // Una actividad "existe" solo si trae texto de verdad. En Modo Examen el
+    // simulador deja actividad vacía a propósito (ver agents/combinarTemas.js)
+    // y antes eso pintaba un recuadro en blanco bajo el título "Actividad"
+    // (31-ago-2026).
+    const tieneContenido = (a) => !!a && (String(a.titulo || "").trim() || String(a.instrucciones || "").trim());
+    const actividadesConTexto = Array.isArray(c.actividades) ? c.actividades.filter(tieneContenido) : [];
+
+    const actividadesHtml = actividadesConTexto.length
+      ? actividadesConTexto
           .map(
             (a) => `
         <div class="actividad-box">
@@ -2902,7 +2909,7 @@
       `
           )
           .join("")
-      : c.actividad
+      : tieneContenido(c.actividad)
       ? `
         <div class="actividad-box">
           <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
