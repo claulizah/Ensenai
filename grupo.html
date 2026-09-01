@@ -188,10 +188,37 @@
   // tarda 30-60s en despertar con la primera petición — esa primera
   // petición puede fallar con un "Failed to fetch" genérico. Este helper
   // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
+  // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
+  // un reintento genera el material DOS veces.
+  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  // Un fetch que truena casi de inmediato es "nunca salió" (servidor
+  // dormido, sin internet); uno que truena después de un rato pudo haber
+  // llegado y seguir procesándose del otro lado.
+  const MS_FALLO_INMEDIATO = 3000;
+
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    const metodo = (opciones?.method || "GET").toUpperCase();
+    const esIdempotente = metodo === "GET" || metodo === "HEAD";
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const t0 = Date.now();
+
     try {
       return await fetch(url, opciones);
     } catch (err) {
+      const tardo = Date.now() - t0;
+
+      // Peticiones que escriben: reintentar a ciegas es lo que producía
+      // material duplicado y cupo gastado doble (31-ago-2026). Solo se
+      // reintenta lo que es seguro reintentar.
+      if (!esIdempotente && (esCara || tardo >= MS_FALLO_INMEDIATO)) {
+        throw new Error(
+          tardo >= MS_FALLO_INMEDIATO
+            ? "Se perdió la conexión, pero es posible que el material SÍ se haya generado del otro lado. Revisa si ya aparece en tu lista antes de volver a intentar, para no generarlo dos veces."
+            : "No pudimos conectar con el servidor. Vuelve a intentarlo."
+        );
+      }
+
       if (cont) {
         cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
       }
@@ -437,18 +464,26 @@
   // y viajan como base64 dentro del JSON, así que se reducen a 1400px de
   // lado y se recomprimen como JPEG antes de subirlas. Aquí se guardan por
   // grupo, porque en esta pantalla puede haber varias ligas abiertas a la vez.
+  // Nombres legibles de las inteligencias, para "Adaptar por inteligencia"
+  // (grupo.html no las necesitaba antes: las 8 solo se veían en g.html).
+  const ETIQUETAS_INTELIGENCIA = {
+    linguistica: "Lingüística", logico_matematica: "Lógico-matemática", espacial: "Espacial",
+    musical: "Musical", kinestesica: "Corporal-kinestésica", interpersonal: "Interpersonal",
+    intrapersonal: "Intrapersonal", naturalista: "Naturalista",
+  };
+
   const MAX_FOTOS = 3;
   const LADO_MAX = 1400;
   const fotosPorGrupo = {};
 
   // ── Tips mientras se genera ─────────────────────────────────────────────
-  // En modo grupo la generación tarda más (son 8 actividades, una por
-  // inteligencia). Estos consejos están escritos para quien da clase o
+  // En modo grupo la generación tarda (es el material más completo que
+  // produce el sistema). Estos consejos están escritos para quien da clase o
   // acompaña, no para un papá — y varios explican POR QUÉ el material viene
   // como viene, que es la duda más común de un profesional que lo estrena.
   const TIPS_GRUPO = [
-    "En un salón hay perfiles mezclados. Por eso el material trae una actividad por cada tipo de inteligencia, no una sola para todos.",
-    "No tienes que usar las 8 actividades. Elige dos o tres y reparte según lo que sabes de cada quien.",
+    "En un salón hay perfiles mezclados. Por eso la actividad viene diseñada para que le entre todo el grupo: se puede resolver hablando, escribiendo, dibujando o moviéndose.",
+    "Si quieres una versión distinta para cada tipo de inteligencia, el botón \"Adaptar por inteligencia\" te genera las 8 sobre este mismo tema.",
     "Dar actividades distintas no es hacer diferencias: es darle a cada quien una puerta de entrada al mismo tema.",
     "Antes de compartir el material puedes editar la trivia — corregir, quitar o agregar preguntas propias.",
     "Repasar el mismo tema tres veces en días distintos fija mucho más que una sesión larga.",
@@ -861,11 +896,13 @@
             t.pago_status === "pendiente"
               ? `<button class="secundario chico" id="btn-pagar-lista-${t.id}">Pagar</button>`
               : `<button class="secundario chico" id="btn-respuestas-${t.id}">Ver respuestas</button>
-                 <button class="secundario chico" id="btn-ejercicios-${t.id}">Ver ejercicios</button>`
+                 <button class="secundario chico" id="btn-ejercicios-${t.id}">Ver ejercicios</button>
+                 <button class="secundario chico" id="btn-adaptar-${t.id}">🧠 Adaptar por inteligencia</button>`
           }
         </div>
         ${t.pago_status !== "pendiente" ? `<div id="respuestas-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
         ${t.pago_status !== "pendiente" ? `<div id="ejercicios-marcados-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+        ${t.pago_status !== "pendiente" ? `<div id="adaptar-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
       `
         )
         .join("");
@@ -883,6 +920,8 @@
           if (btn) btn.addEventListener("click", () => toggleRespuestas(grupoId, t.id));
           const btnEj = document.getElementById(`btn-ejercicios-${t.id}`);
           if (btnEj) btnEj.addEventListener("click", () => toggleEjerciciosMarcados(grupoId, t.id));
+          const btnAd = document.getElementById(`btn-adaptar-${t.id}`);
+          if (btnAd) btnAd.addEventListener("click", () => adaptarPorInteligencia(grupoId, t.id));
         });
 
       cont.querySelectorAll("[data-seleccionar]").forEach((chk) => {
@@ -1072,6 +1111,61 @@
    * toggleRespuestas() de arriba, incluido el manejo de nombres en grupos
    * anónimos.
    */
+  /**
+   * "Adaptar por inteligencia" (31-ago-2026): pide las 8 actividades de la
+   * tabla de Gardner para un tema que ya existe. El tema se genera con UNA
+   * actividad pensada para todo el grupo (más rápido, menos material que
+   * revisar); esto es para quien sí quiere repartir una distinta a cada
+   * quien. El backend las guarda dentro del tema, así que solo se generan
+   * una vez — una segunda llamada las regresa sin volver a gastar generación.
+   */
+  async function adaptarPorInteligencia(grupoId, temaId) {
+    const panel = document.getElementById(`adaptar-${temaId}`);
+    const btn = document.getElementById(`btn-adaptar-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "🧠 Adaptar por inteligencia";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Armando una actividad por cada inteligencia… (unos segundos)</div>`;
+    if (btn) { btn.textContent = "Ocultar actividades"; btn.disabled = true; }
+
+    const nivel = document.getElementById(`nivel-input-${grupoId}`)?.value || "primaria_alta";
+    const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grupos/temas/${temaId}/actividades`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ nivel, enfoque }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron generar las actividades.");
+
+      const porInteligencia = (data.actividades || []).filter((a) => a && a.inteligencia !== "todas");
+      panel.innerHTML =
+        `<p class="ayuda" style="margin:8px 0 4px;">Ya quedaron guardadas en el tema — tus alumnos las ven en su liga. No tienes que usar las 8: elige las que te sirvan.</p>` +
+        porInteligencia
+          .map(
+            (a) => `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+              <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--bosque);">${escapeHtml(
+                ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia
+              )}</div>
+              <div style="font-weight:700; margin:2px 0 4px;">${escapeHtml(a.titulo || "")}</div>
+              <div style="font-size:0.9rem; line-height:1.5;">${escapeHtml(a.instrucciones || "")}</div>
+            </div>`
+          )
+          .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function toggleEjerciciosMarcados(grupoId, temaId) {
     const panel = document.getElementById(`ejercicios-marcados-${temaId}`);
     const btn = document.getElementById(`btn-ejercicios-${temaId}`);

@@ -110,8 +110,8 @@
   }
   .separador-referidos::before, .separador-referidos::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
   .btn-canjear-chico {
-    flex: 0 0 auto; background: var(--profundo); color: #fff; border: none; border-radius: 999px;
-    padding: 0 20px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+    flex: 0 0 auto; align-self: stretch; background: var(--profundo); color: #fff; border: none; border-radius: 999px;
+    padding: 12px 20px; font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.9rem; cursor: pointer;
   }
 </style>
 </head>
@@ -154,10 +154,37 @@
   // tarda 30-60s en despertar con la primera petición — esa primera
   // petición puede fallar con un "Failed to fetch" genérico. Este helper
   // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
+  // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
+  // un reintento genera el material DOS veces.
+  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  // Un fetch que truena casi de inmediato es "nunca salió" (servidor
+  // dormido, sin internet); uno que truena después de un rato pudo haber
+  // llegado y seguir procesándose del otro lado.
+  const MS_FALLO_INMEDIATO = 3000;
+
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    const metodo = (opciones?.method || "GET").toUpperCase();
+    const esIdempotente = metodo === "GET" || metodo === "HEAD";
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const t0 = Date.now();
+
     try {
       return await fetch(url, opciones);
     } catch (err) {
+      const tardo = Date.now() - t0;
+
+      // Peticiones que escriben: reintentar a ciegas es lo que producía
+      // material duplicado y cupo gastado doble (31-ago-2026). Solo se
+      // reintenta lo que es seguro reintentar.
+      if (!esIdempotente && (esCara || tardo >= MS_FALLO_INMEDIATO)) {
+        throw new Error(
+          tardo >= MS_FALLO_INMEDIATO
+            ? "Se perdió la conexión, pero es posible que el material SÍ se haya generado del otro lado. Revisa si ya aparece en tu lista antes de volver a intentar, para no generarlo dos veces."
+            : "No pudimos conectar con el servidor. Vuelve a intentarlo."
+        );
+      }
+
       if (cont) {
         cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
       }

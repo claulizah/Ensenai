@@ -186,6 +186,29 @@
     100% { transform: translateX(265%); }
   }
   .espera-titulo { color: #4A6A85; font-size: 0.92rem; margin: 0 0 16px; }
+  .btn-seguir-navegando {
+    background: none; border: none; color: #5b7d99; font-family: inherit; font-weight: 700;
+    font-size: 0.83rem; text-decoration: underline; cursor: pointer; margin-top: 14px;
+  }
+  /* Aviso flotante de "se está generando en segundo plano" (31-ago-2026):
+     generar tarda ~1 min y antes eso dejaba la pantalla secuestrada. Ahora
+     se puede seguir navegando y este aviso avisa cuando el tema ya está. */
+  .aviso-generacion {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 60;
+    display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px);
+    background: #fff; border: 2px solid var(--aqua); border-radius: 999px; padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(30,58,138,0.18);
+    font-size: 0.86rem; font-weight: 700; color: var(--profundo);
+  }
+  .aviso-generacion.listo { border-color: var(--menta); }
+  .aviso-generacion.falla { border-color: #FFC4B5; color: #B94A2E; }
+  .aviso-generacion .texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aviso-generacion button {
+    flex-shrink: 0; border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.82rem;
+    background: var(--menta); color: #fff;
+  }
+  .aviso-generacion button.cerrar { background: none; color: #5b7d99; padding: 7px 4px; font-size: 1rem; }
   .tip-caja {
     display: flex; gap: 12px; text-align: left; align-items: flex-start;
     background: var(--hielo); border: 2px dashed var(--menta); border-radius: 14px; padding: 14px 16px;
@@ -527,10 +550,37 @@
   // tarda 30-60s en despertar con la primera petición — esa primera
   // petición puede fallar con un "Failed to fetch" genérico. Este helper
   // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
+  // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
+  // un reintento genera el material DOS veces.
+  const RUTAS_QUE_NO_SE_REINTENTAN = ["/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar"];
+  // Un fetch que truena casi de inmediato es "nunca salió" (servidor
+  // dormido, sin internet); uno que truena después de un rato pudo haber
+  // llegado y seguir procesándose del otro lado.
+  const MS_FALLO_INMEDIATO = 3000;
+
   async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    const metodo = (opciones?.method || "GET").toUpperCase();
+    const esIdempotente = metodo === "GET" || metodo === "HEAD";
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r));
+    const t0 = Date.now();
+
     try {
       return await fetch(url, opciones);
     } catch (err) {
+      const tardo = Date.now() - t0;
+
+      // Peticiones que escriben: reintentar a ciegas es lo que producía
+      // material duplicado y cupo gastado doble (31-ago-2026). Solo se
+      // reintenta lo que es seguro reintentar.
+      if (!esIdempotente && (esCara || tardo >= MS_FALLO_INMEDIATO)) {
+        throw new Error(
+          tardo >= MS_FALLO_INMEDIATO
+            ? "Se perdió la conexión, pero es posible que el material SÍ se haya generado del otro lado. Revisa si ya aparece en tu lista antes de volver a intentar, para no generarlo dos veces."
+            : "No pudimos conectar con el servidor. Vuelve a intentarlo."
+        );
+      }
+
       if (cont) {
         cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
       }
@@ -1240,7 +1290,7 @@
    * el rato. Las etapas son un estimado (no vienen del backend en tiempo
    * real), así que se pisan un poco optimistas a propósito.
    */
-  function iniciarTips(contenedor, encabezado) {
+  function iniciarTips(contenedor, encabezado, accion) {
     detenerTips();
     const tips = armarListaTips();
     const etapas = Array.isArray(encabezado) ? encabezado : null;
@@ -1271,7 +1321,10 @@
             .slice(0, Math.min(tips.length, 6))
             .map((_, k) => `<span class="${k === i % Math.min(tips.length, 6) ? "activo" : ""}"></span>`)
             .join("")}</div>
+          ${accion ? `<button type="button" class="btn-seguir-navegando" id="btn-accion-espera">${escapeHtml(accion.texto)}</button>` : ""}
         </div>`;
+      // El repintado borra el botón cada vez, así que se vuelve a conectar.
+      if (accion) document.getElementById("btn-accion-espera")?.addEventListener("click", accion.onClick);
     };
 
     pintar();
@@ -1282,6 +1335,37 @@
       if (tick % 3 === 0) i++;
       pintar();
     }, 2000);
+  }
+
+  // ── Generación en segundo plano ────────────────────────────────────────
+  // Antes, generar un tema secuestraba la pantalla ~1 minuto. Ahora se puede
+  // seguir usando la app mientras tanto: el fetch sigue vivo y este aviso
+  // flotante avisa cuando el tema está listo. Y aunque se cierre la página,
+  // el backend igual termina y guarda el tema en el historial.
+  let generacionEnCurso = null;
+
+  function quitarAvisoGeneracion() {
+    document.getElementById("aviso-generacion")?.remove();
+  }
+
+  function mostrarAvisoGeneracion({ estado, texto, accionTexto, onAccion }) {
+    quitarAvisoGeneracion();
+    const div = document.createElement("div");
+    div.className = `aviso-generacion${estado === "listo" ? " listo" : estado === "falla" ? " falla" : ""}`;
+    div.id = "aviso-generacion";
+    div.innerHTML = `
+      <span class="texto">${escapeHtml(texto)}</span>
+      ${accionTexto ? `<button type="button" id="btn-aviso-generacion">${escapeHtml(accionTexto)}</button>` : ""}
+      ${estado === "generando" ? "" : `<button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>`}
+    `;
+    document.body.appendChild(div);
+    if (accionTexto && onAccion) {
+      document.getElementById("btn-aviso-generacion").addEventListener("click", () => {
+        quitarAvisoGeneracion();
+        onAccion();
+      });
+    }
+    document.getElementById("btn-cerrar-aviso")?.addEventListener("click", quitarAvisoGeneracion);
   }
 
   function detenerTips() {
@@ -1950,6 +2034,17 @@
   }
 
   async function generarTema() {
+    // Con la generación en segundo plano, el botón sigue disponible aunque
+    // ya haya una corriendo — pero una sola a la vez (si no, la segunda
+    // pisaría la pantalla de espera de la primera y se gastaría cupo doble).
+    if (generacionEnCurso) {
+      mostrarAvisoGeneracion({
+        estado: "generando",
+        texto: `⏳ Espera — "${generacionEnCurso.tema}" todavía se está generando`,
+      });
+      return;
+    }
+
     const tema = document.getElementById("tema-input").value.trim();
     const nivel = document.getElementById("nivel-input").value;
     const perfilId = document.getElementById("perfil-input").value || null;
@@ -1986,36 +2081,85 @@
           { ms: 27000, texto: "Haciendo una última revisión de calidad…" },
           { ms: 39000, texto: "Ya casi — puliendo los últimos detalles…" },
         ];
-    iniciarTips(resultado, etapasEspera);
+    // La espera trae un "seguir navegando": minimiza esta pantalla y deja el
+    // fetch corriendo en segundo plano (ver generacionEnCurso).
+    iniciarTips(resultado, etapasEspera, {
+      texto: "Seguir navegando mientras se genera →",
+      onClick: () => {
+        if (!generacionEnCurso) return;
+        generacionEnCurso.minimizada = true;
+        detenerTips();
+        const zona = document.getElementById("resultado-generar");
+        if (zona) zona.innerHTML = "";
+        mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${tema}"…` });
+      },
+    });
 
-    try {
-      const res = await fetchConReintento(
-        `${API_BASE}/api/temas/generar`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-          body: JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas, enfoque }),
-        },
-        null, // no sobreescribir la zona de tips con el mensaje de reintento
-        null
-      );
-      const data = await res.json();
-      detenerTips();
-      if (res.status === 402) {
-        resultado.innerHTML = `
-          <div class="error">${escapeHtml(data.error)}</div>
-          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
-        `;
-        return;
-      }
-      if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
+    const cuerpo = JSON.stringify({ tema, nivel, modo: "individual", perfilId, etiquetas, detalles, imagenes: fotosSeleccionadas, enfoque });
+    fotosSeleccionadas = []; // ya viajan en el cuerpo; no arrastrarlas al siguiente
 
-      fotosSeleccionadas = []; // el tema ya se generó; no arrastrar las fotos al siguiente
-      mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
-    } catch (err) {
-      detenerTips();
-      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
-    }
+    const promesa = fetchConReintento(
+      `${API_BASE}/api/temas/generar`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: cuerpo,
+      },
+      null, // no sobreescribir la zona de tips con el mensaje de reintento
+      null
+    ).then(async (res) => ({ res, data: await res.json() }));
+
+    generacionEnCurso = { tema, promesa, minimizada: false };
+
+    promesa
+      .then(({ res, data }) => {
+        const enCurso = generacionEnCurso;
+        generacionEnCurso = null;
+        detenerTips();
+        // La zona de tips ya no existe si la persona se fue a otra pantalla.
+        const zona = document.getElementById("resultado-generar");
+        const inline = !enCurso.minimizada && !!zona;
+
+        if (res.status === 402) {
+          const msg = data.error || "Llegaste al límite de tu plan.";
+          if (inline) {
+            zona.innerHTML = `
+              <div class="error">${escapeHtml(msg)}</div>
+              <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+            `;
+          } else {
+            mostrarAvisoGeneracion({ estado: "falla", texto: `"${tema}": ${msg}`, accionTexto: "Ver mi plan", onAccion: () => (window.location.href = "comprador.html") });
+          }
+          return;
+        }
+        if (!res.ok) throw new Error(data.error || "No se pudo generar el material.");
+
+        if (inline) {
+          mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
+        } else {
+          // Se quedó en segundo plano: no la sacamos de donde esté, solo le
+          // avisamos. El historial se refresca para que ya aparezca ahí.
+          mostrarAvisoGeneracion({
+            estado: "listo",
+            texto: `✨ "${data.contenido?.tema || tema}" ya está listo`,
+            accionTexto: "Verlo",
+            onAccion: () => mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion),
+          });
+          if (document.getElementById("lista-historial")) cargarHistorial();
+        }
+      })
+      .catch((err) => {
+        const enCurso = generacionEnCurso;
+        generacionEnCurso = null;
+        detenerTips();
+        const zona = document.getElementById("resultado-generar");
+        const msg = mensajeErrorAmigable(err);
+        if (enCurso && !enCurso.minimizada && zona) {
+          zona.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+        } else {
+          mostrarAvisoGeneracion({ estado: "falla", texto: `"${tema}": ${msg}` });
+        }
+      });
   }
 
   async function cargarHistorial() {
