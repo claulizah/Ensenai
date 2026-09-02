@@ -39,6 +39,29 @@
      se ve en TODAS las pantallas de esta página — también mientras lees un
      tema o contestas la trivia — y deja de competir por atención con
      "Mis temas anteriores". */
+  /* ── Pantalla de perfil (2-sep-2026) ───────────────────────────────
+     Antes se entraba directo al formulario de generar, con seis tarjetas
+     encima. Ahora lo primero es el perfil: quién es, cómo aprende, cómo
+     va y sus temas; generar es UN botón. */
+  .hero-perfil { display: flex; gap: 14px; align-items: center; }
+  .hero-perfil .datos { flex: 1 1 auto; min-width: 0; }
+  .hero-perfil h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+  .chips-inteligencia { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .chip-inteligencia { border-radius: 999px; padding: 2px 10px; font-size: 0.72rem; font-weight: 800; color: #fff; }
+  .rejilla-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .stat-perfil { background: var(--hielo); border-radius: 14px; padding: 10px 6px; text-align: center; }
+  .stat-perfil .num { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.25rem; color: var(--profundo); }
+  .stat-perfil .lbl { font-size: 0.7rem; color: #4A6A85; font-weight: 700; }
+  .burbujas-perfil { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .burbuja-perfil {
+    display: flex; align-items: center; gap: 7px; background: #fff; border: 2px solid var(--linea);
+    border-radius: 999px; padding: 3px 12px 3px 3px; font-weight: 700; font-size: 0.82rem;
+    color: #4A6A85; cursor: pointer; font-family: inherit;
+  }
+  .burbuja-perfil.activa { border-color: var(--profundo); color: var(--profundo); font-weight: 800; }
+  .burbuja-perfil.nueva { padding: 3px 14px; border-style: dashed; }
+  .acciones-perfil { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .acciones-perfil .secundario { width: 100%; margin-top: 0; }
   .barra-racha { background: #fff; border-bottom: 2px solid var(--linea); }
   .barra-racha-interna { max-width: 640px; margin: 0 auto; padding: 12px 20px; }
   .barra-racha-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -174,6 +197,7 @@
     font-family: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; color: #5b7d99; margin-right: 6px;
   }
   .btn-solucion { border-color: var(--menta); color: var(--bosque); }
+  .btn-revisar-mio { display: inline-block; margin-top: 8px; background: #fff; border: 2px solid var(--cielo); color: var(--profundo); font-family: inherit; font-weight: 700; font-size: 0.82rem; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
   .btn-solucion.abierta { background: var(--hielo); }
   .pista-caja { background: #FFF7E6; border-radius: 10px; padding: 10px 13px; margin-top: 9px; font-size: 0.9rem; color: #8A6100; }
   .solucion-caja { background: var(--hielo); border-radius: 10px; padding: 13px 15px; margin-top: 10px; }
@@ -344,6 +368,20 @@
   .toggle-modo-examen { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.85rem; color: var(--profundo); cursor: pointer; }
   .toggle-modo-examen input { width: 17px; height: 17px; accent-color: #F97066; cursor: pointer; }
   .chip-etiqueta { background: #fff; border: 2px solid var(--linea); color: var(--profundo); font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  /* Acciones por tema del historial: "ya lo aprendí" y "borrar" (2-sep-2026) */
+  .chip-aprendido { border-color: var(--aqua); color: var(--bosque); }
+  .chip-borrar { border-color: #F3C7C2; color: #B4342A; }
+  .bloque-aprendidos { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--linea); }
+  .bloque-aprendidos > button { background: none; border: 0; padding: 0; font-family: inherit; font-weight: 700; font-size: 0.85rem; color: var(--bosque); cursor: pointer; }
+  .historial-item--aprendido { opacity: 0.72; }
+  /* Revisión de MI procedimiento, ejercicio por ejercicio */
+  .revision-mia { margin-top: 10px; }
+  .revision-mia textarea { width: 100%; min-height: 90px; }
+  .revision-caja { margin-top: 10px; background: var(--hielo); border: 2px solid var(--linea); border-radius: 12px; padding: 12px 14px; }
+  .revision-caja .veredicto { margin: 0 0 8px; font-weight: 700; color: var(--profundo); font-size: 0.92rem; }
+  .revision-caja ol { margin: 0; padding-left: 20px; }
+  .revision-caja li { font-size: 0.88rem; line-height: 1.5; margin-bottom: 6px; }
+  .revision-caja .sugerencia { margin: 8px 0 0; font-size: 0.88rem; color: var(--bosque); font-weight: 700; }
   .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
   #buscar-historial { margin-bottom: 8px; }
   .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; cursor: pointer; }
@@ -412,6 +450,9 @@
   let perfilesCache = [];
   let perfilSeleccionadoId = "";
   let historialCache = [];
+  // "Ya aprendidos" arranca colapsado: la lista de temas debe mostrar lo que
+  // falta trabajar, no todo el archivo histórico (pedido del 2-sep-2026).
+  let mostrarAprendidos = false;
   let etiquetaActiva = "";
   let progresoCache = null;
   let etiquetaActivaProgreso = "";
@@ -772,7 +813,7 @@
     };
 
     await cargarTipoUsuario();
-    mostrarFormulario();
+    mostrarPerfil();
 
     // Si quedó una generación a medias (se bloqueó el celular, se cerró la
     // pestaña), se retoma en silencio y se avisa cuando esté lista.
@@ -830,23 +871,167 @@
     document.getElementById("btn-saltar-quiz").addEventListener("click", mostrarFormulario);
   }
 
-  function mostrarFormulario() {
+  /**
+   * PANTALLA DE INICIO (2-sep-2026, pedido de la usuaria: "entras directo
+   * ahí"). El perfil es lo primero que se ve: quién es, cómo aprende,
+   * cuántos temas lleva completados y su lista de temas. Generar material,
+   * que antes era el formulario que recibía a todos, ahora es un botón.
+   *
+   * Los datos se pintan desde los caches que ya llenaban las funciones de
+   * siempre (perfilesCache, historialCache, gamificacionCache): cada una
+   * llama a pintarHeroPerfil() al terminar, así la tarjeta se completa
+   * conforme van llegando en vez de esperar a la más lenta.
+   */
+  let perfilActivoId = null;
+  let gamificacionCache = null;
+  let limitePerfilesCache = 1;
+
+  function mostrarPerfil() {
     document.getElementById("contenido").innerHTML = `
       ${window.introHTML ? window.introHTML("individual") : ""}
-      <div class="tarjeta" id="tarjeta-mi-progreso">
-        <h2 style="margin-top:0;">📊 Mi progreso</h2>
+      <div class="tarjeta" id="tarjeta-perfil">
+        <div id="zona-perfil-hero"><div class="cargando">Cargando…</div></div>
+      </div>
+      <button class="primario" id="btn-ir-generar" style="margin-top:0;">✨ Generar un tema nuevo</button>
+      <div class="acciones-perfil" style="margin-top:10px;">
+        <button type="button" class="secundario" id="btn-ir-examen">🎯 Modo examen</button>
+        <button type="button" class="secundario" id="btn-ir-revisar">🔍 Revisar un ejercicio</button>
+      </div>
+      <div class="tarjeta" id="tarjeta-mi-progreso" style="margin-top:18px;">
+        <h2 style="margin-top:0;">📊 Cómo va</h2>
         <div id="zona-mi-progreso"><div class="cargando">Cargando…</div></div>
       </div>
-      <div class="tarjeta">
-        <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
-        <p class="ayuda" style="margin:0 0 10px;">${
-          versionQuiz() === "adulto"
-            ? "Tu perfil define el estilo del material. Puedes tener más de uno si estudias cosas muy distintas."
-            : "Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender."
-        }</p>
-        <div id="zona-perfiles"><div class="cargando">Cargando…</div></div>
+      <div class="tarjeta" id="tarjeta-mis-temas">
+        <h2>Mis temas</h2>
+        <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
+        <div id="filtros-historial" style="display:none; margin-bottom:12px;">
+          <input type="text" id="buscar-historial" placeholder="Buscar por tema o etiqueta…" style="margin-bottom:8px;">
+          <div id="chips-etiquetas" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+          <div id="accion-etiqueta"></div>
+        </div>
+        <div id="barra-combinar" class="barra-combinar" style="display:none;"></div>
+        <div id="lista-historial"><div class="cargando">Cargando…</div></div>
       </div>
-      <div class="tarjeta">
+    `;
+
+    document.getElementById("btn-ir-generar").addEventListener("click", () => mostrarFormulario());
+    document.getElementById("btn-ir-revisar").addEventListener("click", () => mostrarFormulario("revisar"));
+    document.getElementById("btn-ir-examen").addEventListener("click", () => {
+      document.getElementById("tarjeta-mis-temas")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const hint = document.getElementById("hint-combinar");
+      if (hint && historialCache.length >= 2) hint.style.display = "";
+    });
+    cargarPerfiles();
+    cargarHistorial();
+    cargarGamificacion();
+    cargarMiProgreso();
+  }
+
+  /**
+   * La tarjeta de arriba del perfil. Se vuelve a pintar cada vez que llega
+   * un dato nuevo, así que tiene que aguantar que los caches estén vacíos.
+   */
+  function pintarHeroPerfil() {
+    const cont = document.getElementById("zona-perfil-hero");
+    if (!cont) return;
+
+    const esAdulto = versionQuiz() === "adulto";
+
+    // Sin ningún perfil todavía: la tarjeta se convierte en la invitación al
+    // quiz, que es el primer paso real del producto.
+    if (!perfilesCache.length) {
+      cont.innerHTML = `
+        <div style="text-align:center;">
+          <h1 style="margin:0 0 8px;">${esAdulto ? "¿Cómo aprendes mejor?" : "¿Cómo aprende mejor?"}</h1>
+          <p class="ayuda" style="margin:0 0 14px;">Son 12 preguntas rápidas. Con eso, todo el material que generes se adapta a ${
+            esAdulto ? "tu" : "su"
+          } forma de aprender.</p>
+          <button class="primario" id="btn-hero-quiz" style="margin-top:0;">Contestar el quiz</button>
+        </div>`;
+      document.getElementById("btn-hero-quiz").addEventListener("click", () => mostrarQuizPerfil());
+      return;
+    }
+
+    const perfil = perfilesCache.find((p) => p.id === perfilActivoId) || perfilesCache[0];
+    perfilActivoId = perfil.id;
+
+    const g = gamificacionCache || { racha_actual: 0, medallas: [] };
+    const completados = historialCache.filter((t) => t.aprendido).length;
+    const tipos = (perfil.inteligencia_dominante || []).slice(0, 2);
+
+    // Las burbujas solo aparecen si de verdad hay entre quién elegir (o
+    // espacio en el plan para otro): con un solo hijo son ruido.
+    const puedeAgregar = perfilesCache.length < limitePerfilesCache;
+    const burbujasHtml =
+      perfilesCache.length > 1 || puedeAgregar
+        ? `<div class="burbujas-perfil">
+            ${perfilesCache
+              .map(
+                (p) => `<button type="button" class="burbuja-perfil${p.id === perfilActivoId ? " activa" : ""}" data-perfil-burbuja="${p.id}">
+                  ${htmlAvatar(p, 26)}<span>${escapeHtml(p.nombre)}</span>
+                </button>`
+              )
+              .join("")}
+            ${puedeAgregar ? `<button type="button" class="burbuja-perfil nueva" id="btn-burbuja-nueva">+ Agregar</button>` : ""}
+          </div>`
+        : "";
+
+    cont.innerHTML = `
+      ${burbujasHtml}
+      <div class="hero-perfil">
+        ${htmlAvatar(perfil, 76)}
+        <div class="datos">
+          <h1>${escapeHtml(perfil.nombre)}</h1>
+          <div class="chips-inteligencia">
+            ${tipos
+              .map(
+                (t) =>
+                  `<span class="chip-inteligencia" style="background:${COLOR_INTELIGENCIA[t] || "#B9CFE4"};">${escapeHtml(
+                    ETIQUETAS_INTELIGENCIA[t] || t
+                  )}</span>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+      ${
+        tipos.length
+          ? `<p class="ayuda" style="margin:14px 0 0; font-size:0.85rem;">${esAdulto ? "Aprendes" : "Aprende"} mejor ${escapeHtml(
+              tipos.map((t) => (COMO_APRENDE[t] || "").toLowerCase()).filter(Boolean).join(", y también ")
+            )}. Todo el material sale así.</p>`
+          : ""
+      }
+      <div class="rejilla-stats">
+        <div class="stat-perfil"><div class="num">🔥 ${g.racha_actual || 0}</div><div class="lbl">día${g.racha_actual === 1 ? "" : "s"} de racha</div></div>
+        <div class="stat-perfil"><div class="num">${completados}</div><div class="lbl">tema${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"}</div></div>
+        <div class="stat-perfil"><div class="num">${(g.medallas || []).length}</div><div class="lbl">medalla${(g.medallas || []).length === 1 ? "" : "s"}</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px;">
+        <button type="button" class="secundario" style="margin:0;" id="btn-ver-perfiles">⚙️ Mis perfiles</button>
+        <a href="comprador.html?cuenta=1" style="font-size:0.82rem; font-weight:800; color:var(--bosque); text-decoration:none;">Mi plan y medallas →</a>
+      </div>
+    `;
+
+    cont.querySelectorAll("[data-perfil-burbuja]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        perfilActivoId = btn.dataset.perfilBurbuja;
+        pintarHeroPerfil();
+      });
+    });
+    document.getElementById("btn-burbuja-nueva")?.addEventListener("click", () => mostrarQuizPerfil());
+    document.getElementById("btn-ver-perfiles")?.addEventListener("click", () => mostrarFormulario("perfiles"));
+  }
+
+  /**
+   * Pantalla de GENERAR. Ya no es la pantalla de inicio (eso es
+   * mostrarPerfil): se llega con un botón y se regresa con otro. `anclaje`
+   * ("revisar" | "perfiles") permite entrar directo a una de las tarjetas
+   * de abajo desde el perfil, sin que la persona tenga que buscarla.
+   */
+  function mostrarFormulario(anclaje) {
+    document.getElementById("contenido").innerHTML = `
+      <button type="button" class="secundario" id="btn-volver-perfil" style="margin:0 0 14px;">← Mi perfil</button>
+      <div class="tarjeta" id="tarjeta-generar">
         <h1>✨ Genera material sobre un tema</h1>
         <p class="ayuda">Escribe cualquier tema y lo adaptamos a tu edad y a tu forma de aprender.</p>
         <label>Perfil a usar</label>
@@ -881,7 +1066,7 @@
         <button class="primario" id="btn-generar">Generar material</button>
         <div id="resultado-generar"></div>
       </div>
-      <div class="tarjeta">
+      <div class="tarjeta" id="tarjeta-revisar">
         <h1>🔍 Revisar un ejercicio</h1>
         <p class="ayuda">Sube la foto de un ejercicio que ya resolviste a mano y te decimos en qué paso está el error, si lo hay.</p>
         <label>Foto del ejercicio resuelto</label>
@@ -894,18 +1079,26 @@
         <button class="primario" id="btn-revisar-ejercicio">Revisar mi ejercicio</button>
         <div id="resultado-revision"></div>
       </div>
-      <div class="tarjeta">
-        <h2>Mis temas anteriores</h2>
-        <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
-        <div id="filtros-historial" style="display:none; margin-bottom:12px;">
-          <input type="text" id="buscar-historial" placeholder="Buscar por tema o etiqueta…" style="margin-bottom:8px;">
-          <div id="chips-etiquetas" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-          <div id="accion-etiqueta"></div>
-        </div>
-        <div id="barra-combinar" class="barra-combinar" style="display:none;"></div>
-        <div id="lista-historial"><div class="cargando">Cargando…</div></div>
+      <div class="tarjeta" id="tarjeta-perfiles">
+        <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
+        <p class="ayuda" style="margin:0 0 10px;">${
+          versionQuiz() === "adulto"
+            ? "Tu perfil define el estilo del material. Puedes tener más de uno si estudias cosas muy distintas."
+            : "Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender."
+        }</p>
+        <div id="zona-perfiles"><div class="cargando">Cargando…</div></div>
       </div>
     `;
+    document.getElementById("btn-volver-perfil").addEventListener("click", () => mostrarPerfil());
+    if (anclaje === "revisar" || anclaje === "perfiles") {
+      // Un instante después: la tarjeta ya está en el DOM pero el navegador
+      // todavía no acomoda el scroll si se pide en el mismo tick.
+      setTimeout(
+        () => document.getElementById(anclaje === "revisar" ? "tarjeta-revisar" : "tarjeta-perfiles")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        60
+      );
+    }
     document.getElementById("btn-generar").addEventListener("click", generarTema);
     // Enter en el campo "Tema" genera de una vez — es el campo obligatorio
     // y el primero que se llena; los demás son opcionales, así que no hace
@@ -921,9 +1114,7 @@
     fotosRevision = [];
     pintarMiniaturasRevision();
     cargarPerfiles();
-    cargarHistorial();
     cargarGamificacion();
-    cargarMiProgreso();
   }
 
   /**
@@ -946,7 +1137,9 @@
       );
       const plan = await res.json();
       if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu racha.");
-      renderGamificacion(plan.gamificacion || { racha_actual: 0, racha_record: 0, medallas: [] });
+      gamificacionCache = plan.gamificacion || { racha_actual: 0, racha_record: 0, medallas: [] };
+      renderGamificacion(gamificacionCache);
+      pintarHeroPerfil(); // la racha y las medallas también se ven en el perfil
     } catch (err) {
       // No es crítico: mejor esconder la franja que dejar un hueco roto.
       const barra = document.getElementById("barra-racha");
@@ -1275,6 +1468,8 @@
   }
 
   async function cargarPerfiles() {
+    // En la pantalla de perfil no existe #zona-perfiles: igual hay que traer
+    // los perfiles, porque son lo que se pinta arriba (pintarHeroPerfil).
     const cont = document.getElementById("zona-perfiles");
     try {
       const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/perfiles`, {
@@ -1285,6 +1480,9 @@
 
       perfilesCache = data.perfiles || [];
       const limite = data.limite_perfiles;
+      limitePerfilesCache = limite;
+      pintarHeroPerfil();
+      if (!cont) return; // estamos en la pantalla de perfil: no hay lista que pintar
 
       const listaHtml = perfilesCache.length
         ? perfilesCache
@@ -1314,7 +1512,7 @@
         ${
           perfilesCache.length < limite
             ? `<button class="secundario" style="width:100%;" id="btn-nuevo-perfil">+ Agregar perfil (hacer quiz)</button>`
-            : `<p class="ayuda" style="margin:6px 0 0; font-size:0.85rem;">Llegaste al límite de tu plan — <a href="comprador.html">mejora tu plan</a> para agregar más.</p>`
+            : `<p class="ayuda" style="margin:6px 0 0; font-size:0.85rem;">Llegaste al límite de tu plan — <a href="comprador.html?cuenta=1">mejora tu plan</a> para agregar más.</p>`
         }
       `;
 
@@ -1342,8 +1540,14 @@
         // Si solo hay un perfil, se preselecciona: es lo que la persona
         // quiere el 99% de las veces y evita generar con "Balanceado" sin
         // darse cuenta.
+        // Prioridad: lo que ya estaba elegido en el selector > el perfil que
+        // la persona tiene abierto en su pantalla de perfil > el único que
+        // existe. Así, entrar desde "Sofía" y darle a generar no termina
+        // haciendo material para Mateo.
         select.value = perfilesCache.some((p) => p.id === previo)
           ? previo
+          : perfilesCache.some((p) => p.id === perfilActivoId)
+          ? perfilActivoId
           : perfilesCache.length === 1
           ? perfilesCache[0].id
           : previo;
@@ -1351,7 +1555,7 @@
         pintarPerfilActivo();
       }
     } catch (err) {
-      cont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      if (cont) cont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
     }
   }
 
@@ -1676,6 +1880,15 @@
   let perfilIdEditando = null;
 
   async function mostrarQuizPerfil(idExistente) {
+    // El quiz vive dentro de la tarjeta de perfiles, que solo existe en la
+    // pantalla de generar. Desde el perfil (botón "Contestar el quiz" o
+    // "+ Agregar") hay que ir allá primero, o esto tronaría con cont null.
+    if (!document.getElementById("zona-perfiles")) {
+      mostrarFormulario("perfiles");
+      await cargarPerfiles();
+      return mostrarQuizPerfil(idExistente);
+    }
+
     perfilIdEditando = idExistente || null;
     const existente = perfilesCache.find((p) => p.id === perfilIdEditando);
     const cont = document.getElementById("zona-perfiles");
@@ -2191,7 +2404,7 @@
       if (res.status === 402) {
         resultado.innerHTML = `
           <div class="error">${escapeHtml(data.error)}</div>
-          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
         `;
         return;
       }
@@ -2524,7 +2737,7 @@
         detenerTips();
         resultado.innerHTML = `
           <div class="error">${escapeHtml(data.error || "Llegaste al límite de tu plan.")}</div>
-          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
         `;
         return;
       }
@@ -2555,6 +2768,7 @@
       if (!res.ok) throw new Error(data.error || "No se pudo cargar tu historial.");
 
       historialCache = data.temas || [];
+      pintarHeroPerfil(); // "temas completados" sale de este cache
       etiquetaActiva = "";
       temasSeleccionados.clear();
       modoExamenActivo = false;
@@ -2635,6 +2849,78 @@
     }
   }
 
+  /**
+   * "Ya lo aprendí" / "Volver a practicarlo" (2-sep-2026). No borra nada: el
+   * tema se conserva completo, solo deja de contar como pendiente — sale de
+   * "Mi progreso" y sus preguntas ya no entran en la trivia diaria (que es
+   * lo que empuja la racha). Ver PATCH /api/temas/mios/:id en el backend.
+   *
+   * Se pinta optimista y se revierte si el servidor dice que no: marcar un
+   * tema es un gesto chiquito y esperar el viaje completo se siente lento.
+   */
+  async function alternarAprendido(id, btn) {
+    const tema = historialCache.find((t) => t.id === id);
+    if (!tema) return;
+    const anterior = !!tema.aprendido;
+    tema.aprendido = !anterior;
+    mostrarAprendidos = mostrarAprendidos || anterior; // al desmarcar, que no "desaparezca"
+    renderHistorial();
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ aprendido: !anterior }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar el tema.");
+      cargarMiProgreso(); // "Mi progreso" ya no debe incluirlo (o volver a incluirlo)
+    } catch (err) {
+      tema.aprendido = anterior;
+      renderHistorial();
+      alert(err.message);
+    }
+  }
+
+  /**
+   * Borrar un tema del historial, definitivo. Se avisa con todas sus letras
+   * que NO devuelve cupo del mes, porque es la pregunta obvia y la respuesta
+   * (el contador cuenta generaciones, no temas guardados) no es adivinable.
+   */
+  async function borrarTemaDelHistorial(id, btn) {
+    const tema = historialCache.find((t) => t.id === id);
+    if (!tema) return;
+    const confirmado = confirm(
+      `¿Borrar "${tema.tema}"?\n\nSe borra para siempre, junto con la trivia que contestaste y los ejercicios que marcaste de ese tema.\n\nOjo: borrarlo NO te devuelve el tema en tu cupo del mes.`
+    );
+    if (!confirmado) return;
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Borrando…";
+    }
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo borrar el tema.");
+
+      historialCache = historialCache.filter((t) => t.id !== id);
+      temasSeleccionados.delete(id);
+      renderChipsEtiquetas();
+      renderHistorial();
+      cargarMiProgreso();
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "🗑️ Borrar";
+      }
+      alert(err.message);
+    }
+  }
+
   function renderHistorial() {
     const cont = document.getElementById("lista-historial");
     const busqueda = (document.getElementById("buscar-historial").value || "").trim().toLowerCase();
@@ -2654,25 +2940,62 @@
 
     const permiteSeleccion = historialCache.length >= 2;
 
-    cont.innerHTML = filtrados
-      .map(
-        (t) => `
-      <div class="historial-item historial-item--tema" data-id="${t.id}">
+    // Los temas marcados como aprendidos se van a su propia sección, abajo
+    // y plegada: siguen ahí para reabrirlos o reimprimirlos, pero dejan de
+    // competir con lo que sí está pendiente.
+    const pendientes = filtrados.filter((t) => !t.aprendido);
+    const aprendidos = filtrados.filter((t) => t.aprendido);
+
+    const fila = (t) => `
+      <div class="historial-item historial-item--tema${t.aprendido ? " historial-item--aprendido" : ""}" data-id="${t.id}">
         ${permiteSeleccion ? `<input type="checkbox" class="seleccionar" data-seleccionar="${t.id}" ${temasSeleccionados.has(t.id) ? "checked" : ""} title="Seleccionar para armar un repaso">` : ""}
         <div class="historial-item-info">
           <div class="historial-item-linea1">
-            <span class="titulo">📘 ${escapeHtml(t.tema)}</span>
+            <span class="titulo">${t.aprendido ? "✅" : "📘"} ${escapeHtml(t.tema)}</span>
             <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
           </div>
           <span class="etiquetas-item">
             ${(t.etiquetas || []).map((e) => `<span class="etiqueta-badge">${escapeHtml(e)}</span>`).join("")}
             <button type="button" class="chip-etiqueta" style="padding:1px 9px; font-size:0.72rem;" data-editar-etiquetas="${t.id}">✏️ Etiquetas</button>
+            <button type="button" class="chip-etiqueta chip-aprendido" style="padding:1px 9px; font-size:0.72rem;" data-aprendido="${t.id}">${
+              t.aprendido ? "↩️ Volver a practicarlo" : "✅ Ya lo aprendí"
+            }</button>
+            <button type="button" class="chip-etiqueta chip-borrar" style="padding:1px 9px; font-size:0.72rem;" data-borrar="${t.id}">🗑️ Borrar</button>
           </span>
         </div>
       </div>
-    `
-      )
-      .join("");
+    `;
+
+    cont.innerHTML =
+      (pendientes.length
+        ? pendientes.map(fila).join("")
+        : `<p class="ayuda" style="margin:0;">Ya marcaste como aprendidos todos los temas que coinciden. 🎉</p>`) +
+      (aprendidos.length
+        ? `<div class="bloque-aprendidos">
+             <button type="button" id="btn-ver-aprendidos">✅ Ya aprendidos (${aprendidos.length}) ${mostrarAprendidos ? "▲" : "▼"}</button>
+             <div style="margin-top:10px; ${mostrarAprendidos ? "" : "display:none;"}">${aprendidos.map(fila).join("")}</div>
+           </div>`
+        : "");
+
+    const btnVerAprendidos = document.getElementById("btn-ver-aprendidos");
+    if (btnVerAprendidos) {
+      btnVerAprendidos.addEventListener("click", () => {
+        mostrarAprendidos = !mostrarAprendidos;
+        renderHistorial();
+      });
+    }
+    cont.querySelectorAll("[data-aprendido]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        alternarAprendido(btn.dataset.aprendido, btn);
+      });
+    });
+    cont.querySelectorAll("[data-borrar]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        borrarTemaDelHistorial(btn.dataset.borrar, btn);
+      });
+    });
 
     cont.querySelectorAll(".historial-item .titulo, .historial-item .fecha").forEach((el) => {
       el.addEventListener("click", () => verTemaDelHistorial(el.closest(".historial-item").dataset.id));
@@ -2774,7 +3097,7 @@
       if (res.status === 402) {
         cont.innerHTML = `
           <div class="error">${escapeHtml(data.error)}</div>
-          <a href="comprador.html" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
         `;
         return;
       }
@@ -3279,6 +3602,63 @@
     };
   }
 
+  /**
+   * Manda a revisar el procedimiento que la persona escribió para UN
+   * ejercicio. El enunciado y la solución NO se mandan desde aquí: el
+   * servidor los lee del tema guardado (ver POST
+   * /api/temas/mios/:id/revisar-ejercicio), así la revisión sabe contra qué
+   * comparar y nadie puede alterar el ejercicio desde el navegador.
+   */
+  async function revisarMiProcedimiento(indice, btn) {
+    const salida = document.getElementById("revision-res-" + indice);
+    const caja = document.getElementById("procedimiento-" + indice);
+    if (!salida || !caja) return;
+
+    const procedimiento = (caja.value || "").trim();
+    if (!procedimiento) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">Escribe cómo lo resolviste (aunque sea en pasos cortos) para poder revisarlo.</p></div>`;
+      return;
+    }
+    if (!ultimoTemaId) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">Este material no está guardado, así que no se puede revisar por ejercicio.</p></div>`;
+      return;
+    }
+
+    btn.disabled = true;
+    const textoOriginal = btn.textContent;
+    btn.textContent = "Revisando…";
+    salida.innerHTML = `<div class="cargando">Leyendo tu procedimiento paso por paso…</div>`;
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${ultimoTemaId}/revisar-ejercicio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ indice, procedimiento }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo revisar tu procedimiento.");
+
+      const pasos = Array.isArray(data.pasos) ? data.pasos : [];
+      salida.innerHTML = `
+        <div class="revision-caja">
+          <p class="veredicto">${escapeHtml(data.veredicto || "")}</p>
+          ${
+            pasos.length
+              ? `<ol>${pasos
+                  .map((p) => `<li>${p.correcto ? "✅" : "⚠️"} ${escapeHtml(p.comentario || "")}</li>`)
+                  .join("")}</ol>`
+              : ""
+          }
+          ${data.sugerencia ? `<p class="sugerencia">👉 ${escapeHtml(data.sugerencia)}</p>` : ""}
+        </div>`;
+    } catch (err) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">${escapeHtml(err.message)}</p></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  }
+
   function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
     ultimoContenido = contenido;
     ultimoTemaId = temaId;
@@ -3449,6 +3829,20 @@
           <input type="checkbox" class="chk-ejercicio-resuelto" data-ej="${i}">
           ✓ Ya la resolví
         </label>
+        <!-- "Que lo puedas resolver y la IA te diga cómo lo resolviste"
+             (2-sep-2026). Solo aparece en temas guardados: la revisión
+             necesita el id del tema para leer el enunciado y la solución
+             del lado del servidor. -->
+        ${
+          temaId
+            ? `<button type="button" class="btn-revisar-mio" data-ej="${i}">✍️ Revisar cómo lo resolví</button>
+               <div class="revision-mia" id="revision-${i}" style="display:none;">
+                 <textarea id="procedimiento-${i}" placeholder="Escribe los pasos que hiciste, aunque sea cortito. Ej.: elevé 3 y 4 al cuadrado, sumé 9+16=25, saqué raíz y me dio 5."></textarea>
+                 <button type="button" class="secundario btn-enviar-revision" data-ej="${i}">Revisar mi procedimiento</button>
+                 <div id="revision-res-${i}"></div>
+               </div>`
+            : ""
+        }
       </div>`
       )
       .join("");
@@ -3569,6 +3963,20 @@
       });
     });
 
+    document.querySelectorAll(".btn-revisar-mio").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("revision-" + btn.dataset.ej);
+        const abierta = caja.style.display !== "none";
+        caja.style.display = abierta ? "none" : "block";
+        btn.textContent = abierta ? "✍️ Revisar cómo lo resolví" : "✍️ Ocultar";
+        if (!abierta) document.getElementById("procedimiento-" + btn.dataset.ej)?.focus();
+      });
+    });
+
+    document.querySelectorAll(".btn-enviar-revision").forEach((btn) => {
+      btn.addEventListener("click", () => revisarMiProcedimiento(parseInt(btn.dataset.ej, 10), btn));
+    });
+
     document.querySelectorAll(".btn-solucion").forEach((btn) => {
       btn.addEventListener("click", () => {
         const caja = document.getElementById("solucion-" + btn.dataset.ej);
@@ -3579,7 +3987,7 @@
       });
     });
 
-    document.getElementById("btn-volver").addEventListener("click", mostrarFormulario);
+    document.getElementById("btn-volver").addEventListener("click", () => mostrarPerfil());
     document.getElementById("btn-respuestas").addEventListener("click", () => {
       document.getElementById("caja-respuestas").classList.toggle("abierto");
     });
