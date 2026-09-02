@@ -100,6 +100,10 @@
   .bloque-est.destacado { border-left-color: var(--menta); background: var(--hielo); border-radius: 0 12px 12px 0; padding: 14px 16px; }
   .bloque-est.destacado p { font-size: 1rem; color: var(--bosque); font-weight: 600; }
   .bloque-titulo { font-family: 'Grandstander', sans-serif; color: var(--profundo); font-size: 0.98rem; margin: 0 0 6px; }
+  .parrafo-largo { margin: 0 0 10px; line-height: 1.6; }
+  .parrafo-largo:last-child { margin-bottom: 0; }
+  /* Racha del alumno — franja discreta bajo el encabezado (2-sep-2026) */
+  .racha-alumno { background: #fff; border-bottom: 2px solid var(--linea, #DCEEFC); padding: 10px 20px; text-align: center; font-size: 0.88rem; }
   .lista-pasos { margin: 0; padding-left: 20px; }
   .lista-pasos li { margin-bottom: 7px; line-height: 1.55; font-size: 0.94rem; }
   .lista-ideas { margin: 0; padding-left: 18px; list-style: none; }
@@ -165,6 +169,8 @@
   <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
 </header>
 
+<div class="racha-alumno" id="racha-alumno" style="display:none;"></div>
+
 <main id="contenido">
   <div class="cargando">Cargando…</div>
 </main>
@@ -214,6 +220,155 @@
     return t.replace(/\n/g, "<br>");
   }
 
+  /**
+   * "Más estructurado cuando hay mucho texto" (pedido de la usuaria,
+   * 2-sep-2026): la IA suele devolver la actividad como UN párrafo enorme
+   * con los pasos numerados en línea ("1. Ponte de pie... 2. Repite el
+   * verso..."). En celular eso es un muro de texto imposible de seguir
+   * MIENTRAS haces la actividad. Esto lo estructura al pintarlo, sin tocar
+   * lo que ya está guardado — así también se arreglan los temas viejos del
+   * historial, no solo los que se generen de aquí en adelante.
+   *
+   * Reglas a propósito conservadoras (mejor no partir que partir mal):
+   * - Lista numerada solo si los marcadores van 1, 2, 3... consecutivos y
+   *   hay al menos dos. Así "3.5", "(3, 4, 5)" o "1/2" no la disparan.
+   * - Viñetas solo cuando el guion/•/– ABRE renglón: a media frase casi
+   *   siempre es un inciso, no una lista.
+   * - Sin marcadores, un texto muy largo se parte en párrafos de ~3 frases
+   *   para que respire; uno corto se deja exactamente igual que antes.
+   */
+  function formatearLargo(str) {
+    const bruto = String(str == null ? "" : str).trim();
+    if (!bruto) return "";
+
+    // 1) Pasos numerados: "1. ", "2) "...
+    const marcas = [];
+    const re = /(^|[\s (])(\d{1,2})[.)]\s+/g;
+    let m;
+    while ((m = re.exec(bruto)) !== null) {
+      marcas.push({ num: parseInt(m[2], 10), inicio: m.index + m[1].length, fin: re.lastIndex });
+    }
+    const secuencia = [];
+    let esperado = 1;
+    for (let i = 0; i < marcas.length; i++) {
+      if (marcas[i].num === esperado) {
+        secuencia.push(marcas[i]);
+        esperado++;
+      }
+    }
+    if (secuencia.length >= 2) {
+      const pasos = [];
+      for (let i = 0; i < secuencia.length; i++) {
+        const hasta = i + 1 < secuencia.length ? secuencia[i + 1].inicio : bruto.length;
+        const paso = bruto.slice(secuencia[i].fin, hasta).trim();
+        if (paso) pasos.push(paso);
+      }
+      if (pasos.length >= 2) {
+        const intro = bruto.slice(0, secuencia[0].inicio).trim();
+        return (
+          (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+          `<ol class="lista-pasos">${pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>`
+        );
+      }
+    }
+
+    // 2) Viñetas al inicio de renglón
+    const renglones = bruto.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const esVineta = (l) => /^[-–—•*]\s+/.test(l);
+    const primera = renglones.findIndex(esVineta);
+    if (primera !== -1 && renglones.slice(primera).filter(esVineta).length >= 2) {
+      const intro = renglones.slice(0, primera).join(" ").trim();
+      const items = [];
+      renglones.slice(primera).forEach((l) => {
+        if (esVineta(l)) items.push(l.replace(/^[-–—•*]\s+/, ""));
+        else if (items.length) items[items.length - 1] += " " + l;
+      });
+      return (
+        (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+        `<ul class="lista-ideas">${items.map((t) => `<li>${formatearTexto(t)}</li>`).join("")}</ul>`
+      );
+    }
+
+    // 3) Sin marcadores: párrafos que respiren
+    const parrafos = [];
+    bruto
+      .split(/\n{2,}/)
+      .map((b) => b.trim())
+      .filter(Boolean)
+      .forEach((bloque) => {
+        if (bloque.length <= 320) {
+          parrafos.push(bloque);
+          return;
+        }
+        const frases = bloque.match(/[^.!?…]+[.!?…]+["'”’)\]]*\s*|[^.!?…]+$/g) || [bloque];
+        let acumulado = "";
+        frases.forEach((f) => {
+          acumulado += f;
+          if (acumulado.length >= 220) {
+            parrafos.push(acumulado.trim());
+            acumulado = "";
+          }
+        });
+        const resto = acumulado.trim();
+        if (resto) {
+          // Una cola muy corta como párrafo suelto se ve peor que pegada.
+          if (resto.length < 60 && parrafos.length) parrafos[parrafos.length - 1] += " " + resto;
+          else parrafos.push(resto);
+        }
+      });
+    return parrafos.map((p) => `<p class="parrafo-largo">${formatearTexto(p)}</p>`).join("");
+  }
+
+  /**
+   * Racha del alumno (2-sep-2026). Quien entra por la liga no tiene cuenta,
+   * así que su identidad la pone su propio navegador: un id aleatorio que se
+   * guarda junto al nombre y viaja en cada envío (ver utils/rachaAlumno.js).
+   * Si entra desde otro aparato empieza racha nueva — por eso en pantalla se
+   * habla de "tu racha en este grupo" y no se promete más que eso.
+   */
+  function idAlumno(grupoSlug) {
+    const clave = `ensenai_alumno_${grupoSlug}`;
+    try {
+      let id = localStorage.getItem(clave);
+      if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, "");
+        localStorage.setItem(clave, id);
+      }
+      return id;
+    } catch (e) {
+      return null; // navegación privada: contesta igual, solo sin racha
+    }
+  }
+
+  function rachaGuardada(grupoSlug) {
+    try {
+      return JSON.parse(localStorage.getItem(`ensenai_racha_${grupoSlug}`) || "null");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Se guarda para poder saludar con la racha al volver a abrir la liga,
+   * sin pedirle nada al servidor (el alumno no tiene sesión que consultar). */
+  function guardarRacha(grupoSlug, racha) {
+    if (!racha) return;
+    try {
+      localStorage.setItem(`ensenai_racha_${grupoSlug}`, JSON.stringify(racha));
+    } catch (e) {
+      /* sin consecuencias */
+    }
+    pintarRachaAlumno(racha);
+  }
+
+  function pintarRachaAlumno(racha) {
+    const cont = document.getElementById("racha-alumno");
+    if (!cont || !racha || !racha.racha_actual) return;
+    cont.style.display = "";
+    cont.innerHTML = `🔥 <strong>${racha.racha_actual} día${racha.racha_actual === 1 ? "" : "s"} seguido${
+      racha.racha_actual === 1 ? "" : "s"
+    }</strong> en este grupo${racha.racha_record > racha.racha_actual ? ` · tu récord: ${racha.racha_record}` : ""}`;
+  }
+
   function nombreGuardado(grupoSlug) {
     try {
       return localStorage.getItem(`ensenai_nombre_${grupoSlug}`);
@@ -255,6 +410,11 @@
 
       grupoActual = data.grupo;
       temasActuales = data.temas || [];
+
+      // Si ya venía con racha de visitas anteriores, se le saluda con ella
+      // desde el primer segundo (viene de su propio navegador, no del
+      // servidor: el alumno no tiene sesión que consultar).
+      pintarRachaAlumno(rachaGuardada(slug));
 
       const nombreYaGuardado = nombreGuardado(slug);
       if (!nombreYaGuardado) {
@@ -375,11 +535,13 @@
    */
   async function enviarRespuestas(temaId, respuestas) {
     try {
-      await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(temaId)}/respuestas`, {
+      const res = await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(temaId)}/respuestas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: nombreParaEnviar(slug), respuestas }),
+        body: JSON.stringify({ nombre: nombreParaEnviar(slug), respuestas, alumnoId: idAlumno(slug) }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.racha) guardarRacha(slug, data.racha);
     } catch (err) {
       // no bloquea la experiencia del alumno si falla
     }
@@ -409,10 +571,12 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre: nombreParaEnviar(slug), indices }),
+          body: JSON.stringify({ nombre: nombreParaEnviar(slug), indices, alumnoId: idAlumno(slug) }),
         }
       );
       if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => ({}));
+      if (data.racha) guardarRacha(slug, data.racha);
       if (aviso) {
         aviso.style.display = "block";
         aviso.textContent = indices.length
@@ -862,7 +1026,7 @@
         <div class="actividad-box">
           <span class="inteligencia">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)}</span>
           <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(a.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(a.instrucciones || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(a.instrucciones || "")}</div>
         </div>
       `
           )
@@ -871,7 +1035,7 @@
       ? `
         <div class="actividad-box">
           <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
-          <div style="font-size:0.92rem; line-height:1.5;">${formatearTexto(c.actividad.instrucciones || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(c.actividad.instrucciones || "")}</div>
         </div>
       `
       : "";
@@ -933,7 +1097,7 @@
           (s) => `
         <div class="bloque-est">
           ${s.titulo ? `<h3 class="bloque-titulo">${formatearTexto(s.titulo)}</h3>` : ""}
-          <p>${formatearTexto(s.texto || "")}</p>
+          ${formatearLargo(s.texto || "")}
         </div>`
         )
         .join("")}

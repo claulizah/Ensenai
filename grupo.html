@@ -121,6 +121,23 @@
   .metrica { background: var(--hielo); border-radius: 10px; padding: 8px 14px; text-align: center; }
   .metrica .num { font-family: 'Grandstander', sans-serif; font-weight: 700; color: var(--profundo); font-size: 1.2rem; }
   .metrica .label { font-size: 0.72rem; color: #4A6A85; text-transform: uppercase; letter-spacing: 0.02em; }
+  /* Panel del maestro en dos niveles (2-sep-2026) */
+  .tarjeta-grupo .cabeza-grupo { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .tarjeta-grupo .metricas-chicas { font-size: 0.78rem; color: #4A6A85; font-weight: 700; white-space: nowrap; }
+  .viendo-ahora { background: var(--hielo); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .viendo-ahora.vacio { background: none; border: 2px dashed var(--linea); }
+  .viendo-ahora .etiqueta-mini { margin: 0; font-size: 0.7rem; color: #4A6A85; font-weight: 800; letter-spacing: 0.03em; }
+  .viendo-ahora .titulo-vigente { margin: 4px 0 0; font-weight: 800; font-size: 0.92rem; }
+  .chip-bajos { background: #FFF0EC; border: 1px solid #FFC4B5; color: #B94A2E; font-family: inherit; font-weight: 800; font-size: 0.76rem; border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+  .fila-bajo { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px dashed var(--linea); font-size: 0.82rem; }
+  .fila-alumno { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--linea); }
+  .fila-alumno:first-child { border-top: 0; }
+  .fila-alumno .quien { min-width: 0; }
+  .fila-alumno .nombre-alumno { font-weight: 800; font-size: 0.9rem; }
+  .chip-racha { flex-shrink: 0; background: var(--hielo); color: var(--bosque); border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 0.85rem; }
+  .chip-racha.apagada { background: #F2F5F8; color: #7B93A8; }
+  .acciones-grupo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .acciones-grupo button { width: 100%; margin-top: 0; }
   .liga-box { display: flex; gap: 8px; align-items: center; background: var(--hielo); border-radius: 10px; padding: 8px 12px; margin: 10px 0; }
   .liga-box input { border: none; background: none; padding: 4px; font-size: 0.9rem; flex: 1; color: var(--bosque); font-weight: 700; }
   .tema-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 10px; }
@@ -163,6 +180,10 @@
 <main id="contenido">
   <div class="cargando">Cargando…</div>
 </main>
+
+<!-- Intro "qué puedes hacer aquí" — compartida con tema.html (ver intro.js).
+     Va antes del script de la página porque este llama a window.introHTML(). -->
+<script src="intro.js"></script>
 
 <script>
   const API_BASE = "https://ensenai-backend.onrender.com";
@@ -342,16 +363,63 @@
     }
   }
 
+  /**
+   * El panel del maestro pasó de UNA pantallota a dos niveles (2-sep-2026,
+   * pedido de la usuaria: "que no se vea como una pantalla con muchísima
+   * info"). Antes cada grupo traía, siempre abierto, sus métricas, su liga,
+   * el formulario completo de generar y su lista de temas: con tres grupos
+   * era imposible encontrar nada.
+   *
+   *   renderListaGrupos  → una tarjeta corta por grupo: qué está viendo,
+   *                        cuántos van, su liga y dos botones.
+   *   renderGrupoDetalle → el grupo abierto, con todo el detalle de antes.
+   *
+   * Cuál se pinta lo decide grupoAbiertoId, que se conserva entre
+   * re-dibujos: cargarGrupos() se llama desde muchos lados (crear grupo,
+   * agregar tema, pagar) y el maestro no debe salir del grupo que está
+   * viendo por eso.
+   */
+  let gruposCache = [];
+  let grupoAbiertoId = null;
+  const resumenTemaCache = {};
+
   function renderGrupos(grupos, avisoInicial) {
+    gruposCache = grupos;
+    const abierto = grupoAbiertoId ? grupos.find((g) => g.id === grupoAbiertoId) : null;
+    if (grupoAbiertoId && !abierto) grupoAbiertoId = null; // se borró o cambió de cuenta
+    if (abierto) renderGrupoDetalle(abierto, avisoInicial);
+    else renderListaGrupos(grupos, avisoInicial);
+  }
+
+  function abrirGrupo(id, anclaje) {
+    grupoAbiertoId = id;
+    const g = gruposCache.find((x) => x.id === id);
+    if (!g) return cargarGrupos();
+    renderGrupoDetalle(g);
+    if (anclaje === "generar") {
+      setTimeout(() => document.getElementById(`zona-generar-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    }
+  }
+
+  function volverALista() {
+    grupoAbiertoId = null;
+    renderListaGrupos(gruposCache);
+  }
+
+  /** El tema activo más reciente de un grupo — es el que el maestro tiene
+   * "en el aire" y lo único que necesita ver desde la lista. */
+  function temaVigente(g) {
+    const activos = (g.temas || []).filter((t) => t.pago_status !== "pendiente");
+    return activos.length ? activos[activos.length - 1] : null;
+  }
+
+  function renderListaGrupos(grupos, avisoInicial) {
     const cont = document.getElementById("contenido");
     const ligaBase = `${window.location.origin}/g.html`;
 
     cont.innerHTML = `
       ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
-      <div class="tarjeta">
-        <h1>Mi grupo</h1>
-        <p class="ayuda">Genera material para tu salón o tus pacientes y compártelo con una sola liga — ellos entran gratis, sin cuenta, con solo su nombre.</p>
-      </div>
+      ${window.introHTML ? window.introHTML("maestro") : ""}
 
       <div class="tarjeta">
         <h2>Mi plan de grupo</h2>
@@ -361,54 +429,41 @@
       ${grupos.length === 0 ? `<div class="tarjeta"><div class="aviso">Todavía no tienes ningún grupo — crea el primero abajo.</div></div>` : ""}
 
       ${grupos
-        .map(
-          (g) => `
-        <div class="tarjeta grupo-item" data-grupo-id="${g.id}">
-          <div class="nombre">🏫 ${escapeHtml(g.nombre)}</div>
-          <div class="metricas">
-            <div class="metrica"><div class="num">${g.temas_totales}</div><div class="label">Temas</div></div>
-            <div class="metrica"><div class="num">${g.temas_activos}</div><div class="label">Activos</div></div>
-            <div class="metrica"><div class="num">${g.accesos_registrados}</div><div class="label">Accesos</div></div>
+        .map((g) => {
+          const vigente = temaVigente(g);
+          return `
+        <div class="tarjeta tarjeta-grupo" data-grupo-id="${g.id}">
+          <div class="cabeza-grupo">
+            <div class="nombre">🏫 ${escapeHtml(g.nombre)}</div>
+            <div class="metricas-chicas">${g.temas_totales} tema${g.temas_totales === 1 ? "" : "s"} · ${g.accesos_registrados} acceso${
+              g.accesos_registrados === 1 ? "" : "s"
+            }</div>
           </div>
+
+          ${
+            vigente
+              ? `<div class="viendo-ahora">
+                   <p class="etiqueta-mini">VIENDO AHORA</p>
+                   <p class="titulo-vigente">${escapeHtml(vigente.titulo)}</p>
+                   <div id="resumen-${g.id}" class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Revisando cómo van…</div>
+                 </div>`
+              : `<div class="viendo-ahora vacio">
+                   <p class="ayuda" style="margin:0; font-size:0.85rem;">Este grupo todavía no tiene ningún tema activo.</p>
+                 </div>`
+          }
+
           <div class="liga-box">
             <input readonly value="${ligaBase}?slug=${encodeURIComponent(g.slug)}" id="liga-${g.id}">
             <button class="secundario chico" onclick="copiarLiga('${g.id}')">Copiar</button>
           </div>
 
-          <hr class="divisor">
-          <h3>Agregar un tema nuevo</h3>
-          <div id="zona-generar-${g.id}">
-            <label>Tema</label>
-            <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…" onkeydown="if (event.key === 'Enter') generarTema('${g.id}', ${g.temas_totales === 0})">
-            <label>¿Algo específico que quieras que incluya? (opcional)</label>
-            <textarea id="detalles-input-${g.id}" placeholder="Ej. Solo lo que vimos en clase esta semana, o: enfócate en los ejemplos prácticos."></textarea>
-            <label>Foto del temario, resumen o apuntes (opcional)</label>
-            <div class="zona-foto">
-              <label class="btn-foto" for="fotos-input-${g.id}">📷 Subir foto</label>
-              <input type="file" id="fotos-input-${g.id}" accept="image/*" multiple onchange="alElegirFotos('${g.id}', event)">
-              <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu material de clase.</p>
-              <div class="miniaturas" id="miniaturas-fotos-${g.id}"></div>
-            </div>
-            <label>Nivel del grupo</label>
-            <select id="nivel-input-${g.id}">
-              ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
-            </select>
-            <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
-              <input type="checkbox" id="enfoque-psico-input-${g.id}">
-              🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
-            </label>
-            <button class="primario" onclick="generarTema('${g.id}', ${g.temas_totales === 0})">✨ Generar material</button>
-            <div id="resultado-generar-${g.id}"></div>
+          <div class="acciones-grupo">
+            <button class="primario chico" data-agregar-tema="${g.id}">✨ Agregar tema</button>
+            <button class="secundario chico" data-abrir-grupo="${g.id}">Ver el grupo</button>
           </div>
-
-          <hr class="divisor">
-          <h3>Temas en tu liga</h3>
-          <p class="hint-combinar" id="hint-combinar-${g.id}" style="display:none;">Selecciona dos o más para armar un repaso que los junte a todos antes de un examen.</p>
-          <div id="barra-combinar-${g.id}" class="barra-combinar" style="display:none;"></div>
-          <div id="lista-temas-${g.id}"><div class="cargando">Cargando…</div></div>
         </div>
-      `
-        )
+      `;
+        })
         .join("")}
 
       <div class="tarjeta">
@@ -425,14 +480,223 @@
       </div>
     `;
 
-    grupos.forEach((g) => cargarTemas(g.id));
+    cont.querySelectorAll("[data-abrir-grupo]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.abrirGrupo)));
+    cont.querySelectorAll("[data-agregar-tema]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.agregarTema, "generar")));
+
     cargarSuscripcionGrupo();
+    grupos.forEach((g) => pintarResumenVigente(g));
+    // Aunque aquí no haya formulario donde pintarla, una generación a medias
+    // se retoma igual: el aviso flotante es el que avisa cuando esté lista.
+    reanudarTrabajoPendiente();
+  }
+
+  /**
+   * "19 de 28 contestaron · promedio 74% · 3 abajo del 50%". Los nombres NO
+   * se muestran de entrada (decisión de la usuaria: "al seleccionar se
+   * muestra la lista desplegable"): el conteo es un botón que despliega
+   * quiénes son. Una sola petición por grupo, y solo del tema vigente.
+   */
+  async function pintarResumenVigente(g) {
+    const cont = document.getElementById(`resumen-${g.id}`);
+    const vigente = temaVigente(g);
+    if (!cont || !vigente) return;
+
+    try {
+      const resumen = await resumenDeTema(g.id, vigente.id);
+      if (!document.body.contains(cont)) return; // cambió de pantalla mientras cargaba
+
+      if (!resumen.contestaron) {
+        cont.textContent = "Todavía nadie contesta la trivia de este tema.";
+        return;
+      }
+      cont.innerHTML = `
+        ${resumen.contestaron} contestaron${resumen.promedio !== null ? ` · promedio ${resumen.promedio}%` : ""}
+        ${
+          resumen.bajos.length
+            ? ` · <button type="button" class="chip-bajos" data-ver-bajos="${vigente.id}">${resumen.bajos.length} abajo del 50% ▾</button>`
+            : ""
+        }
+        <div id="bajos-${vigente.id}" style="display:none; margin-top:8px;"></div>`;
+
+      cont.querySelector("[data-ver-bajos]")?.addEventListener("click", () => alternarBajos(g.id, vigente.id));
+    } catch (err) {
+      cont.textContent = "No se pudo leer cómo van (revisa tu conexión).";
+    }
+  }
+
+  /** Trae y resume las respuestas de un tema. Se cachea por tema: el maestro
+   * entra y sale de sus grupos todo el tiempo. */
+  async function resumenDeTema(grupoId, temaId) {
+    if (resumenTemaCache[temaId]) return resumenTemaCache[temaId];
+
+    const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
+      headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudieron leer las respuestas.");
+
+    const respuestas = data.respuestas || [];
+    const conPuntaje = respuestas.filter((r) => r.total_cerradas > 0);
+    const porcentaje = (r) => Math.round((r.aciertos / r.total_cerradas) * 100);
+    const resumen = {
+      contestaron: respuestas.length,
+      promedio: conPuntaje.length ? Math.round(conPuntaje.reduce((s, r) => s + porcentaje(r), 0) / conPuntaje.length) : null,
+      bajos: conPuntaje
+        .filter((r) => porcentaje(r) < 50)
+        .map((r, i) => ({ nombre: r.nombre || `Anónimo ${i + 1}`, porcentaje: porcentaje(r) })),
+    };
+    resumenTemaCache[temaId] = resumen;
+    return resumen;
+  }
+
+  function alternarBajos(grupoId, temaId) {
+    const caja = document.getElementById(`bajos-${temaId}`);
+    if (!caja) return;
+    const abierta = caja.style.display === "block";
+    caja.style.display = abierta ? "none" : "block";
+    const btn = document.querySelector(`[data-ver-bajos="${temaId}"]`);
+    const resumen = resumenTemaCache[temaId];
+    if (btn && resumen) btn.textContent = `${resumen.bajos.length} abajo del 50% ${abierta ? "▾" : "▴"}`;
+    if (abierta || !resumen) return;
+
+    caja.innerHTML = resumen.bajos
+      .map(
+        (a) => `<div class="fila-bajo"><span>${escapeHtml(a.nombre)}</span><strong>${a.porcentaje}%</strong></div>`
+      )
+      .join("");
+  }
+
+  function renderGrupoDetalle(g, avisoInicial) {
+    const cont = document.getElementById("contenido");
+    const ligaBase = `${window.location.origin}/g.html`;
+
+    cont.innerHTML = `
+      ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
+      <button type="button" class="secundario" id="btn-volver-grupos" style="margin:0 0 14px;">← Mis grupos</button>
+
+      <div class="tarjeta grupo-item" data-grupo-id="${g.id}">
+        <div class="nombre">🏫 ${escapeHtml(g.nombre)}</div>
+        <div class="metricas">
+          <div class="metrica"><div class="num">${g.temas_totales}</div><div class="label">Temas</div></div>
+          <div class="metrica"><div class="num">${g.temas_activos}</div><div class="label">Activos</div></div>
+          <div class="metrica"><div class="num">${g.accesos_registrados}</div><div class="label">Accesos</div></div>
+        </div>
+        <div class="liga-box">
+          <input readonly value="${ligaBase}?slug=${encodeURIComponent(g.slug)}" id="liga-${g.id}">
+          <button class="secundario chico" onclick="copiarLiga('${g.id}')">Copiar</button>
+        </div>
+        ${
+          temaVigente(g)
+            ? `<div class="viendo-ahora">
+                 <p class="etiqueta-mini">VIENDO AHORA</p>
+                 <p class="titulo-vigente">${escapeHtml(temaVigente(g).titulo)}</p>
+                 <div id="resumen-${g.id}" class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Revisando cómo van…</div>
+               </div>`
+            : ""
+        }
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Agregar un tema nuevo</h3>
+        <div id="zona-generar-${g.id}">
+          <label>Tema</label>
+          <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…" onkeydown="if (event.key === 'Enter') generarTema('${g.id}', ${g.temas_totales === 0})">
+          <label>¿Algo específico que quieras que incluya? (opcional)</label>
+          <textarea id="detalles-input-${g.id}" placeholder="Ej. Solo lo que vimos en clase esta semana, o: enfócate en los ejemplos prácticos."></textarea>
+          <label>Foto del temario, resumen o apuntes (opcional)</label>
+          <div class="zona-foto">
+            <label class="btn-foto" for="fotos-input-${g.id}">📷 Subir foto</label>
+            <input type="file" id="fotos-input-${g.id}" accept="image/*" multiple onchange="alElegirFotos('${g.id}', event)">
+            <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu material de clase.</p>
+            <div class="miniaturas" id="miniaturas-fotos-${g.id}"></div>
+          </div>
+          <label>Nivel del grupo</label>
+          <select id="nivel-input-${g.id}">
+            ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
+          </select>
+          <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
+            <input type="checkbox" id="enfoque-psico-input-${g.id}">
+            🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
+          </label>
+          <button class="primario" onclick="generarTema('${g.id}', ${g.temas_totales === 0})">✨ Generar material</button>
+          <div id="resultado-generar-${g.id}"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Cómo van tus alumnos</h3>
+        <p class="ayuda" style="margin:0 0 10px; font-size:0.82rem;">Cada vez que alguien contesta una trivia o marca ejercicios, ese día cuenta para su racha.</p>
+        <div id="alumnos-${g.id}"><div class="cargando">Cargando…</div></div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Temas en tu liga</h3>
+        <p class="hint-combinar" id="hint-combinar-${g.id}" style="display:none;">Selecciona dos o más para armar un repaso que los junte a todos antes de un examen.</p>
+        <div id="barra-combinar-${g.id}" class="barra-combinar" style="display:none;"></div>
+        <div id="lista-temas-${g.id}"><div class="cargando">Cargando…</div></div>
+      </div>
+    `;
+
+    document.getElementById("btn-volver-grupos").addEventListener("click", volverALista);
+
+    cargarTemas(g.id);
+    cargarAlumnos(g.id);
+    pintarResumenVigente(g);
     // Re-dibujar #contenido borra la pantalla de espera y el panel de
     // material ya generado; aqui se devuelven a su lugar.
     restaurarEstadoDeGrupos();
     // Y si quedo una generacion a medias (se bloqueo el celular, se cerro
     // la pestana), se retoma en silencio y se avisa cuando este lista.
     reanudarTrabajoPendiente();
+  }
+
+  /**
+   * "Que los alumnos la sigan y el maestro pueda revisarla" (2-sep-2026).
+   * Lista de quién está siguiendo el material del grupo, ordenada por racha.
+   * En grupos anónimos no hay nombres — se numeran, que es justo lo que
+   * necesita quien atiende pacientes: ver constancia, no identificar.
+   */
+  async function cargarAlumnos(grupoId) {
+    const cont = document.getElementById(`alumnos-${grupoId}`);
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/alumnos`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el avance de tu grupo.");
+
+      const alumnos = data.alumnos || [];
+      if (!alumnos.length) {
+        cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía nadie contesta una trivia ni marca ejercicios. En cuanto lo hagan, aquí verás quién le está siguiendo.</p>`;
+        return;
+      }
+
+      const hoy = new Date().toISOString().slice(0, 10);
+      const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const cuando = (d) => (d === hoy ? "hoy" : d === ayer ? "ayer" : d ? new Date(`${d}T12:00:00Z`).toLocaleDateString("es-MX") : "—");
+
+      let anonimos = 0;
+      cont.innerHTML = alumnos
+        .map((a) => {
+          const quien = a.nombre ? escapeHtml(a.nombre) : `Anónimo ${++anonimos}`;
+          // Una racha viva (movida hoy o ayer) se ve en color; una que ya se
+          // rompió se deja apagada, para que el maestro distinga de un
+          // vistazo quién sigue enganchado y quién se quedó atrás.
+          const viva = a.ultimo_dia === hoy || a.ultimo_dia === ayer;
+          return `
+            <div class="fila-alumno">
+              <div class="quien">
+                <div class="nombre-alumno">${quien}</div>
+                <div class="ayuda" style="font-size:0.76rem;">${a.dias_activos} día${a.dias_activos === 1 ? "" : "s"} en total · última vez ${cuando(a.ultimo_dia)}</div>
+              </div>
+              <span class="chip-racha${viva ? "" : " apagada"}">🔥 ${a.racha_actual}</span>
+            </div>`;
+        })
+        .join("");
+    } catch (err) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">No se pudo cargar el avance de tu grupo ahorita.</p>`;
+    }
   }
 
   const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
@@ -531,6 +795,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo crear el grupo.");
 
+      grupoAbiertoId = null; // el grupo nuevo se ve en la lista, con los demás
       cargarGrupos();
     } catch (err) {
       resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;

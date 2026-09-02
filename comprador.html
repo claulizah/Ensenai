@@ -452,6 +452,17 @@
         window.location.href = "tema.html";
         return;
       }
+
+      // Desde el 2-sep-2026 la pantalla de inicio de quien estudia es su
+      // PERFIL (tema.html), no este panel de cuenta: "entras directo ahí".
+      // Educadores siguen cayendo en el panel, porque su pantalla útil es
+      // grupo.html y desde aquí tienen las dos puertas. Con ?cuenta=1 (la
+      // liga "Mi plan y medallas" del perfil) se entra al panel a fuerza.
+      if (tipo !== "educador" && params.get("cuenta") !== "1") {
+        window.location.href = "tema.html";
+        return;
+      }
+
       mostrarDashboard(data.session);
     } else {
       mostrarLogin("login");
