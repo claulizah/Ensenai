@@ -813,32 +813,68 @@
           ? `${plan.temas_usados_este_mes} temas-grupo cubiertos este mes — sin límite`
           : `${plan.temas_usados_este_mes} de ${plan.limite_temas_mes} temas-grupo cubiertos este mes`;
 
-      let botones = "";
-      if (plan.nivel !== "ilimitado") {
-        botones += `<button class="primario" style="margin-top:10px;" id="btn-ilimitado-grupo">Pasar a Ilimitado — $159/mes</button>`;
-      }
-      if (plan.nivel === "gratis") {
-        botones += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Esencial — $109/mes (20 temas-grupo, 3 grupos)</button>`;
-      }
-
       cont.innerHTML = `
-        <p class="ayuda" style="margin:0 0 4px;"><strong>Plan ${NOMBRES_NIVEL_GRUPO[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN/mes` : ""}</p>
+        <p class="ayuda" style="margin:0 0 4px;"><strong>Plan ${NOMBRES_NIVEL_GRUPO[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN` : ""}</p>
         <p class="ayuda" style="margin:0 0 4px; font-size:0.85rem;">${escapeHtml(usoTexto)}</p>
         <p class="ayuda" style="margin:0; font-size:0.85rem;">${plan.grupos_actuales} de ${plan.limite_grupos} grupo(s) creados.</p>
-        ${botones}
+        <div id="zona-botones-plan-grupo"></div>
       `;
-      if (document.getElementById("btn-ilimitado-grupo")) {
-        document.getElementById("btn-ilimitado-grupo").addEventListener("click", () => suscribirGrupo("ilimitado"));
-      }
-      if (document.getElementById("btn-aprendemos-grupo")) {
-        document.getElementById("btn-aprendemos-grupo").addEventListener("click", () => suscribirGrupo("aprendemos"));
-      }
+      pintarBotonesPlanGrupo(plan);
     } catch (err) {
       cont.innerHTML = `<div class="error">No se pudo cargar tu plan.</div>`;
     }
   }
 
-  async function suscribirGrupo(nivel) {
+  /**
+   * Botones de plan con selector mensual/anual (3-sep-2026, schema_v39).
+   * Igual que en comprador.html: los montos reales viven en
+   * platform_settings y los cobra el backend; esto es solo la etiqueta.
+   */
+  const PRECIOS_GRUPO = {
+    aprendemos: { mensual: 89, anual: 890 },
+    ilimitado: { mensual: 129, anual: 1290 },
+  };
+  let periodoElegidoGrupo = "mensual";
+
+  function pintarBotonesPlanGrupo(plan) {
+    const zona = document.getElementById("zona-botones-plan-grupo");
+    if (!zona) return;
+    if (plan.nivel === "ilimitado") {
+      zona.innerHTML = "";
+      return;
+    }
+
+    const anual = periodoElegidoGrupo === "anual";
+    const etiqueta = (nivel) =>
+      anual
+        ? `$${PRECIOS_GRUPO[nivel].anual.toLocaleString("es-MX")}/año`
+        : `$${PRECIOS_GRUPO[nivel].mensual}/mes`;
+
+    let html = `
+      <div style="display:flex; gap:6px; margin-top:12px;">
+        <button type="button" class="${anual ? "secundario" : "primario"} chico" data-periodo="mensual" style="flex:1; width:auto;">Mensual</button>
+        <button type="button" class="${anual ? "primario" : "secundario"} chico" data-periodo="anual" style="flex:1; width:auto;">Anual · 2 meses gratis</button>
+      </div>
+      <button class="primario" style="margin-top:10px;" id="btn-ilimitado-grupo">Pasar a Ilimitado — ${etiqueta("ilimitado")}</button>`;
+    if (plan.nivel === "gratis") {
+      html += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Esencial — ${etiqueta("aprendemos")} (20 temas-grupo, 3 grupos)</button>`;
+    }
+    html += `<p class="ayuda" style="margin:6px 0 0; font-size:0.8rem;">🎉 Precio de fundador: se te queda mientras no canceles, aunque suba después.</p>`;
+    zona.innerHTML = html;
+
+    zona.querySelectorAll("[data-periodo]").forEach((b) =>
+      b.addEventListener("click", () => {
+        periodoElegidoGrupo = b.dataset.periodo;
+        pintarBotonesPlanGrupo(plan);
+      })
+    );
+    const btnIli = document.getElementById("btn-ilimitado-grupo");
+    if (btnIli) btnIli.addEventListener("click", () => suscribirGrupo("ilimitado", periodoElegidoGrupo));
+    const btnEse = document.getElementById("btn-aprendemos-grupo");
+    if (btnEse) btnEse.addEventListener("click", () => suscribirGrupo("aprendemos", periodoElegidoGrupo));
+  }
+
+  async function suscribirGrupo(nivel, periodo = "mensual") {
     const cont = document.getElementById("zona-suscripcion-grupo");
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
@@ -847,7 +883,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
-          body: JSON.stringify({ tipo: "grupo", nivel }),
+          body: JSON.stringify({ tipo: "grupo", nivel, periodo }),
         },
         cont,
         "Preparando tu pago… (si el servidor estaba dormido, puede tardar unos segundos)"
@@ -858,7 +894,7 @@
     } catch (err) {
       cont.innerHTML = `
         <div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>
-        <button class="secundario" style="width:100%;" onclick="suscribirGrupo('${nivel}')">Reintentar</button>
+        <button class="secundario" style="width:100%;" onclick="suscribirGrupo('${nivel}', '${periodo}')">Reintentar</button>
       `;
     }
   }
