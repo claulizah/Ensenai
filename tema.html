@@ -48,10 +48,27 @@
   .hero-perfil h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
   .chips-inteligencia { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .chip-inteligencia { border-radius: 999px; padding: 2px 10px; font-size: 0.72rem; font-weight: 800; color: #fff; }
-  .rejilla-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
-  .stat-perfil { background: var(--hielo); border-radius: 14px; padding: 10px 6px; text-align: center; }
-  .stat-perfil .num { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.25rem; color: var(--profundo); }
-  .stat-perfil .lbl { font-size: 0.7rem; color: #4A6A85; font-weight: 700; }
+  /* Las tres tarjetas (racha / temas / medallas) tienen que verse del mismo
+     alto y con los numeros y las etiquetas alineados entre si. Dos cosas lo
+     rompian: el emoji de la racha crece la linea del numero solo en esa
+     tarjeta, y "temas completados" ocupa dos renglones donde "medallas"
+     ocupa uno. Por eso el numero va en una franja de alto fijo (con el
+     emoji a tamano controlado) y la etiqueta reserva siempre dos renglones. */
+  .rejilla-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin-top: 16px; }
+  .stat-perfil {
+    background: var(--hielo); border-radius: 14px; padding: 10px 6px; text-align: center;
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  }
+  .stat-perfil .num {
+    font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.25rem; color: var(--profundo);
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    height: 28px; line-height: 1; white-space: nowrap;
+  }
+  .stat-perfil .num .emoji { font-size: 1.05rem; line-height: 1; font-family: 'Nunito', sans-serif; }
+  .stat-perfil .lbl {
+    font-size: 0.7rem; color: #4A6A85; font-weight: 700; line-height: 1.25;
+    min-height: 2.5em; display: flex; align-items: center; justify-content: center;
+  }
   .burbujas-perfil { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .burbuja-perfil {
     display: flex; align-items: center; gap: 7px; background: #fff; border: 2px solid var(--linea);
@@ -179,9 +196,6 @@
   .bloque-est.plegable { border-left-color: var(--cielo); }
   .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
 
-  .diagrama-caja { border: 2px solid var(--linea); border-radius: 16px; padding: 16px; margin-bottom: 18px; background: #fff; }
-  .diagrama-scroll { overflow-x: auto; }
-  .diagrama-scroll svg { min-width: 460px; display: block; }
 
   /* ── Ejercicios ── */
   .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
@@ -340,6 +354,12 @@
   .respuesta-abierta:disabled { background: #F7FAFD; color: #4A6A85; }
   #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
   .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  /* Tarjetas de repaso en pantalla: antes solo se veia la instruccion
+     ("recorta cada tarjeta") y las tarjetas no aparecian por ningun lado. */
+  .lista-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .tarjeta-repaso { border: 1.5px solid var(--linea); border-radius: 10px; overflow: hidden; background: #fff; }
+  .tarjeta-repaso .frente { padding: 9px 10px; font-weight: 800; font-size: 0.87rem; line-height: 1.3; }
+  .tarjeta-repaso .reverso { padding: 9px 10px; font-size: 0.85rem; line-height: 1.35; color: var(--bosque); background: var(--hielo); border-top: 1px dashed var(--aqua); }
   .respuestas-toggle { text-align: center; }
   .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
   .respuestas-box.abierto { display: block; }
@@ -402,6 +422,8 @@
 
 <!-- Intro "qué puedes hacer aquí" — compartida con grupo.html (ver intro.js).
      Va antes del script de la página porque este llama a window.introHTML(). -->
+<script src="diagrama.js"></script>
+<script src="imprimible.js"></script>
 <script src="intro.js"></script>
 
 <script>
@@ -593,108 +615,14 @@
     return parrafos.map((p) => `<p class="parrafo-largo">${formatearTexto(p)}</p>`).join("");
   }
 
-  /**
-   * Arma una vista imprimible (pestaña nueva + print() automático) para el
-   * material extra en forma de tarjetas — pedido explícito de la usuaria
-   * (31-ago-2026): antes memorama/flashcards solo se veían como un párrafo
-   * de instrucciones, sin forma real de recortarlas. Solo aplica a temas
-   * generados desde este cambio en adelante (ver material_extra[].tarjetas);
-   * los temas viejos del historial siguen mostrando solo el texto.
-   *
-   * - memorama/relacionar: cada par se separa en DOS tarjetas sueltas (una
-   *   con "frente", otra con "reverso") — así funciona de verdad el juego
-   *   de emparejar, no tiene sentido un frente/reverso pegados.
-   * - flashcards/tarjetas: cada elemento es UNA tarjeta con "frente" arriba
-   *   y, si trae "reverso", una línea punteada de doblez y la respuesta
-   *   abajo — para doblar el papel en vez de depender de imprimir a doble
-   *   cara (que en casa casi nunca sale bien alineado).
-   */
-  function imprimirTarjetas(tipo, tarjetasOriginales) {
-    const tarjetas = (tarjetasOriginales || []).filter((t) => t && (t.frente || t.reverso));
-    if (!tarjetas.length) return;
-
-    const esEmparejar = tipo === "memorama" || tipo === "relacionar";
-    let tarjetasHtml = "";
-
-    if (esEmparejar) {
-      const sueltas = [];
-      tarjetas.forEach((t) => {
-        if (t.frente) sueltas.push(t.frente);
-        if (t.reverso) sueltas.push(t.reverso);
-      });
-      tarjetasHtml = sueltas
-        .map((texto) => `<div class="tarjeta-imprimible"><div class="tarjeta-texto">${escapeHtml(texto)}</div></div>`)
-        .join("");
-    } else {
-      tarjetasHtml = tarjetas
-        .map(
-          (t) => `
-        <div class="tarjeta-imprimible tarjeta-doblez">
-          <div class="tarjeta-mitad">${escapeHtml(t.frente || "")}</div>
-          ${
-            t.reverso
-              ? `<div class="tarjeta-linea-doblez">✂️ dobla aquí ✂️</div><div class="tarjeta-mitad tarjeta-reverso">${escapeHtml(t.reverso)}</div>`
-              : ""
-          }
-        </div>`
-        )
-        .join("");
-    }
-
-    const html = `<!doctype html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Tarjetas para imprimir — EnseñAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: 'Nunito', sans-serif; margin: 0; padding: 18px; background: #fff; color: #1E3A8A; }
-  .encabezado { text-align: center; margin-bottom: 16px; }
-  .encabezado h1 { font-family: 'Grandstander', sans-serif; font-size: 1.1rem; margin: 0 0 4px; color: #1E3A8A; }
-  .encabezado p { margin: 0; font-size: 0.82rem; color: #5b7d99; }
-  .rejilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .tarjeta-imprimible {
-    border: 2px dashed #7DD3FC; border-radius: 12px; padding: 14px 10px; min-height: 110px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-    page-break-inside: avoid; break-inside: avoid;
+  /* El imprimible del material de repaso (tarjetas de doblar, memorama,
+     y "imprimir todo") vive en imprimible.js — lo comparten tema.html,
+     g.html y grupo.html. Aqui solo quedan los dos atajos. */
+  function imprimirTarjetas(tipo, tarjetas) {
+    if (window.EnsenaiImprimible) window.EnsenaiImprimible.tarjetas(tipo, tarjetas);
   }
-  .tarjeta-texto { font-weight: 700; font-size: 0.95rem; line-height: 1.35; }
-  .tarjeta-doblez { min-height: 190px; padding: 0; justify-content: flex-start; }
-  .tarjeta-mitad { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 14px 10px; font-weight: 700; font-size: 0.95rem; text-align: center; }
-  .tarjeta-reverso { color: #065F46; background: #F0FDF4; border-radius: 0 0 10px 10px; }
-  .tarjeta-linea-doblez { border-top: 1px dashed #7DD3FC; font-size: 0.68rem; color: #5b7d99; text-align: center; padding: 2px 0; }
-  .no-imprimir { text-align: center; margin-bottom: 16px; }
-  .no-imprimir button {
-    font-family: 'Grandstander', sans-serif; font-weight: 600; background: #34D399; color: #fff; border: none;
-    border-radius: 999px; padding: 9px 20px; font-size: 0.9rem; cursor: pointer;
-  }
-  @media print {
-    body { padding: 0; }
-    .no-imprimir { display: none; }
-  }
-</style>
-</head>
-<body>
-  <div class="no-imprimir"><button onclick="window.print()">🖨️ Imprimir</button></div>
-  <div class="encabezado">
-    <h1>EnseñAI — Tarjetas</h1>
-    <p>${esEmparejar ? "Recorta cada tarjeta y júntalas en pares." : "Recorta cada tarjeta y dóblala por la línea punteada."}</p>
-  </div>
-  <div class="rejilla">${tarjetasHtml}</div>
-</body>
-</html>`;
-
-    const ventana = window.open("", "_blank");
-    if (!ventana) {
-      alert("Tu navegador bloqueó la ventana de impresión — permite ventanas emergentes para ensenai.com e intenta de nuevo.");
-      return;
-    }
-    ventana.document.write(html);
-    ventana.document.close();
-    ventana.onload = () => {
-      setTimeout(() => ventana.print(), 300);
-    };
+  function imprimirMaterialExtra(materiales, tituloTema) {
+    if (window.EnsenaiImprimible) window.EnsenaiImprimible.materialExtra(materiales, tituloTema);
   }
 
   // Un fetch que nunca llegó al servidor (sin internet, backend caído,
@@ -1002,7 +930,7 @@
           : ""
       }
       <div class="rejilla-stats">
-        <div class="stat-perfil"><div class="num">🔥 ${g.racha_actual || 0}</div><div class="lbl">día${g.racha_actual === 1 ? "" : "s"} de racha</div></div>
+        <div class="stat-perfil"><div class="num"><span class="emoji">🔥</span>${g.racha_actual || 0}</div><div class="lbl">día${g.racha_actual === 1 ? "" : "s"} de racha</div></div>
         <div class="stat-perfil"><div class="num">${completados}</div><div class="lbl">tema${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"}</div></div>
         <div class="stat-perfil"><div class="num">${(g.medallas || []).length}</div><div class="lbl">medalla${(g.medallas || []).length === 1 ? "" : "s"}</div></div>
       </div>
@@ -1173,11 +1101,15 @@
   function actualizarRachaChip(g) {
     const titulo = document.getElementById("racha-titulo");
     const sub = document.getElementById("racha-sub");
-    if (titulo) titulo.textContent = `🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}`;
+    // Los números se leen con || 0: si el backend responde sin ellos (o con
+    // una forma vieja), la franja decía "Récord: undefined días".
+    const actual = g.racha_actual || 0;
+    const record = g.racha_record || 0;
+    if (titulo) titulo.textContent = `🔥 Racha: ${actual} día${actual === 1 ? "" : "s"}`;
     if (sub) {
       sub.textContent =
-        g.racha_actual > 0
-          ? `Récord: ${g.racha_record} día${g.racha_record === 1 ? "" : "s"}`
+        actual > 0
+          ? `Récord: ${record} día${record === 1 ? "" : "s"}`
           : "Genera un tema o haz tu trivia diaria para empezar tu racha.";
     }
   }
@@ -3337,250 +3269,29 @@
     }
   }
 
-  // ── Diagramas dibujados (SVG) ───────────────────────────────────────────
-  // El generador ya no entrega el esquema como arte ASCII con guiones: manda
-  // datos estructurados (ver `diagrama` en agents/generateTema.js) y aquí se
-  // dibujan como gráficos de verdad. Todo es SVG inline, sin librerías: se
-  // ve nítido en cualquier pantalla, se puede imprimir, y no agrega peso.
-  const DIAG = {
-    ancho: 600,
-    colores: ["#1E3A8A", "#34D399", "#F97066", "#7C6FE0", "#F5A524", "#60A5FA"],
-  };
-
-  /** Corta un texto en varias líneas de ~`max` caracteres, sin partir palabras. */
-  function partirLineas(texto, max) {
-    const palabras = String(texto || "").split(/\s+/).filter(Boolean);
-    const lineas = [];
-    let actual = "";
-    for (const p of palabras) {
-      if ((actual + " " + p).trim().length > max && actual) {
-        lineas.push(actual);
-        actual = p;
-      } else {
-        actual = (actual + " " + p).trim();
-      }
-    }
-    if (actual) lineas.push(actual);
-    return lineas;
-  }
-
-  function svgTexto(texto, x, y, opts = {}) {
-    const { max = 22, tam = 12, color = "#1F2937", peso = "600", alto = 15, ancla = "middle" } = opts;
-    const lineas = partirLineas(texto, max);
-    const inicio = y - ((lineas.length - 1) * alto) / 2;
-    return lineas
-      .map(
-        (l, i) =>
-          `<text x="${x}" y="${inicio + i * alto}" text-anchor="${ancla}" font-family="Nunito, sans-serif" font-size="${tam}" font-weight="${peso}" fill="${color}" dominant-baseline="middle">${escapeHtml(l)}</text>`
-      )
-      .join("");
-  }
-
-  function dibujarMapaMental(d) {
-    const ramas = (d.ramas || []).slice(0, 5);
-    if (!ramas.length) return "";
-    const filaAlto = 74;
-    const alto = 90 + ramas.length * filaAlto;
-    const cx = 118;
-    const cyCentro = alto / 2;
-
-    let s = `<rect x="20" y="${cyCentro - 34}" width="196" height="68" rx="16" fill="#1E3A8A"/>`;
-    s += svgTexto(d.centro || "", 118, cyCentro, { max: 18, tam: 14, color: "#fff", peso: "700" });
-
-    ramas.forEach((r, i) => {
-      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
-      const y = 60 + i * filaAlto + 26;
-      // Curva del centro a la rama
-      s += `<path d="M216 ${cyCentro} C 268 ${cyCentro}, 268 ${y}, 300 ${y}" stroke="${color}" stroke-width="2.5" fill="none"/>`;
-      s += `<rect x="300" y="${y - 22}" width="180" height="44" rx="12" fill="${color}"/>`;
-      s += svgTexto(r.titulo || "", 390, y, { max: 20, tam: 12, color: "#fff", peso: "700" });
-
-      (r.hijos || []).slice(0, 3).forEach((h, j) => {
-        const hy = y - 14 + j * 17;
-        s += `<circle cx="496" cy="${hy}" r="3" fill="${color}"/>`;
-        s += `<text x="506" y="${hy}" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85" dominant-baseline="middle">${escapeHtml(String(h).slice(0, 26))}</text>`;
-      });
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarLineaTiempo(d) {
-    const hitos = (d.hitos || []).slice(0, 7);
-    if (!hitos.length) return "";
-    const filaAlto = 78;
-    const alto = 40 + hitos.length * filaAlto;
-    const x = 92;
-
-    let s = `<line x1="${x}" y1="30" x2="${x}" y2="${alto - 30}" stroke="#DCEEFC" stroke-width="4" stroke-linecap="round"/>`;
-    hitos.forEach((h, i) => {
-      const color = DIAG.colores[i % DIAG.colores.length];
-      const y = 40 + i * filaAlto + 20;
-      s += `<circle cx="${x}" cy="${y}" r="11" fill="${color}"/>`;
-      s += `<text x="${x - 24}" y="${y}" text-anchor="end" font-family="Grandstander, sans-serif" font-size="13" font-weight="700" fill="${color}" dominant-baseline="middle">${escapeHtml(String(h.fecha || "").slice(0, 12))}</text>`;
-      s += svgTexto(h.titulo || "", 120, y - (h.detalle ? 10 : 0), { max: 44, tam: 12.5, color: "#1F2937", peso: "700", ancla: "start", alto: 15 });
-      if (h.detalle) {
-        s += svgTexto(h.detalle, 120, y + 14, { max: 52, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
-      }
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarComparativo(d) {
-    const cols = (d.columnas || []).slice(0, 3);
-    const filas = (d.filas || []).slice(0, 6);
-    if (!cols.length || !filas.length) return "";
-
-    const anchoCriterio = 150;
-    const anchoCol = (600 - anchoCriterio - 20) / cols.length;
-    const filaAlto = 54;
-    const alto = 54 + filas.length * filaAlto + 10;
-
-    let s = "";
-    // Encabezados
-    cols.forEach((c, i) => {
-      const cx = anchoCriterio + 10 + i * anchoCol + anchoCol / 2;
-      const color = DIAG.colores[i % DIAG.colores.length];
-      s += `<rect x="${anchoCriterio + 10 + i * anchoCol + 3}" y="8" width="${anchoCol - 6}" height="36" rx="10" fill="${color}"/>`;
-      s += svgTexto(c, cx, 26, { max: 18, tam: 12, color: "#fff", peso: "700", alto: 13 });
-    });
-
-    filas.forEach((f, i) => {
-      const y = 54 + i * filaAlto;
-      if (i % 2 === 0) s += `<rect x="6" y="${y}" width="588" height="${filaAlto - 4}" rx="8" fill="#F7FAFD"/>`;
-      s += svgTexto(f.criterio || "", 16, y + (filaAlto - 4) / 2, { max: 24, tam: 11.5, color: "#1E3A8A", peso: "700", ancla: "start", alto: 14 });
-      (f.valores || []).slice(0, cols.length).forEach((v, j) => {
-        const cx = anchoCriterio + 10 + j * anchoCol + anchoCol / 2;
-        s += svgTexto(v, cx, y + (filaAlto - 4) / 2, { max: 26, tam: 11, color: "#2E4A63", peso: "400", alto: 13 });
-      });
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarProceso(d) {
-    const pasos = (d.pasos || []).slice(0, 6);
-    if (!pasos.length) return "";
-    const filaAlto = 76;
-    const alto = 20 + pasos.length * filaAlto;
-
-    let s = "";
-    pasos.forEach((p, i) => {
-      const color = DIAG.colores[i % DIAG.colores.length];
-      const y = 16 + i * filaAlto;
-      s += `<rect x="8" y="${y}" width="584" height="60" rx="14" fill="#fff" stroke="${color}" stroke-width="2"/>`;
-      s += `<circle cx="44" cy="${y + 30}" r="17" fill="${color}"/>`;
-      s += `<text x="44" y="${y + 30}" text-anchor="middle" font-family="Grandstander, sans-serif" font-size="15" font-weight="700" fill="#fff" dominant-baseline="middle">${i + 1}</text>`;
-      s += svgTexto(p.titulo || "", 76, y + (p.detalle ? 21 : 30), { max: 52, tam: 12.5, peso: "700", ancla: "start", alto: 15 });
-      if (p.detalle) s += svgTexto(p.detalle, 76, y + 42, { max: 62, tam: 10.5, color: "#5b7d99", peso: "400", ancla: "start", alto: 13 });
-      // Flecha al siguiente
-      if (i < pasos.length - 1) {
-        s += `<path d="M300 ${y + 60} l0 10 m-5 -5 l5 5 l5 -5" stroke="#B9CFE4" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-      }
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarCiclo(d) {
-    const etapas = (d.etapas || []).slice(0, 6);
-    if (etapas.length < 2) return "";
-    const size = 420;
-    const cx = 300, cy = size / 2, r = 130;
-
-    let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#DCEEFC" stroke-width="3" stroke-dasharray="7 7"/>`;
-    etapas.forEach((e, i) => {
-      const ang = (i / etapas.length) * 2 * Math.PI - Math.PI / 2;
-      const x = cx + r * Math.cos(ang);
-      const y = cy + r * Math.sin(ang);
-      const color = DIAG.colores[i % DIAG.colores.length];
-      s += `<circle cx="${x}" cy="${y}" r="46" fill="${color}"/>`;
-      s += svgTexto(e.titulo || "", x, y, { max: 12, tam: 10.5, color: "#fff", peso: "700", alto: 12 });
-      // Flecha hacia la siguiente etapa
-      const angF = ((i + 0.5) / etapas.length) * 2 * Math.PI - Math.PI / 2;
-      const fx = cx + (r + 2) * Math.cos(angF);
-      const fy = cy + (r + 2) * Math.sin(angF);
-      s += `<circle cx="${fx}" cy="${fy}" r="7" fill="#B9CFE4"/>`;
-      s += `<text x="${fx}" y="${fy}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" dominant-baseline="middle">›</text>`;
-    });
-    return `<svg viewBox="0 0 600 ${size}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarJerarquia(d) {
-    const niveles = (d.niveles || []).slice(0, 4);
-    if (!niveles.length) return "";
-    const anchoCaja = Math.min(170, (600 - 40) / niveles.length - 12);
-    const paso = (600 - 40) / niveles.length;
-    let maxHijos = 0;
-    niveles.forEach((n) => (maxHijos = Math.max(maxHijos, (n.hijos || []).length)));
-    const alto = 150 + maxHijos * 26;
-
-    let s = `<rect x="${300 - 110}" y="14" width="220" height="52" rx="14" fill="#1E3A8A"/>`;
-    s += svgTexto(d.raiz || "", 300, 40, { max: 22, tam: 13.5, color: "#fff", peso: "700" });
-
-    niveles.forEach((n, i) => {
-      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
-      const cx = 20 + i * paso + paso / 2;
-      s += `<path d="M300 66 C 300 92, ${cx} 92, ${cx} 110" stroke="${color}" stroke-width="2.5" fill="none"/>`;
-      s += `<rect x="${cx - anchoCaja / 2}" y="110" width="${anchoCaja}" height="42" rx="11" fill="${color}"/>`;
-      s += svgTexto(n.titulo || "", cx, 131, { max: 16, tam: 11, color: "#fff", peso: "700", alto: 12 });
-      (n.hijos || []).slice(0, 4).forEach((h, j) => {
-        s += `<text x="${cx}" y="${168 + j * 22}" text-anchor="middle" font-family="Nunito, sans-serif" font-size="10.5" fill="#4A6A85">${escapeHtml(String(h).slice(0, 22))}</text>`;
-      });
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  function dibujarPartes(d) {
-    const partes = (d.partes || []).slice(0, 6);
-    if (!partes.length) return "";
-    const filaAlto = 50;
-    const alto = 60 + partes.length * filaAlto;
-
-    let s = `<rect x="8" y="8" width="584" height="42" rx="12" fill="#1E3A8A"/>`;
-    s += svgTexto(d.todo || "", 300, 29, { max: 40, tam: 13.5, color: "#fff", peso: "700" });
-
-    partes.forEach((p, i) => {
-      const color = DIAG.colores[(i + 1) % DIAG.colores.length];
-      const y = 62 + i * filaAlto;
-      s += `<rect x="8" y="${y}" width="584" height="${filaAlto - 8}" rx="11" fill="#fff" stroke="#DCEEFC" stroke-width="1.5"/>`;
-      s += `<rect x="8" y="${y}" width="6" height="${filaAlto - 8}" rx="3" fill="${color}"/>`;
-      s += svgTexto(p.nombre || "", 24, y + (filaAlto - 8) / 2, { max: 20, tam: 12, color: color, peso: "700", ancla: "start", alto: 13 });
-      s += svgTexto(p.funcion || "", 190, y + (filaAlto - 8) / 2, { max: 56, tam: 10.5, color: "#4A6A85", peso: "400", ancla: "start", alto: 13 });
-    });
-    return `<svg viewBox="0 0 600 ${alto}" width="100%" role="img">${s}</svg>`;
-  }
-
-  /**
-   * Devuelve el HTML del diagrama, o "" si no hay uno válido.
-   * Cada tipo de diagrama tiene su propio dibujante; si el generador manda
-   * un tipo que no conocemos, simplemente no se dibuja nada.
-   */
+  // ── Diagramas del tema ─────────────────────────────────────────────────
+  // Antes se dibujaban como SVG de 600px de ancho: en celular el texto
+  // acababa renderizando a ~6px o el diagrama se cortaba con scroll
+  // lateral. Ahora viven en diagrama.js y salen como HTML responsivo
+  // (una columna en celular). Si por alguna razón ese archivo no cargó,
+  // no se dibuja nada — el tema se sigue viendo completo.
   function dibujarDiagrama(diagrama) {
-    if (!diagrama || !diagrama.tipo) return "";
-    const d = diagrama.datos || {};
-    const dibujantes = {
-      mapa_mental: dibujarMapaMental,
-      linea_tiempo: dibujarLineaTiempo,
-      comparativo: dibujarComparativo,
-      proceso: dibujarProceso,
-      ciclo: dibujarCiclo,
-      jerarquia: dibujarJerarquia,
-      partes: dibujarPartes,
-    };
-    const fn = dibujantes[diagrama.tipo];
-    if (!fn) return "";
-
-    let svg = "";
     try {
-      svg = fn(d);
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.dibujar(diagrama) : "";
     } catch (err) {
-      return ""; // un diagrama mal formado nunca debe tumbar la vista del tema
+      return "";
     }
-    if (!svg) return "";
+  }
 
-    return `
-      <div class="diagrama-caja">
-        ${diagrama.titulo ? `<h3 class="bloque-titulo" style="margin-bottom:10px;">${escapeHtml(diagrama.titulo)}</h3>` : ""}
-        <div class="diagrama-scroll">${svg}</div>
-      </div>`;
+  /** Las imágenes fijas de la biblioteca que el tema traiga colgadas
+   *  (ver adjuntarIlustraciones en routes/temas.js). Los temas viejos no
+   *  traen ninguna y simplemente no se pinta nada. */
+  function dibujarIlustraciones(lista) {
+    try {
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.ilustraciones(lista) : "";
+    } catch (err) {
+      return "";
+    }
   }
 
   /**
@@ -3730,7 +3441,15 @@
         }
         ${
           tarjetas.length
-            ? `<button type="button" class="secundario btn-imprimir-tarjetas" data-material-idx="${i}" style="margin:0;">🖨️ Imprimir ${
+            ? `<div class="lista-tarjetas">${tarjetas
+                .map(
+                  (t) => `<div class="tarjeta-repaso">
+                      <div class="frente">${escapeHtml(t.frente || "")}</div>
+                      ${t.reverso ? `<div class="reverso">${escapeHtml(t.reverso)}</div>` : ""}
+                    </div>`
+                )
+                .join("")}</div>
+               <button type="button" class="secundario btn-imprimir-tarjetas" data-material-idx="${i}" style="margin:10px 0 0;">🖨️ Imprimir ${
                 tarjetas.length === 1 ? "tarjeta" : "tarjetas"
               } (${tarjetas.length})</button>`
             : ""
@@ -3763,6 +3482,7 @@
     // ── Pestaña 1: ESTUDIAR ──────────────────────────────────────────────
     const estudiarHtml = `
       ${res.que_es ? `<div class="bloque-est destacado"><p>${formatearTexto(res.que_es)}</p></div>` : ""}
+      ${dibujarIlustraciones(c.ilustraciones)}
       ${dibujarDiagrama(c.diagrama)}
       ${res.secciones
         .map(
@@ -3871,7 +3591,13 @@
              <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>`
           : ""
       }
-      ${materialExtraHtml ? `<h2 style="margin-top:${triviaHtml ? "24px" : "0"};">📎 Material extra</h2>${materialExtraHtml}` : ""}
+      ${
+        materialExtraHtml
+          ? `<h2 style="margin-top:${triviaHtml ? "24px" : "0"};">📎 Material de repaso</h2>
+             <button type="button" class="secundario" id="btn-imprimir-repaso" style="margin:0 0 12px; width:100%;">🖨️ Imprimir todo el material de repaso</button>
+             ${materialExtraHtml}`
+          : ""
+      }
       <div class="respuestas-toggle" style="margin-top:20px;"><button class="secundario" id="btn-respuestas">Ver respuestas</button></div>
       <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
     `;
@@ -3900,7 +3626,7 @@
     // directo en Practicar (o Repasar si el simulador es solo trivia).
     const resumenVacio =
       !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
-      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual;
+      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual && !(c.ilustraciones || []).length;
     // Un simulador puede traer SOLO ejercicios o SOLO trivia. Antes se
     // pintaban igual las tres pestañas y el alumno abría una vacía
     // (31-ago-2026): ahora cada pestaña aparece solo si tiene algo dentro.
@@ -3998,6 +3724,11 @@
         if (m) imprimirTarjetas(m.tipo, m.tarjetas);
       });
     });
+
+    const btnImprimirRepaso = document.getElementById("btn-imprimir-repaso");
+    if (btnImprimirRepaso) {
+      btnImprimirRepaso.addEventListener("click", () => imprimirMaterialExtra(c.material_extra, c.titulo || ""));
+    }
 
     const btnGuardarProgreso = document.getElementById("btn-guardar-progreso");
     if (btnGuardarProgreso) {

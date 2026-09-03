@@ -168,6 +168,38 @@
   .fila-opcion input[type="radio"] { width: auto; flex-shrink: 0; }
   .fila-opcion input[type="text"] { padding: 8px 10px; font-size: 0.9rem; }
   .fila-opcion.correcta input[type="text"] { border-color: var(--menta); }
+  /* ── Editor completo del material (2-sep-2026) ─────────────────────────
+     Antes el maestro solo veia (y editaba) la trivia: el resumen, el
+     diagrama, la actividad, los ejercicios y el material de repaso se
+     compartian a ciegas. Ahora se ve y se edita todo antes de mandarlo. */
+  .bloque-editor { background: var(--hielo); border-radius: 14px; padding: 4px 14px 14px; margin: 12px 0; }
+  .bloque-editor > summary {
+    cursor: pointer; list-style: none; padding: 12px 0 10px; font-weight: 800; font-size: 0.92rem;
+    color: var(--profundo); display: flex; align-items: center; gap: 8px;
+  }
+  .bloque-editor > summary::-webkit-details-marker { display: none; }
+  .bloque-editor > summary::after { content: "▾"; margin-left: auto; color: #7FA3C0; font-size: 0.85rem; }
+  .bloque-editor[open] > summary::after { content: "▴"; }
+  .bloque-editor .campo { background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .bloque-editor .campo:last-child { margin-bottom: 0; }
+  .bloque-editor label.et { display: block; font-size: 0.75rem; font-weight: 800; color: #4A6A85; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .bloque-editor textarea { width: 100%; min-height: 62px; font-size: 0.92rem; font-family: inherit; }
+  .bloque-editor input[type="text"] { width: 100%; padding: 8px 10px; font-size: 0.9rem; font-family: inherit; }
+  .bloque-editor .fila-borrable { display: flex; gap: 8px; align-items: flex-start; }
+  .bloque-editor .fila-borrable > *:first-child { flex: 1; min-width: 0; }
+  .bloque-editor .btn-mini { flex: 0 0 auto; margin: 0; padding: 6px 10px; font-size: 0.8rem; }
+  .bloque-editor .agregar { width: 100%; margin-top: 8px; }
+  .bloque-editor .vista-diagrama { background: #fff; border-radius: 12px; padding: 2px 12px 12px; }
+  .bloque-editor .nota { font-size: 0.8rem; color: #4A6A85; margin: 0 0 8px; }
+  .par-tarjeta { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: start; margin-bottom: 8px; }
+  /* Plantillas descargables (ver cargarPlantillas) */
+  .plantilla-item { display: flex; gap: 12px; align-items: center; border: 2px solid var(--linea); border-radius: 12px; padding: 11px 13px; margin-bottom: 8px; }
+  .plantilla-item:last-child { margin-bottom: 0; }
+  .plantilla-item .icono-plantilla { font-size: 1.4rem; flex: 0 0 auto; }
+  .plantilla-item .datos-plantilla { flex: 1 1 auto; min-width: 0; }
+  .plantilla-item .nombre-plantilla { font-weight: 800; font-size: 0.93rem; line-height: 1.3; }
+  .plantilla-item a { text-decoration: none; flex: 0 0 auto; }
+  @media (max-width: 560px) { .par-tarjeta { grid-template-columns: 1fr auto; } }
 </style>
 </head>
 <body>
@@ -183,6 +215,7 @@
 
 <!-- Intro "qué puedes hacer aquí" — compartida con tema.html (ver intro.js).
      Va antes del script de la página porque este llama a window.introHTML(). -->
+<script src="diagrama.js"></script>
 <script src="intro.js"></script>
 
 <script>
@@ -478,16 +511,77 @@
         <button class="primario" onclick="crearGrupo()">Crear grupo</button>
         <div id="resultado-crear-grupo"></div>
       </div>
+
+      <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
+        <h2>📄 Plantillas para imprimir</h2>
+        <p class="ayuda" style="margin:0 0 12px;">Formatos y fichas listos para usar. No dependen de ningún tema: descarga el que te sirva.</p>
+        <div id="lista-plantillas"></div>
+      </div>
     `;
 
     cont.querySelectorAll("[data-abrir-grupo]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.abrirGrupo)));
     cont.querySelectorAll("[data-agregar-tema]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.agregarTema, "generar")));
 
+    cargarPlantillas();
     cargarSuscripcionGrupo();
     grupos.forEach((g) => pintarResumenVigente(g));
     // Aunque aquí no haya formulario donde pintarla, una generación a medias
     // se retoma igual: el aviso flotante es el que avisa cuando esté lista.
     reanudarTrabajoPendiente();
+  }
+
+  /**
+   * Plantillas de la biblioteca (2-sep-2026, junto con admin.html): archivos
+   * que la usuaria sube a mano y el maestro descarga tal cual — formatos,
+   * fichas, planeaciones. No pasan por la IA ni dependen de un tema.
+   *
+   * La tarjeta arranca escondida y solo se muestra si hay algo que ofrecer:
+   * mientras la biblioteca esté vacía (o no se haya corrido schema_v38), el
+   * maestro no ve un recuadro vacío.
+   */
+  async function cargarPlantillas() {
+    const tarjeta = document.getElementById("tarjeta-plantillas");
+    const cont = document.getElementById("lista-plantillas");
+    if (!tarjeta || !cont) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/recursos/plantillas`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      const lista = data.plantillas || [];
+      if (!lista.length) return; // se queda escondida
+
+      cont.innerHTML = lista
+        .map(
+          (p) => `
+        <div class="plantilla-item">
+          <div class="icono-plantilla">${p.tipo_mime === "application/pdf" ? "📄" : "🖼️"}</div>
+          <div class="datos-plantilla">
+            <div class="nombre-plantilla">${escapeHtml(p.nombre)}</div>
+            ${p.descripcion ? `<div class="ayuda" style="margin:2px 0 0; font-size:0.85rem;">${escapeHtml(p.descripcion)}</div>` : ""}
+          </div>
+          <a href="${escapeHtml(p.archivo_url)}" target="_blank" rel="noopener" data-descarga="${p.id}">
+            <button type="button" class="secundario chico">Descargar</button>
+          </a>
+        </div>`
+        )
+        .join("");
+
+      // Contar descargas es un extra: si falla, la descarga ya se abrió igual.
+      cont.querySelectorAll("[data-descarga]").forEach((a) => {
+        a.addEventListener("click", () => {
+          fetch(`${API_BASE}/api/recursos/plantillas/${a.dataset.descarga}/descarga`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+          }).catch(() => {});
+        });
+      });
+
+      tarjeta.style.display = "block";
+    } catch (err) {
+      /* sin plantillas no pasa nada: la tarjeta se queda escondida */
+    }
   }
 
   /**
@@ -1443,6 +1537,429 @@
   // que el panel necesita para armarse (titulo, encabezado, si es gratis).
   const metaGenerado = {};
 
+  /* ── Editor completo del material del grupo (2-sep-2026) ────────────────
+     Reporte de la usuaria: "en el portal de maestros no se ve la explicación
+     del tema para que el maestro la revise", "que los maestros puedan
+     visualizar la información completa que se va a compartir — actividad,
+     resumen, actividades de repaso — y todo es editable", "en el caso de los
+     maestros no se muestra la información, únicamente se ven los títulos".
+
+     Hasta ahora el panel de "material generado" solo mostraba la trivia. Todo
+     lo demás (la explicación, el diagrama, la actividad, los ejercicios y el
+     material de repaso) se compartía con el grupo sin que el maestro lo
+     hubiera visto siquiera.
+
+     Cómo funciona el editor: cada campo lleva `data-ruta` con la ruta dentro
+     del contenido (por ejemplo "resumen.secciones.0.texto"). Un solo listener
+     delegado escribe en contenidoEnEdicion[grupoId] y NO vuelve a pintar —
+     así no se pierde el cursor mientras se escribe. Solo los botones de
+     agregar/quitar vuelven a dibujar la sección. */
+
+  function leerRuta(obj, ruta) {
+    return ruta.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  }
+
+  function escribirRuta(obj, ruta, valor) {
+    const partes = ruta.split(".");
+    const ultima = partes.pop();
+    let ref = obj;
+    for (const k of partes) {
+      if (ref[k] == null) ref[k] = /^\d+$/.test(k) ? [] : {};
+      ref = ref[k];
+    }
+    ref[ultima] = valor;
+  }
+
+  function borrarRuta(obj, ruta) {
+    const partes = ruta.split(".");
+    const ultima = partes.pop();
+    const ref = partes.reduce((o, k) => (o == null ? undefined : o[k]), obj);
+    if (!ref) return;
+    if (Array.isArray(ref)) ref.splice(parseInt(ultima, 10), 1);
+    else delete ref[ultima];
+  }
+
+  /** Los temas de antes del rediseño traen `resumen` como un solo string. */
+  function normalizarResumenGrupo(resumen) {
+    const vacio = { que_es: "", secciones: [], pasos: [], ideas_clave: [], ojo_aqui: "", truco: "" };
+    if (!resumen) return { ...vacio };
+    if (typeof resumen === "string") return { ...vacio, que_es: resumen };
+    return {
+      que_es: resumen.que_es || "",
+      secciones: Array.isArray(resumen.secciones) ? resumen.secciones : [],
+      pasos: Array.isArray(resumen.pasos) ? resumen.pasos : [],
+      ideas_clave: Array.isArray(resumen.ideas_clave) ? resumen.ideas_clave : [],
+      ojo_aqui: resumen.ojo_aqui || "",
+      truco: resumen.truco || "",
+    };
+  }
+
+  /** Deja el contenido en la forma que espera el editor, sin perder nada. */
+  function prepararContenidoEditable(c) {
+    c.resumen = normalizarResumenGrupo(c.resumen);
+    if (!Array.isArray(c.ejercicios)) c.ejercicios = [];
+    if (!Array.isArray(c.trivia)) c.trivia = [];
+    if (!Array.isArray(c.material_extra)) c.material_extra = [];
+    if (!Array.isArray(c.ilustraciones)) c.ilustraciones = [];
+    c.material_extra.forEach((m) => {
+      if (!Array.isArray(m.tarjetas)) m.tarjetas = [];
+    });
+    // Modo grupo trabaja con `actividades` (una genérica + las 8 de Gardner
+    // si se pidieron). Un material combinado viejo puede traer `actividad`.
+    if (!Array.isArray(c.actividades)) {
+      c.actividades =
+        c.actividad && (c.actividad.titulo || c.actividad.instrucciones)
+          ? [{ inteligencia: "todas", titulo: c.actividad.titulo || "", instrucciones: c.actividad.instrucciones || "" }]
+          : [];
+    }
+    return c;
+  }
+
+  function areaEditable(ruta, valor, etiqueta, filas) {
+    return `
+      <label class="et">${escapeHtml(etiqueta)}</label>
+      <textarea data-ruta="${ruta}" rows="${filas || 3}">${escapeHtml(valor || "")}</textarea>`;
+  }
+
+  function textoEditable(ruta, valor, etiqueta) {
+    return `
+      <label class="et">${escapeHtml(etiqueta)}</label>
+      <input type="text" data-ruta="${ruta}" value="${escapeHtml(valor || "")}">`;
+  }
+
+  function botonQuitar(ruta, titulo) {
+    return `<button type="button" class="secundario chico btn-mini" data-accion="quitar" data-ruta="${ruta}" title="${escapeHtml(
+      titulo
+    )}">🗑️</button>`;
+  }
+
+  function botonAgregar(que, etiqueta) {
+    return `<button type="button" class="secundario agregar" data-accion="agregar" data-que="${que}">${escapeHtml(
+      etiqueta
+    )}</button>`;
+  }
+
+  function seccionExplicacion(c) {
+    const r = c.resumen;
+    return `
+      <details class="bloque-editor" open>
+        <summary>📖 Explicación del tema</summary>
+        <p class="nota">Esto es lo que tu grupo va a leer en la pestaña "Estudiar". Puedes cambiar cualquier texto.</p>
+        <div class="campo">${areaEditable("resumen.que_es", r.que_es, "De qué se trata", 3)}</div>
+        ${r.secciones
+          .map(
+            (sec, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${textoEditable(`resumen.secciones.${i}.titulo`, sec.titulo, `Sección ${i + 1} — título`)}</div>
+              ${botonQuitar(`resumen.secciones.${i}`, "Quitar esta sección")}
+            </div>
+            ${areaEditable(`resumen.secciones.${i}.texto`, sec.texto, "Texto", 4)}
+          </div>`
+          )
+          .join("")}
+        ${botonAgregar("seccion", "+ Agregar sección")}
+        ${
+          r.pasos.length
+            ? `<div class="campo"><label class="et">🧭 Paso a paso</label>
+                ${r.pasos
+                  .map(
+                    (paso, i) => `<div class="fila-borrable" style="margin-bottom:6px;">
+                      <input type="text" data-ruta="resumen.pasos.${i}" value="${escapeHtml(paso)}">
+                      ${botonQuitar(`resumen.pasos.${i}`, "Quitar este paso")}
+                    </div>`
+                  )
+                  .join("")}
+               </div>`
+            : ""
+        }
+        ${botonAgregar("paso", "+ Agregar paso")}
+        ${
+          r.ideas_clave.length
+            ? `<div class="campo"><label class="et">⭐ Lo que no se les puede olvidar</label>
+                ${r.ideas_clave
+                  .map(
+                    (idea, i) => `<div class="fila-borrable" style="margin-bottom:6px;">
+                      <input type="text" data-ruta="resumen.ideas_clave.${i}" value="${escapeHtml(idea)}">
+                      ${botonQuitar(`resumen.ideas_clave.${i}`, "Quitar esta idea")}
+                    </div>`
+                  )
+                  .join("")}
+               </div>`
+            : ""
+        }
+        ${botonAgregar("idea", "+ Agregar idea clave")}
+        <div class="campo">${areaEditable("resumen.ojo_aqui", r.ojo_aqui, "⚠️ Ojo aquí", 2)}</div>
+        <div class="campo">${areaEditable("resumen.truco", r.truco, "🎯 Truco para recordarlo", 2)}</div>
+      </details>`;
+  }
+
+  function seccionIlustraciones(c) {
+    const lista = Array.isArray(c.ilustraciones) ? c.ilustraciones : [];
+    if (!lista.length) return "";
+    const html = window.EnsenaiDiagrama ? window.EnsenaiDiagrama.ilustraciones(lista) : "";
+    if (!html) return "";
+    return `
+      <details class="bloque-editor">
+        <summary>🖼️ Ilustraciones (${lista.length})</summary>
+        <p class="nota">Salieron solas de la biblioteca porque el tema las pedía. Quita las que no te sirvan.</p>
+        <div class="vista-diagrama">${html}</div>
+        ${lista
+          .map(
+            (i, idx) => `<div class="fila-borrable" style="margin-top:8px;">
+              <div style="font-size:0.88rem; font-weight:700; align-self:center;">${escapeHtml(i.nombre || "Sin nombre")}</div>
+              ${botonQuitar(`ilustraciones.${idx}`, "Quitar esta ilustración")}
+            </div>`
+          )
+          .join("")}
+      </details>`;
+  }
+
+  function seccionDiagrama(c) {
+    const html = window.EnsenaiDiagrama ? window.EnsenaiDiagrama.dibujar(c.diagrama) : "";
+    if (!html) return "";
+    return `
+      <details class="bloque-editor">
+        <summary>🗺️ Diagrama</summary>
+        <p class="nota">Así lo va a ver tu grupo. El diagrama se arma solo a partir del tema; si no te sirve, quítalo.</p>
+        <div class="vista-diagrama">${html}</div>
+        <button type="button" class="secundario agregar" data-accion="quitar-diagrama">🗑️ Quitar el diagrama</button>
+      </details>`;
+  }
+
+  function seccionActividades(c) {
+    const acts = c.actividades;
+    return `
+      <details class="bloque-editor">
+        <summary>✏️ Actividad${acts.length === 1 ? "" : "es"} (${acts.length})</summary>
+        <p class="nota">La actividad que van a hacer en clase o en consulta. Es la parte que más se cambia — ajústala a tu grupo.</p>
+        ${
+          acts.length
+            ? acts
+                .map(
+                  (a, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>
+                <label class="et">${
+                  a.inteligencia && a.inteligencia !== "todas"
+                    ? escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)
+                    : "Para todo el grupo"
+                }</label>
+                <input type="text" data-ruta="actividades.${i}.titulo" value="${escapeHtml(
+                    a.titulo || ""
+                  )}" placeholder="Título de la actividad">
+              </div>
+              ${botonQuitar(`actividades.${i}`, "Quitar esta actividad")}
+            </div>
+            ${areaEditable(`actividades.${i}.instrucciones`, a.instrucciones, "Instrucciones", 5)}
+          </div>`
+                )
+                .join("")
+            : `<p class="nota" style="margin:0;">Este material no trae actividad.</p>`
+        }
+        ${botonAgregar("actividad", "+ Agregar actividad")}
+      </details>`;
+  }
+
+  function seccionEjercicios(c) {
+    const ej = c.ejercicios;
+    return `
+      <details class="bloque-editor">
+        <summary>🧮 Ejercicios (${ej.length})</summary>
+        <p class="nota">Los que tu grupo resuelve en la pestaña "Practicar". La pista y la respuesta también son editables.</p>
+        ${ej
+          .map(
+            (e, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${areaEditable(`ejercicios.${i}.enunciado`, e.enunciado, `Ejercicio ${i + 1}`, 2)}</div>
+              ${botonQuitar(`ejercicios.${i}`, "Quitar este ejercicio")}
+            </div>
+            ${textoEditable(`ejercicios.${i}.pista`, e.pista, "Pista")}
+            ${textoEditable(`ejercicios.${i}.respuesta`, e.respuesta, "Respuesta")}
+          </div>`
+          )
+          .join("")}
+        ${botonAgregar("ejercicio", "+ Agregar ejercicio")}
+      </details>`;
+  }
+
+  function seccionMaterialExtra(c) {
+    const mats = c.material_extra;
+    return `
+      <details class="bloque-editor">
+        <summary>📎 Material de repaso (${mats.length})</summary>
+        <p class="nota">Tarjetas para recortar y doblar (pregunta de un lado, respuesta del otro) y otros apoyos de repaso.</p>
+        ${
+          mats.length
+            ? mats
+                .map(
+                  (m, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${textoEditable(`material_extra.${i}.tipo`, m.tipo, `Recurso ${i + 1} — tipo`)}</div>
+              ${botonQuitar(`material_extra.${i}`, "Quitar este recurso")}
+            </div>
+            ${areaEditable(`material_extra.${i}.contenido`, m.contenido, "Cómo se usa", 2)}
+            ${
+              m.tarjetas.length
+                ? `<label class="et" style="margin-top:10px;">Tarjetas (frente / reverso)</label>` +
+                  m.tarjetas
+                    .map(
+                      (t, j) => `
+                <div class="par-tarjeta">
+                  <input type="text" data-ruta="material_extra.${i}.tarjetas.${j}.frente" value="${escapeHtml(
+                        t.frente || ""
+                      )}" placeholder="Frente">
+                  <input type="text" data-ruta="material_extra.${i}.tarjetas.${j}.reverso" value="${escapeHtml(
+                        t.reverso || ""
+                      )}" placeholder="Reverso">
+                  ${botonQuitar(`material_extra.${i}.tarjetas.${j}`, "Quitar esta tarjeta")}
+                </div>`
+                    )
+                    .join("")
+                : ""
+            }
+            <button type="button" class="secundario agregar" data-accion="agregar" data-que="tarjeta" data-idx="${i}">+ Agregar tarjeta</button>
+            ${
+              m.tarjetas.length
+                ? `<button type="button" class="secundario agregar" data-accion="imprimir-tarjetas" data-idx="${i}">🖨️ Imprimir estas tarjetas</button>`
+                : ""
+            }
+          </div>`
+                )
+                .join("")
+            : `<p class="nota" style="margin:0;">Este material no trae recursos de repaso.</p>`
+        }
+        ${
+          mats.length
+            ? `<button type="button" class="secundario agregar" data-accion="imprimir-repaso">🖨️ Imprimir todo el material de repaso</button>`
+            : ""
+        }
+      </details>`;
+  }
+
+  /**
+   * Pinta el editor completo dentro de #editor-material-<grupoId>.
+   * La trivia conserva su propio editor (renderEditorTrivia) porque necesita
+   * los radios de "cuál es la correcta".
+   */
+  function renderEditorMaterial(grupoId) {
+    const cont = document.getElementById(`editor-material-${grupoId}`);
+    if (!cont) return;
+    const c = prepararContenidoEditable(contenidoEnEdicion[grupoId] || {});
+
+    cont.innerHTML =
+      seccionExplicacion(c) +
+      seccionIlustraciones(c) +
+      seccionDiagrama(c) +
+      seccionActividades(c) +
+      seccionEjercicios(c) +
+      `<details class="bloque-editor"><summary>🧠 Trivia (${(c.trivia || []).length})</summary>
+         <div id="editor-trivia-${grupoId}" class="editor-trivia" style="padding:0; background:transparent;"></div>
+       </details>` +
+      seccionMaterialExtra(c);
+
+    renderEditorTrivia(grupoId);
+    conectarEditorMaterial(grupoId, cont);
+  }
+
+  /** Quita del material lo que quedó vacío al editarlo, para que al grupo no
+   *  le lleguen secciones, ejercicios o tarjetas en blanco. */
+  function limpiarContenidoEditado(c) {
+    if (!c) return c;
+    const conTexto = (s) => String(s || "").trim();
+    if (c.resumen && typeof c.resumen === "object") {
+      if (Array.isArray(c.resumen.secciones)) {
+        c.resumen.secciones = c.resumen.secciones.filter((s) => conTexto(s.titulo) || conTexto(s.texto));
+      }
+      if (Array.isArray(c.resumen.pasos)) c.resumen.pasos = c.resumen.pasos.filter(conTexto);
+      if (Array.isArray(c.resumen.ideas_clave)) c.resumen.ideas_clave = c.resumen.ideas_clave.filter(conTexto);
+    }
+    if (Array.isArray(c.actividades)) {
+      c.actividades = c.actividades.filter((a) => conTexto(a.titulo) || conTexto(a.instrucciones));
+    }
+    if (Array.isArray(c.ejercicios)) {
+      c.ejercicios = c.ejercicios.filter((e) => conTexto(e.enunciado));
+    }
+    if (Array.isArray(c.material_extra)) {
+      c.material_extra.forEach((m) => {
+        if (Array.isArray(m.tarjetas)) {
+          m.tarjetas = m.tarjetas.filter((t) => conTexto(t.frente) || conTexto(t.reverso));
+        }
+      });
+      c.material_extra = c.material_extra.filter(
+        (m) => conTexto(m.contenido) || (Array.isArray(m.tarjetas) && m.tarjetas.length)
+      );
+    }
+    return c;
+  }
+
+  /** Un solo juego de listeners delegados para todo el editor. */
+  function conectarEditorMaterial(grupoId, cont) {
+    if (cont.dataset.conectado === "1") return;
+    cont.dataset.conectado = "1";
+
+    const invalidarPdf = () => {
+      delete pdfCache[grupoId];
+      delete pdfCacheSinRespuestas[grupoId];
+    };
+
+    cont.addEventListener("input", (ev) => {
+      const ruta = ev.target.dataset && ev.target.dataset.ruta;
+      if (!ruta) return;
+      escribirRuta(contenidoEnEdicion[grupoId], ruta, ev.target.value);
+      invalidarPdf();
+    });
+
+    cont.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-accion]");
+      if (!btn || !cont.contains(btn)) return;
+      const c = contenidoEnEdicion[grupoId];
+      const accion = btn.dataset.accion;
+
+      if (accion === "quitar") {
+        borrarRuta(c, btn.dataset.ruta);
+      } else if (accion === "quitar-diagrama") {
+        c.diagrama = { tipo: "ninguno" };
+      } else if (accion === "agregar") {
+        const que = btn.dataset.que;
+        if (que === "seccion") c.resumen.secciones.push({ titulo: "", texto: "" });
+        else if (que === "paso") c.resumen.pasos.push("");
+        else if (que === "idea") c.resumen.ideas_clave.push("");
+        else if (que === "actividad") c.actividades.push({ inteligencia: "todas", titulo: "", instrucciones: "" });
+        else if (que === "ejercicio") c.ejercicios.push({ enunciado: "", pista: "", pasos: [], respuesta: "" });
+        else if (que === "tarjeta") {
+          const m = c.material_extra[parseInt(btn.dataset.idx, 10)];
+          if (m) {
+            if (!Array.isArray(m.tarjetas)) m.tarjetas = [];
+            m.tarjetas.push({ frente: "", reverso: "" });
+          }
+        }
+      } else if (accion === "imprimir-tarjetas") {
+        const m = c.material_extra[parseInt(btn.dataset.idx, 10)];
+        if (m && window.EnsenaiImprimible) window.EnsenaiImprimible.tarjetas(m.tipo, m.tarjetas);
+        return; // imprimir no cambia el material: no hay que repintar
+      } else if (accion === "imprimir-repaso") {
+        if (window.EnsenaiImprimible) window.EnsenaiImprimible.materialExtra(c.material_extra, c.tema || "");
+        return;
+      } else {
+        return;
+      }
+
+      invalidarPdf();
+      // Se vuelve a pintar conservando qué secciones estaban abiertas.
+      const abiertas = [...cont.querySelectorAll("details")].map((d) => d.open);
+      cont.dataset.conectado = "";
+      renderEditorMaterial(grupoId);
+      const nuevas = cont.querySelectorAll("details");
+      abiertas.forEach((abierta, i) => {
+        if (nuevas[i]) nuevas[i].open = abierta;
+      });
+    });
+  }
+
   function pintarResultadoGenerado(grupoId) {
     const zona = document.getElementById(`resultado-generar-${grupoId}`);
     const meta = metaGenerado[grupoId];
@@ -1450,13 +1967,15 @@
     if (!zona || !meta || !contenido) return;
 
     zona.innerHTML = `
-      <div class="aviso">✓ ${escapeHtml(meta.encabezado)}: <strong>${escapeHtml(meta.titulo)}</strong>. Puedes editar la trivia antes de compartirlo con tu grupo.</div>
-      <div id="editor-trivia-${grupoId}" class="editor-trivia"></div>
+      <div class="aviso">✓ ${escapeHtml(meta.encabezado)}: <strong>${escapeHtml(
+      meta.titulo
+    )}</strong>. Revisa y edita todo lo que quieras antes de compartirlo con tu grupo — así es como lo van a ver.</div>
+      <div id="editor-material-${grupoId}"></div>
       <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${meta.esPrimerTemaGratis ? " (gratis)" : ""}</button>
       <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
       <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
     `;
-    renderEditorTrivia(grupoId);
+    renderEditorMaterial(grupoId);
     document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
       agregarTemaAGrupo(grupoId, meta.titulo, contenidoEnEdicion[grupoId], meta.esPrimerTemaGratis)
     );
@@ -1500,6 +2019,10 @@
       if (contenido.trivia.length !== totalAntes) delete pdfCache[grupoId];
         delete pdfCacheSinRespuestas[grupoId];
     }
+    // Mismo criterio para el resto del material ahora que TODO es editable
+    // (2-sep-2026): lo que quedó en blanco al editar no se le comparte al
+    // grupo como una tarjeta o un ejercicio vacío.
+    limpiarContenidoEditado(contenido);
 
     const zonaInicial = zonaGenerar(grupoId);
     if (zonaInicial) zonaInicial.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
@@ -1619,11 +2142,13 @@
           ${
             t.pago_status === "pendiente"
               ? `<button class="secundario chico" id="btn-pagar-lista-${t.id}">Pagar</button>`
-              : `<button class="secundario chico" id="btn-respuestas-${t.id}">Ver respuestas</button>
+              : `<button class="secundario chico" id="btn-material-${t.id}">📖 Ver material</button>
+                 <button class="secundario chico" id="btn-respuestas-${t.id}">Cómo contestaron</button>
                  <button class="secundario chico" id="btn-ejercicios-${t.id}">Ver ejercicios</button>
                  <button class="secundario chico" id="btn-adaptar-${t.id}">🧠 Adaptar por inteligencia</button>`
           }
         </div>
+        ${t.pago_status !== "pendiente" ? `<div id="material-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
         ${t.pago_status !== "pendiente" ? `<div id="respuestas-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
         ${t.pago_status !== "pendiente" ? `<div id="ejercicios-marcados-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
         ${t.pago_status !== "pendiente" ? `<div id="adaptar-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
@@ -1640,6 +2165,8 @@
       temas
         .filter((t) => t.pago_status !== "pendiente")
         .forEach((t) => {
+          const btnMat = document.getElementById(`btn-material-${t.id}`);
+          if (btnMat) btnMat.addEventListener("click", () => toggleMaterialTema(grupoId, t.id));
           const btn = document.getElementById(`btn-respuestas-${t.id}`);
           if (btn) btn.addEventListener("click", () => toggleRespuestas(grupoId, t.id));
           const btnEj = document.getElementById(`btn-ejercicios-${t.id}`);
@@ -1783,6 +2310,92 @@
    * el backend nunca guarda nombre, así que aquí simplemente sale como
    * "Alumno N (anónimo)".
    */
+  /**
+   * "Ver material" de un tema que YA está en la liga (2-sep-2026).
+   *
+   * GET /api/grupos/mios no manda el contenido de los temas (pesaría
+   * muchísimo), así que en la lista solo se veían los títulos: el maestro no
+   * tenía forma de releer lo que le compartió a su grupo, ni de corregir una
+   * redacción o una respuesta sin volver a generar el tema. Aquí se pide ese
+   * tema completo y se abre en el MISMO editor con el que se revisa un
+   * material recién generado; "Guardar cambios" lo actualiza en la liga
+   * (PATCH), sin gastar cupo.
+   */
+  async function toggleMaterialTema(grupoId, temaId) {
+    const panel = document.getElementById(`material-${temaId}`);
+    const btn = document.getElementById(`btn-material-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      panel.innerHTML = "";
+      delete contenidoEnEdicion[`tema-${temaId}`];
+      if (btn) btn.textContent = "📖 Ver material";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando el material…</div>`;
+    if (btn) btn.textContent = "Ocultar material";
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, panel);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el material.");
+
+      const clave = `tema-${temaId}`;
+      contenidoEnEdicion[clave] = data.tema.contenido || {};
+
+      panel.innerHTML = `
+        <p class="ayuda" style="margin:0 0 8px;">Así lo ve tu grupo. Puedes corregir lo que quieras y guardarlo — no gasta temas de tu plan.</p>
+        <div id="editor-material-${clave}"></div>
+        <button type="button" class="primario" id="btn-guardar-tema-${temaId}" style="margin-top:10px;">💾 Guardar cambios</button>
+        <div id="aviso-guardar-${temaId}"></div>
+      `;
+      renderEditorMaterial(clave);
+
+      document.getElementById(`btn-guardar-tema-${temaId}`).addEventListener("click", (ev) =>
+        guardarTemaEditado(grupoId, temaId, ev.target)
+      );
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  async function guardarTemaEditado(grupoId, temaId, btn) {
+    const clave = `tema-${temaId}`;
+    const aviso = document.getElementById(`aviso-guardar-${temaId}`);
+    const contenido = limpiarContenidoEditado(contenidoEnEdicion[clave]);
+    if (!contenido) return;
+    if (Array.isArray(contenido.trivia)) {
+      contenido.trivia = contenido.trivia.filter((p) => (p.pregunta || "").trim());
+    }
+
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    if (aviso) aviso.innerHTML = "";
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ contenido }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron guardar los cambios.");
+      if (aviso) {
+        aviso.innerHTML = `<div class="aviso" style="margin-top:10px;">✓ Guardado. Tu grupo ya ve la versión nueva. Si habías descargado el imprimible, vuelve a generarlo para que coincida.</div>`;
+      }
+      renderEditorMaterial(clave); // refleja lo que se limpió al guardar
+    } catch (err) {
+      if (aviso) aviso.innerHTML = `<div class="error" style="margin-top:10px;">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  }
+
   async function toggleRespuestas(grupoId, temaId) {
     const panel = document.getElementById(`respuestas-${temaId}`);
     const btn = document.getElementById(`btn-respuestas-${temaId}`);
@@ -1790,7 +2403,7 @@
 
     if (panel.style.display === "block") {
       panel.style.display = "none";
-      if (btn) btn.textContent = "Ver respuestas";
+      if (btn) btn.textContent = "Cómo contestaron";
       return;
     }
     panel.style.display = "block";
@@ -1939,9 +2552,16 @@
           const marca = m.created_at
             ? new Date(m.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
             : "";
-          const n = (m.indices_resueltos || []).length;
+          const indices = (m.indices_resueltos || []).slice().sort((a, b) => a - b);
+          const n = indices.length;
+          // Cuáles resolvió, no solo cuántos: si todo el grupo se salta el
+          // mismo ejercicio, eso es justo lo que el maestro necesita ver.
+          const cuales = n
+            ? `<div class="ayuda" style="margin:3px 0 0;">Ejercicios: ${indices.map((i) => i + 1).join(", ")}</div>`
+            : "";
           return `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
             <div><strong>${quien}</strong> — ${n}/${m.total_ejercicios} ejercicios marcados <span class="ayuda">· ${marca}</span></div>
+            ${cuales}
           </div>`;
         })
         .join("");
