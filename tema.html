@@ -405,6 +405,12 @@
   .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
   #buscar-historial { margin-bottom: 8px; }
   .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; cursor: pointer; }
+  /* Plantillas enganchadas a un tema (ver cargarPlantillasDelTema) */
+  .plantilla-tema { display: flex; gap: 10px; align-items: center; border: 2px solid var(--linea); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+  .plantilla-tema:last-child { margin-bottom: 0; }
+  .plantilla-tema .icono-plantilla { font-size: 1.3rem; flex: 0 0 auto; }
+  /* tema.html no tenía la regla de botón chiquito que sí trae grupo.html */
+  .plantilla-tema button.chico { padding: 8px 14px; font-size: 0.85rem; margin-top: 0; width: auto; }
 </style>
 </head>
 <body>
@@ -3370,6 +3376,69 @@
     }
   }
 
+  /**
+   * "📎 Para imprimir": las hojas de la biblioteca que embonan con ESTE tema
+   * (3-sep-2026).
+   *
+   * El servidor decide cuáles (GET /api/recursos/plantillas/para-tema, ver
+   * utils/matcherPlantillas.js). Si no embona ninguna, no se pinta nada:
+   * más vale que la sección no exista a que ofrezca material que no viene
+   * al caso. Falla en silencio a propósito — es un extra del tema, nunca
+   * puede romper la pantalla del tema en sí.
+   */
+  async function cargarPlantillasDelTema(contenido) {
+    const zona = document.getElementById("zona-plantillas-tema");
+    if (!zona || !sesionActual) return;
+    try {
+      const params = new URLSearchParams({ tema: contenido?.tema || "" });
+      if (contenido?.nivel) params.set("nivel", contenido.nivel);
+      if (contenido?.enfoque) params.set("enfoque", contenido.enfoque);
+
+      const res = await fetch(`${API_BASE}/api/recursos/plantillas/para-tema?${params}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      const lista = data.plantillas || [];
+      if (!lista.length) return;
+
+      // La zona pudo haberse re-dibujado mientras llegaba la respuesta.
+      const zonaAhora = document.getElementById("zona-plantillas-tema");
+      if (!zonaAhora) return;
+
+      zonaAhora.innerHTML = `
+        <div style="margin-top:18px; border-top:2px solid var(--linea); padding-top:14px;">
+          <h3 style="margin:0 0 2px; font-size:1rem;">📎 Para imprimir</h3>
+          <p class="ayuda" style="margin:0 0 10px; font-size:0.85rem;">Hojas de nuestra biblioteca que le quedan a este tema.</p>
+          ${lista
+            .map(
+              (p) => `
+            <div class="plantilla-tema">
+              <div class="icono-plantilla">${p.tipo_mime === "application/pdf" ? "📄" : "🖼️"}</div>
+              <div style="flex:1 1 auto; min-width:0;">
+                <div style="font-weight:800; font-size:0.92rem; line-height:1.3;">${escapeHtml(p.nombre)}</div>
+                ${p.descripcion ? `<div class="ayuda" style="margin:2px 0 0; font-size:0.82rem;">${escapeHtml(p.descripcion)}</div>` : ""}
+              </div>
+              <a href="${escapeHtml(p.archivo_url)}" target="_blank" rel="noopener" data-descarga="${p.id}" style="text-decoration:none; flex:0 0 auto;">
+                <button type="button" class="secundario chico">Descargar</button>
+              </a>
+            </div>`
+            )
+            .join("")}
+        </div>`;
+
+      zonaAhora.querySelectorAll("[data-descarga]").forEach((a) =>
+        a.addEventListener("click", () => {
+          fetch(`${API_BASE}/api/recursos/plantillas/${a.dataset.descarga}/descarga`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+          }).catch(() => {});
+        })
+      );
+    } catch (err) {
+      /* el material extra nunca puede tumbar el tema */
+    }
+  }
+
   function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
     ultimoContenido = contenido;
     ultimoTemaId = temaId;
@@ -3669,8 +3738,11 @@
         <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
         <div class="panel" id="panel-repasar" style="${tabInicial === "repasar" ? "" : "display:none;"}">${repasarHtml}</div>
         <button class="secundario" id="btn-pdf" style="margin-top:18px; width:100%;">${pdfUrlGuardado ? "📄 Descargar imprimible (PDF)" : "📄 Generar imprimible (PDF)"}</button>
+        <div id="zona-plantillas-tema"></div>
       </div>
     `;
+
+    cargarPlantillasDelTema(c);
 
     document.querySelectorAll(".pestana").forEach((btn) => {
       btn.addEventListener("click", () => {

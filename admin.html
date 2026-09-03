@@ -144,6 +144,7 @@
   ];
   const NIVELES = [
     { value: "", label: "Cualquier nivel" },
+    { value: "preescolar", label: "Preescolar (3-5 años)" },
     { value: "primaria_baja", label: "Primaria baja (6-8 años)" },
     { value: "primaria_alta", label: "Primaria alta (9-12 años)" },
     { value: "secundaria", label: "Secundaria (12-15 años)" },
@@ -462,6 +463,18 @@
     const panel = document.getElementById("panel");
     panel.innerHTML = `
       <div class="tarjeta">
+        <h2>📦 Subir varias a la vez</h2>
+        <p class="ayuda">Para cargar un cuadernillo completo sin llenar un formulario por hoja. Si el archivo se llama <code>nivel__categoria__enfoque__Nombre.pdf</code>, esos datos se llenan solos; si no, se usa el nombre del archivo tal cual y queda en categoría "otros".</p>
+        <input type="file" id="pl-lote" multiple accept=".svg,.png,.jpg,.jpeg,.webp,.pdf">
+        <div class="check">
+          <input type="checkbox" id="chk-lote-publicar">
+          <label for="chk-lote-publicar">Publicarlas de inmediato (si no, las revisas aquí abajo antes)</label>
+        </div>
+        <button class="primario" type="button" id="btn-lote">Subir las que elegí</button>
+        <div id="avance-lote"></div>
+      </div>
+
+      <div class="tarjeta">
         <h2>Subir plantilla</h2>
         <p class="ayuda">El maestro la busca y la descarga tal cual — formatos, fichas, planeaciones. Puedes subirla sin publicar para revisarla antes.</p>
         <form id="form-plantilla">
@@ -511,6 +524,7 @@
     `;
 
     document.getElementById("form-plantilla").addEventListener("submit", subirPlantilla);
+    document.getElementById("btn-lote").addEventListener("click", subirLotePlantillas);
     dibujarGridPlantillas();
   }
 
@@ -544,6 +558,129 @@
       el.querySelector('[data-accion="toggle"]').onclick = () => alternarPublicadaPlantilla(pl);
       el.querySelector('[data-accion="borrar"]').onclick = () => borrarPlantilla(pl);
     });
+  }
+
+  /**
+   * Subida múltiple de plantillas (3-sep-2026).
+   *
+   * Nació de un problema real: los cuadernillos que Claudia hizo en Canva
+   * salen partidos en ~230 hojas sueltas, y llenar 230 veces el formulario
+   * de arriba no es un flujo, es un castigo. Esto sube todas de un jalón
+   * usando el MISMO endpoint de siempre (POST /api/admin/plantillas), una
+   * por una: no hace falta backend nuevo, y si una falla las demás siguen.
+   *
+   * La metadata viaja en el NOMBRE del archivo, separada por dobles guiones
+   * bajos, para que se pueda revisar y corregir desde el explorador de
+   * archivos antes de subir nada:
+   *
+   *   preescolar__lenguaje__escolar__Laberinto de la letra A.pdf
+   *   └ nivel      └ categoría └ enfoque  └ nombre que verá el maestro
+   *
+   * Todo es opcional de derecha a izquierda: con 3 partes se asume que
+   * falta el enfoque, con 2 que solo viene categoría, y un archivo sin
+   * ningún "__" se sube con su propio nombre y categoría "otros".
+   */
+  const NIVELES_VALIDOS = ["preescolar", "primaria_baja", "primaria_alta", "secundaria", "preparatoria", "universidad"];
+
+  function datosDesdeNombre(nombreArchivo) {
+    const sinExtension = nombreArchivo.replace(/\.[^.]+$/, "");
+    const partes = sinExtension.split("__").map((x) => x.trim()).filter((x, i, a) => i < a.length - 1 ? x !== "" : true);
+
+    let nivel = "", categoria = "", enfoque = "", nombre = sinExtension;
+
+    if (partes.length >= 4) {
+      [nivel, categoria, enfoque] = partes;
+      nombre = partes.slice(3).join(" — ");
+    } else if (partes.length === 3) {
+      [nivel, categoria] = partes;
+      nombre = partes[2];
+    } else if (partes.length === 2) {
+      categoria = partes[0];
+      nombre = partes[1];
+    }
+
+    // "todos" / "cualquiera" es la forma de decir "sirve para cualquier
+    // nivel", que en la base se guarda como null.
+    if (!NIVELES_VALIDOS.includes(nivel)) nivel = "";
+    if (enfoque !== "escolar" && enfoque !== "psicoeducativo") enfoque = "";
+
+    return {
+      nombre: nombre.trim() || sinExtension,
+      categoria: (categoria || "otros").toLowerCase(),
+      nivel,
+      enfoque,
+    };
+  }
+
+  function leerArchivoSuelto(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(lector.result);
+      lector.onerror = () => reject(new Error("No se pudo leer el archivo."));
+      lector.readAsDataURL(file);
+    });
+  }
+
+  async function subirLotePlantillas() {
+    const input = document.getElementById("pl-lote");
+    const avance = document.getElementById("avance-lote");
+    const boton = document.getElementById("btn-lote");
+    const publicar = document.getElementById("chk-lote-publicar").checked;
+    const archivos = Array.from(input.files || []);
+
+    if (!archivos.length) {
+      avance.innerHTML = `<div class="error">Primero elige los archivos.</div>`;
+      return;
+    }
+
+    boton.disabled = true;
+    const fallas = [];
+    let subidas = 0;
+
+    const pintar = (i) => {
+      avance.innerHTML = `
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}</p>
+        ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
+      `;
+    };
+    pintar(0);
+
+    for (let i = 0; i < archivos.length; i++) {
+      const file = archivos[i];
+      try {
+        if (file.size > MAX_BYTES) {
+          throw new Error(`pesa ${(file.size / 1024 / 1024).toFixed(1)} MB (máx. 2 MB)`);
+        }
+        if (!TIPOS_PLANTILLA.includes(file.type)) {
+          throw new Error("ese tipo de archivo no se acepta");
+        }
+        const datos = datosDesdeNombre(file.name);
+        const archivoBase64 = await leerArchivoSuelto(file);
+        await llamar("/api/admin/plantillas", {
+          method: "POST",
+          body: JSON.stringify({
+            nombre: datos.nombre,
+            descripcion: "",
+            categoria: datos.categoria,
+            nivel: datos.nivel || null,
+            enfoque: datos.enfoque || null,
+            publicada: publicar,
+            archivoBase64,
+            tipoMime: file.type,
+          }),
+        });
+        subidas++;
+      } catch (err) {
+        fallas.push(`${file.name}: ${err.message}`);
+      }
+      pintar(i + 1);
+    }
+
+    boton.disabled = false;
+    input.value = "";
+    await cargarPlantillas();
+    dibujarGridPlantillas();
+    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} plantilla(s) en la biblioteca${publicar ? " y ya publicadas" : " sin publicar — revísalas abajo y publícalas"}.</div>`;
   }
 
   async function subirPlantilla(ev) {
