@@ -531,7 +531,7 @@
       </div>
 
       <div class="tarjeta">
-        <h2>Biblioteca (${plantillas.length})</h2>
+        <h2>Biblioteca (<span id="cuenta-biblioteca">${plantillas.length}</span>)</h2>
         <div id="barra-seleccion"></div>
         <div id="grid-plantillas" class="grid"></div>
       </div>
@@ -554,6 +554,12 @@
 
   function dibujarGridPlantillas() {
     const cont = document.getElementById("grid-plantillas");
+    // El título se pinta una vez con renderPlantillas(), pero la lista se
+    // vuelve a cargar después de subir, publicar o borrar: sin esto, el
+    // encabezado se quedaba con el número viejo mientras la barra de abajo
+    // ya mostraba el nuevo (se veía "Biblioteca (210)" y "Seleccionar las 271").
+    const cuenta = document.getElementById("cuenta-biblioteca");
+    if (cuenta) cuenta.textContent = String(plantillas.length);
     if (!plantillas.length) {
       plantillasElegidas.clear();
       cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no hay plantillas aquí.</p>`;
@@ -858,9 +864,17 @@
         if (conIA) {
           const p = await proponerDatos(archivoBase64, file.type, file.name);
           if (p) {
+            // Lo que venga en el NOMBRE DEL ARCHIVO manda sobre la IA:
+            // categoría, nivel y enfoque los puso una persona a propósito.
+            // Sin esto pasaba algo confuso: dos hojas del mismo cuadernillo
+            // quedaban en categorías distintas porque el modelo veía una
+            // como "lenguaje" (por la palabra que se escribe) y otra como
+            // "matemáticas" (por la figura). De la IA se toma lo que sí
+            // requiere mirar la hoja: el nombre y la descripción.
+            const veniaEnElNombre = file.name.includes("__");
             datos = {
               nombre: p.nombre,
-              categoria: p.categoria || datos.categoria,
+              categoria: veniaEnElNombre ? datos.categoria : p.categoria || datos.categoria,
               nivel: datos.nivel || p.nivel || "",
               enfoque: datos.enfoque || p.enfoque || "",
               descripcion: p.descripcion || "",
