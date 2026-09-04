@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: sin esto, env(safe-area-inset-bottom) vale 0 en
+     iPhone y la barra de pestañas queda debajo de la rayita del home. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>EnseñAI — Mi grupo</title>
 <link rel="icon" type="image/png" href="assets/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -507,8 +509,8 @@
 
       <div class="vista-tab" id="vista-hojas">
         <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
-          <h2>📄 Plantillas para imprimir <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
-          <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir. No dependen de ningún tema: busca la que te sirva y descárgala.</p>
+          <h2>📄 Imprimibles <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
+          <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir, para casa o para el salón. No dependen de ningún tema.</p>
           <div id="lista-plantillas"></div>
         </div>
       </div>
@@ -564,7 +566,7 @@
     window.EnsenaiTabs.montar({
       tabs: [
         { id: "grupos", icono: "🏫", texto: "Mis grupos" },
-        { id: "hojas", icono: "📄", texto: "Hojas" },
+        { id: "hojas", icono: "📄", texto: "Imprimibles" },
         { id: "plan", icono: "⚙️", texto: "Mi plan" },
       ],
       activa: vistaGrupo,
@@ -611,8 +613,8 @@
       // La pestaña "Hojas" siempre existe: no puede quedarse en blanco.
       tarjeta.style.display = "block";
       tarjeta.innerHTML = `
-        <h2>📄 Plantillas para imprimir</h2>
-        <p class="ayuda" style="margin:0;">Todavía no hay hojas en la biblioteca. Estamos subiéndolas — vuelve en unos días.</p>`;
+        <h2>📄 Imprimibles</h2>
+        <p class="ayuda" style="margin:0;">Todavía no hay imprimibles en la biblioteca. Estamos subiéndolos — vuelve en unos días.</p>`;
     }
   }
 
