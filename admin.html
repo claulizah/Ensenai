@@ -532,6 +532,8 @@
 
       <div class="tarjeta">
         <h2>Biblioteca (<span id="cuenta-biblioteca">${plantillas.length}</span>)</h2>
+        <input type="search" id="buscar-biblioteca" placeholder="Busca por nombre o categoría…" autocomplete="off" style="margin-bottom:8px;">
+        <button type="button" class="secundario chico" id="btn-repetidas" style="width:auto; margin:0 0 10px;">🔎 Encontrar repetidas</button>
         <div id="barra-seleccion"></div>
         <div id="grid-plantillas" class="grid"></div>
       </div>
@@ -540,6 +542,11 @@
     document.getElementById("form-plantilla").addEventListener("submit", subirPlantilla);
     document.getElementById("form-plantilla").archivo.addEventListener("change", analizarArchivoElegido);
     document.getElementById("btn-lote").addEventListener("click", subirLotePlantillas);
+    document.getElementById("btn-repetidas").addEventListener("click", marcarRepetidas);
+    document.getElementById("buscar-biblioteca").addEventListener("input", (ev) => {
+      filtroBiblioteca = ev.target.value;
+      dibujarGridPlantillas();
+    });
     dibujarGridPlantillas();
   }
 
@@ -551,6 +558,71 @@
    * viven aquí afuera para que sobrevivan a los redibujados del grid.
    */
   let plantillasElegidas = new Set();
+  let filtroBiblioteca = "";
+
+  /** Sin acentos ni signos: para buscar y para comparar nombres. */
+  function normalizarTexto(t) {
+    return String(t || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  /**
+   * "🔎 Encontrar repetidas" (4-sep-2026).
+   *
+   * Agrupa por nombre normalizado y DEJA UNA de cada grupo —la más vieja,
+   * que es la que ya podría estar enganchada a un tema— y selecciona las
+   * demás. No borra nada: solo las marca para que las revises y decidas
+   * tú con el botón Borrar de abajo.
+   *
+   * Compara por NOMBRE, no por archivo, a propósito: las que subiste antes
+   * del chequeo de repetidas no tienen huella guardada, así que el nombre
+   * es lo único que tienen en común. De aquí en adelante el servidor ya
+   * rechaza el mismo archivo al subirlo (schema_v41).
+   */
+  function marcarRepetidas() {
+    const grupos = {};
+    [...plantillas]
+      .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")))
+      .forEach((p) => {
+        const clave = normalizarTexto(p.nombre);
+        (grupos[clave] = grupos[clave] || []).push(p);
+      });
+
+    const sobran = [];
+    Object.values(grupos).forEach((lista) => {
+      if (lista.length > 1) sobran.push(...lista.slice(1));
+    });
+
+    const avance = document.getElementById("avance-seleccion");
+    if (!sobran.length) {
+      plantillasElegidas = new Set();
+      dibujarGridPlantillas();
+      const av = document.getElementById("avance-seleccion");
+      if (av) av.innerHTML = `<div class="exito" style="margin-top:6px;">No encontré ninguna repetida por nombre. 👌</div>`;
+      return;
+    }
+
+    plantillasElegidas = new Set(sobran.map((p) => p.id));
+    filtroBiblioteca = "";
+    const buscador = document.getElementById("buscar-biblioteca");
+    if (buscador) buscador.value = "";
+    dibujarGridPlantillas();
+
+    const cuantosGrupos = Object.values(grupos).filter((l) => l.length > 1).length;
+    const av = document.getElementById("avance-seleccion");
+    if (av) {
+      av.innerHTML = `
+        <div class="aviso" style="margin-top:6px; text-align:left;">
+          Encontré <strong>${sobran.length}</strong> repetida(s) en ${cuantosGrupos} grupo(s) de nombre igual.
+          Ya te dejé seleccionadas las que sobran (de cada grupo conservé la más antigua).
+          Revísalas y dale <strong>Borrar</strong> si estás de acuerdo.
+        </div>`;
+    }
+  }
 
   function dibujarGridPlantillas() {
     const cont = document.getElementById("grid-plantillas");
@@ -572,7 +644,20 @@
     const vivas = new Set(plantillas.map((p) => p.id));
     plantillasElegidas = new Set([...plantillasElegidas].filter((id) => vivas.has(id)));
 
-    cont.innerHTML = plantillas.map((p) => {
+    // El buscador solo cambia lo que se VE; la selección se respeta aunque
+    // una seleccionada quede fuera del filtro, para no perderla sin avisar.
+    const q = normalizarTexto(filtroBiblioteca);
+    const visibles = q
+      ? plantillas.filter((p) => normalizarTexto(`${p.nombre} ${p.categoria} ${p.descripcion || ""}`).includes(q))
+      : plantillas;
+
+    if (!visibles.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Ninguna plantilla coincide con "${escapeHtml(filtroBiblioteca)}".</p>`;
+      dibujarBarraSeleccion();
+      return;
+    }
+
+    cont.innerHTML = visibles.map((p) => {
       // Desde schema_v40 el bucket es privado: la miniatura y el botón
       // "Ver" usan la liga firmada que manda el backend, no archivo_url
       // (que ahora es el marcador "privado:<ruta>", no una URL).
@@ -621,13 +706,14 @@
     if (!barra) return;
     const n = plantillasElegidas.size;
     const todas = n > 0 && n === plantillas.length;
+    const filtrando = normalizarTexto(filtroBiblioteca).length > 0;
 
     barra.innerHTML = `
       <div class="check" style="margin:0 0 8px;">
         <input type="checkbox" id="chk-todas" ${todas ? "checked" : ""}>
         <label for="chk-todas">${todas ? "Quitar la selección" : `Seleccionar las ${plantillas.length}`}</label>
       </div>
-      <p class="ayuda" style="margin:0 0 8px;">${n ? `${n} seleccionada${n === 1 ? "" : "s"}` : "Ninguna seleccionada"}</p>
+      <p class="ayuda" style="margin:0 0 8px;">${n ? `${n} seleccionada${n === 1 ? "" : "s"}` : "Ninguna seleccionada"}${filtrando ? " · el buscador solo esconde, no quita de la selección" : ""}</p>
       <div style="display:flex; flex-wrap:wrap; gap:6px;">
         <button type="button" class="secundario chico" data-lote="publicar" ${n ? "" : "disabled"}>Publicar</button>
         <button type="button" class="secundario chico" data-lote="ocultar" ${n ? "" : "disabled"}>Ocultar</button>
