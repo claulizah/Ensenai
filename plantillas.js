@@ -177,13 +177,16 @@
       cont.innerHTML = `
         <div class="pl-candado">
           <div class="pl-num">${data.total}</div>
-          <p class="pl-nota" style="margin:2px 0 10px;">hojas listas para imprimir en la biblioteca de EnseñAI.<br>
-          Con el plan <strong>Ilimitado</strong> puedes buscar entre todas y bajar las que quieras.</p>
+          <p class="pl-nota" style="margin:2px 0 10px;">imprimibles listos en la biblioteca de EnseñAI.<br>
+          Con el plan <strong>Ilimitado</strong> puedes buscar entre todos y bajar los que quieras.</p>
           <button type="button" class="primario" data-upgrade>Ver el plan Ilimitado</button>
-          <p class="pl-nota" style="margin:8px 0 0; font-size:0.82rem;">Con tu plan actual sigues recibiendo las hojas que le quedan a cada tema que generas.</p>
+          <p class="pl-nota" style="margin:8px 0 0; font-size:0.82rem;">Con tu plan actual sigues recibiendo los imprimibles que le quedan a cada tema que generas.</p>
         </div>`;
       cont.querySelector("[data-upgrade]")?.addEventListener("click", () => onUpgrade && onUpgrade());
       cont.dataset.plHay = "1";
+      // El numerito de la pestaña se pone también con el candado puesto: que
+      // se vea cuántos hay es justo el argumento de venta.
+      cont.dataset.plTotal = String(data.total);
       return;
     }
 
@@ -303,7 +306,7 @@
       cont.innerHTML = `
         <div style="margin-top:18px; border-top:2px solid var(--linea,#dfe7ef); padding-top:14px;">
           <h3 style="margin:0 0 2px; font-size:1rem;">📎 Para imprimir</h3>
-          <p class="pl-nota" style="margin:0 0 10px; font-size:0.85rem;">Hojas de nuestra biblioteca que le quedan a este tema.</p>
+          <p class="pl-nota" style="margin:0 0 10px; font-size:0.85rem;">Imprimibles de nuestra biblioteca que le quedan a este tema.</p>
           ${lista.map(fila).join("")}
         </div>`;
       conectarDescargas(cont, opciones);
