@@ -100,11 +100,42 @@
     },
   };
 
+  /**
+   * ¿Se pinta abierta o plegada? (4-sep-2026)
+   *
+   * La primera visita se ve completa —es la que enseña el producto—, pero
+   * de la segunda en adelante arranca plegada: ayuda una vez y estorba
+   * siempre después, y en celular se comía la pantalla entera.
+   *
+   * Tres estados en localStorage bajo la misma clave:
+   *   (vacío)   nunca la ha visto  -> abierta
+   *   "vista"   ya la vio una vez  -> plegada
+   *   "abierta" / "cerrada"        -> lo que la persona eligió, manda
+   *
+   * El detalle fino: esta función se llama MUCHAS veces por sesión (las
+   * páginas repintan #contenido a cada rato). Si marcara "vista" en la
+   * primera llamada, la tarjeta se cerraría sola a media primera visita.
+   * Por eso la decisión de la sesión se guarda en sessionStorage y se
+   * respeta hasta que la persona cierre la pestaña.
+   */
   function leerAbierta(clave) {
     try {
-      // Sin nada guardado = primera vez = se ve completa.
-      return localStorage.getItem(clave) !== "cerrada";
+      var guardado = localStorage.getItem(clave);
+      if (guardado === "cerrada") return false;
+      if (guardado === "abierta") return true;
+
+      // Sin elección explícita: se decide una sola vez por sesión.
+      var claveSesion = clave + "_sesion";
+      var deLaSesion = sessionStorage.getItem(claveSesion);
+      if (deLaSesion !== null) return deLaSesion === "1";
+
+      var primeraVez = guardado !== "vista";
+      sessionStorage.setItem(claveSesion, primeraVez ? "1" : "0");
+      if (primeraVez) localStorage.setItem(clave, "vista");
+      return primeraVez;
     } catch (e) {
+      // Navegación privada o almacenamiento bloqueado: se ve completa,
+      // que es el peor caso aceptable (informa de más, no de menos).
       return true;
     }
   }
