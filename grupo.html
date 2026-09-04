@@ -446,12 +446,9 @@
 
     cont.innerHTML = `
       ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
-      ${window.introHTML ? window.introHTML("maestro") : ""}
 
-      <div class="tarjeta">
-        <h2>Mi plan de grupo</h2>
-        <div id="zona-suscripcion-grupo"><div class="cargando">Cargando…</div></div>
-      </div>
+      <div class="vista-tab" id="vista-grupos">
+      ${window.introHTML ? window.introHTML("maestro") : ""}
 
       ${grupos.length === 0 ? `<div class="tarjeta"><div class="aviso">Todavía no tienes ningún grupo — crea el primero abajo.</div></div>` : ""}
 
@@ -506,12 +503,26 @@
         <div id="resultado-crear-grupo"></div>
       </div>
 
-      <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
-        <h2>📄 Plantillas para imprimir <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
-        <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir. No dependen de ningún tema: busca la que te sirva y descárgala.</p>
-        <div id="lista-plantillas"></div>
+      </div>
+
+      <div class="vista-tab" id="vista-hojas">
+        <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
+          <h2>📄 Plantillas para imprimir <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
+          <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir. No dependen de ningún tema: busca la que te sirva y descárgala.</p>
+          <div id="lista-plantillas"></div>
+        </div>
+      </div>
+
+      <div class="vista-tab" id="vista-plan">
+        <div class="tarjeta">
+          <h2>Mi plan de grupo</h2>
+          <div id="zona-suscripcion-grupo"><div class="cargando">Cargando…</div></div>
+        </div>
       </div>
     `;
+
+    pintarVistaGrupo();
+    montarTabsGrupo();
 
     cont.querySelectorAll("[data-abrir-grupo]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.abrirGrupo)));
     cont.querySelectorAll("[data-agregar-tema]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.agregarTema, "generar")));
@@ -534,6 +545,37 @@
    * maestro no ve un recuadro vacío.
    */
   /**
+   * Pestañas de abajo del panel del maestro (4-sep-2026): Grupos, Hojas y
+   * Plan. Antes todo esto era una sola pantalla larguísima — el plan, los
+   * grupos, el formulario de crear y la biblioteca entera, una tras otra.
+   */
+  let vistaGrupo = "grupos";
+
+  function pintarVistaGrupo() {
+    ["grupos", "hojas", "plan"].forEach((v) => {
+      const el = document.getElementById("vista-" + v);
+      if (el) el.style.display = v === vistaGrupo ? "" : "none";
+    });
+    window.scrollTo({ top: 0 });
+  }
+
+  function montarTabsGrupo() {
+    if (!window.EnsenaiTabs) return;
+    window.EnsenaiTabs.montar({
+      tabs: [
+        { id: "grupos", icono: "🏫", texto: "Mis grupos" },
+        { id: "hojas", icono: "📄", texto: "Hojas" },
+        { id: "plan", icono: "⚙️", texto: "Mi plan" },
+      ],
+      activa: vistaGrupo,
+      onCambio: (v) => {
+        vistaGrupo = v;
+        pintarVistaGrupo();
+      },
+    });
+  }
+
+  /**
    * Biblioteca de plantillas: la pinta plantillas.js, compartido con
    * tema.html (4-sep-2026). Aquí solo queda el enganche — dónde se pinta,
    * con qué sesión, y a dónde mandar a quien quiera mejorar su plan.
@@ -551,8 +593,11 @@
       cont,
       API_BASE,
       token: () => sesionActual.access_token,
-      onUpgrade: () =>
-        document.getElementById("zona-suscripcion-grupo")?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      onUpgrade: () => {
+        vistaGrupo = "plan";
+        pintarVistaGrupo();
+        window.EnsenaiTabs?.marcar("plan");
+      },
     });
 
     // El módulo marca el contenedor cuando sí pintó algo; si no, la tarjeta
@@ -561,6 +606,13 @@
       const cuenta = document.getElementById("cuenta-plantillas");
       if (cuenta && cont.dataset.plTotal) cuenta.textContent = `· ${cont.dataset.plTotal}`;
       tarjeta.style.display = "block";
+      window.EnsenaiTabs?.globo("hojas", cont.dataset.plTotal || "");
+    } else {
+      // La pestaña "Hojas" siempre existe: no puede quedarse en blanco.
+      tarjeta.style.display = "block";
+      tarjeta.innerHTML = `
+        <h2>📄 Plantillas para imprimir</h2>
+        <p class="ayuda" style="margin:0;">Todavía no hay hojas en la biblioteca. Estamos subiéndolas — vuelve en unos días.</p>`;
     }
   }
 
@@ -641,6 +693,7 @@
   }
 
   function renderGrupoDetalle(g, avisoInicial) {
+    window.EnsenaiTabs?.mostrar(false);
     const cont = document.getElementById("contenido");
     const ligaBase = `${window.location.origin}/g.html`;
 
@@ -2591,6 +2644,7 @@
 <!-- Botón flotante de comentarios del piloto (ver feedback.js). Va al final
      y en archivo aparte: así los tres paneles comparten el mismo widget y
      puede leer API_BASE y sesionActual del script de arriba. -->
+<script src="tabs.js"></script>
 <script src="plantillas.js"></script>
 <script src="feedback.js"></script>
 </body>

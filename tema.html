@@ -815,8 +815,17 @@
   let gamificacionCache = null;
   let limitePerfilesCache = 1;
 
-  function mostrarPerfil() {
+  /**
+   * En qué pestaña de abajo está parada la persona: "inicio", "temas" o
+   * "hojas" (4-sep-2026). Antes todo esto vivía en una sola pantalla y era
+   * un scroll larguísimo, sobre todo con la biblioteca de plantillas.
+   */
+  let vistaPerfil = "inicio";
+
+  function mostrarPerfil(vista) {
+    if (vista) vistaPerfil = vista;
     document.getElementById("contenido").innerHTML = `
+      <div class="vista-tab" id="vista-inicio">
       ${window.introHTML ? window.introHTML("individual") : ""}
       <div class="tarjeta" id="tarjeta-perfil">
         <div id="zona-perfil-hero"><div class="cargando">Cargando…</div></div>
@@ -830,11 +839,17 @@
         <h2 style="margin-top:0;">📊 Cómo va</h2>
         <div id="zona-mi-progreso"><div class="cargando">Cargando…</div></div>
       </div>
+      </div>
+
+      <div class="vista-tab" id="vista-hojas">
       <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
         <h2>📄 Plantillas para imprimir <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
         <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir. No dependen de ningún tema: busca la que te sirva y descárgala.</p>
         <div id="lista-plantillas"></div>
       </div>
+      </div>
+
+      <div class="vista-tab" id="vista-temas">
       <div class="tarjeta" id="tarjeta-mis-temas">
         <h2>Mis temas</h2>
         <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
@@ -846,7 +861,11 @@
         <div id="barra-combinar" class="barra-combinar" style="display:none;"></div>
         <div id="lista-historial"><div class="cargando">Cargando…</div></div>
       </div>
+      </div>
     `;
+
+    pintarVistaPerfil();
+    montarTabs();
 
     document.getElementById("btn-ir-generar").addEventListener("click", () => mostrarFormulario());
     document.getElementById("btn-ir-revisar").addEventListener("click", () => mostrarFormulario("revisar"));
@@ -860,6 +879,35 @@
     cargarGamificacion();
     cargarMiProgreso();
     cargarBibliotecaPlantillas();
+  }
+
+  /** Muestra solo la sección de la pestaña activa. */
+  function pintarVistaPerfil() {
+    ["inicio", "temas", "hojas"].forEach((v) => {
+      const el = document.getElementById("vista-" + v);
+      if (el) el.style.display = v === vistaPerfil ? "" : "none";
+    });
+    window.scrollTo({ top: 0 });
+  }
+
+  /**
+   * La barra de abajo. Se monta una vez y se vuelve a marcar en cada
+   * redibujado; vive fuera de #contenido, que se reescribe a cada rato.
+   */
+  function montarTabs() {
+    if (!window.EnsenaiTabs) return;
+    window.EnsenaiTabs.montar({
+      tabs: [
+        { id: "inicio", icono: "🏠", texto: "Inicio" },
+        { id: "temas", icono: "📚", texto: "Mis temas" },
+        { id: "hojas", icono: "📄", texto: "Hojas" },
+      ],
+      activa: vistaPerfil,
+      onCambio: (v) => {
+        vistaPerfil = v;
+        pintarVistaPerfil();
+      },
+    });
   }
 
   /**
@@ -887,6 +935,14 @@
       const cuenta = document.getElementById("cuenta-plantillas");
       if (cuenta && cont.dataset.plTotal) cuenta.textContent = `· ${cont.dataset.plTotal}`;
       tarjeta.style.display = "block";
+      window.EnsenaiTabs?.globo("hojas", cont.dataset.plTotal || "");
+    } else {
+      // La pestaña "Hojas" existe siempre, así que no puede quedarse en
+      // blanco: si todavía no hay biblioteca, se dice con palabras.
+      tarjeta.style.display = "block";
+      tarjeta.innerHTML = `
+        <h2>📄 Plantillas para imprimir</h2>
+        <p class="ayuda" style="margin:0;">Todavía no hay hojas en la biblioteca. Estamos subiéndolas — vuelve en unos días.</p>`;
     }
   }
 
@@ -992,6 +1048,7 @@
    * de abajo desde el perfil, sin que la persona tenga que buscarla.
    */
   function mostrarFormulario(anclaje) {
+    window.EnsenaiTabs?.mostrar(false);
     document.getElementById("contenido").innerHTML = `
       <button type="button" class="secundario" id="btn-volver-perfil" style="margin:0 0 14px;">← Mi perfil</button>
       <div class="tarjeta" id="tarjeta-generar">
@@ -1847,6 +1904,7 @@
   let perfilIdEditando = null;
 
   async function mostrarQuizPerfil(idExistente) {
+    window.EnsenaiTabs?.mostrar(false);
     // El quiz vive dentro de la tarjeta de perfiles, que solo existe en la
     // pantalla de generar. Desde el perfil (botón "Contestar el quiz" o
     // "+ Agregar") hay que ir allá primero, o esto tronaría con cont null.
@@ -3433,6 +3491,7 @@
   }
 
   function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
+    window.EnsenaiTabs?.mostrar(false);
     ultimoContenido = contenido;
     ultimoTemaId = temaId;
     const c = contenido;
@@ -3847,6 +3906,7 @@
 <!-- Botón flotante de comentarios del piloto (ver feedback.js). Va al final
      y en archivo aparte: así los tres paneles comparten el mismo widget y
      puede leer API_BASE y sesionActual del script de arriba. -->
+<script src="tabs.js"></script>
 <script src="plantillas.js"></script>
 <script src="feedback.js"></script>
 </body>
