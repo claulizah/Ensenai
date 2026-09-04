@@ -524,6 +524,7 @@
 
       <div class="tarjeta">
         <h2>Biblioteca (${plantillas.length})</h2>
+        <div id="barra-seleccion"></div>
         <div id="grid-plantillas" class="grid"></div>
       </div>
     `;
@@ -534,36 +535,155 @@
     dibujarGridPlantillas();
   }
 
+  /**
+   * Selección múltiple en la biblioteca (4-sep-2026).
+   *
+   * Con 230 hojas, publicarlas de una en una son 230 clics; y si algo sale
+   * mal en una tanda, deshacerlo a mano es peor. Los ids seleccionados
+   * viven aquí afuera para que sobrevivan a los redibujados del grid.
+   */
+  let plantillasElegidas = new Set();
+
   function dibujarGridPlantillas() {
     const cont = document.getElementById("grid-plantillas");
     if (!plantillas.length) {
+      plantillasElegidas.clear();
       cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no hay plantillas aquí.</p>`;
+      const barra = document.getElementById("barra-seleccion");
+      if (barra) barra.innerHTML = "";
       return;
     }
-    cont.innerHTML = plantillas.map((p) => `
+
+    // Se limpian los ids de plantillas que ya no existen (borradas).
+    const vivas = new Set(plantillas.map((p) => p.id));
+    plantillasElegidas = new Set([...plantillasElegidas].filter((id) => vivas.has(id)));
+
+    cont.innerHTML = plantillas.map((p) => {
+      // Desde schema_v40 el bucket es privado: la miniatura y el botón
+      // "Ver" usan la liga firmada que manda el backend, no archivo_url
+      // (que ahora es el marcador "privado:<ruta>", no una URL).
+      const url = p.vista_url || (String(p.archivo_url || "").startsWith("http") ? p.archivo_url : "");
+      return `
       <div class="item" data-id="${p.id}">
+        <div class="check" style="margin:0 0 6px;">
+          <input type="checkbox" id="chk-pl-${p.id}" data-elegir="${p.id}" ${plantillasElegidas.has(p.id) ? "checked" : ""}>
+          <label for="chk-pl-${p.id}" style="font-size:0.8rem;">Seleccionar</label>
+        </div>
         <div class="miniatura">
           ${p.tipo_mime === "application/pdf"
             ? `<span class="pdf-tag">📄 PDF</span>`
-            : `<img src="${p.archivo_url}" alt="${escapeHtml(p.nombre)}" loading="lazy">`}
+            : url
+              ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(p.nombre)}" loading="lazy">`
+              : `<span class="pdf-tag">🖼️</span>`}
         </div>
         <span class="pill-estado ${p.publicada ? "pill-si" : "pill-no"}">${p.publicada ? "Publicada" : "Borrador"}</span>
         <div class="nombre">${escapeHtml(p.nombre)}</div>
         <div class="meta">${escapeHtml(p.categoria)} · ${p.nivel ? NIVELES.find(n => n.value === p.nivel)?.label || p.nivel : "Cualquier nivel"} · ${p.descargas || 0} descargas</div>
         <div class="acciones">
-          <a href="${p.archivo_url}" target="_blank" rel="noopener"><button class="secundario chico">Ver</button></a>
+          ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><button class="secundario chico">Ver</button></a>` : ""}
           <button class="secundario chico" data-accion="toggle">${p.publicada ? "Ocultar" : "Publicar"}</button>
           <button class="secundario chico peligro" data-accion="borrar">Borrar</button>
         </div>
       </div>
-    `).join("");
+    `;}).join("");
 
     cont.querySelectorAll(".item").forEach((el) => {
       const id = el.dataset.id;
       const pl = plantillas.find((x) => x.id === id);
       el.querySelector('[data-accion="toggle"]').onclick = () => alternarPublicadaPlantilla(pl);
       el.querySelector('[data-accion="borrar"]').onclick = () => borrarPlantilla(pl);
+      el.querySelector("[data-elegir]").onchange = (ev) => {
+        if (ev.target.checked) plantillasElegidas.add(id);
+        else plantillasElegidas.delete(id);
+        dibujarBarraSeleccion();
+      };
     });
+
+    dibujarBarraSeleccion();
+  }
+
+  function dibujarBarraSeleccion() {
+    const barra = document.getElementById("barra-seleccion");
+    if (!barra) return;
+    const n = plantillasElegidas.size;
+    const todas = n > 0 && n === plantillas.length;
+
+    barra.innerHTML = `
+      <div class="check" style="margin:0 0 8px;">
+        <input type="checkbox" id="chk-todas" ${todas ? "checked" : ""}>
+        <label for="chk-todas">${todas ? "Quitar la selección" : `Seleccionar las ${plantillas.length}`}</label>
+      </div>
+      <p class="ayuda" style="margin:0 0 8px;">${n ? `${n} seleccionada${n === 1 ? "" : "s"}` : "Ninguna seleccionada"}</p>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <button type="button" class="secundario chico" data-lote="publicar" ${n ? "" : "disabled"}>Publicar</button>
+        <button type="button" class="secundario chico" data-lote="ocultar" ${n ? "" : "disabled"}>Ocultar</button>
+        <button type="button" class="secundario chico peligro" data-lote="borrar" ${n ? "" : "disabled"}>Borrar</button>
+      </div>
+      <div id="avance-seleccion"></div>`;
+
+    barra.querySelector("#chk-todas").onchange = (ev) => {
+      plantillasElegidas = ev.target.checked ? new Set(plantillas.map((p) => p.id)) : new Set();
+      dibujarGridPlantillas();
+    };
+    barra.querySelectorAll("[data-lote]").forEach((b) => {
+      b.onclick = () => accionEnLote(b.dataset.lote);
+    });
+  }
+
+  /**
+   * Publica, oculta o borra todas las seleccionadas, una por una con los
+   * endpoints de siempre. Va en serie a propósito: 230 peticiones en
+   * paralelo no las agradece ni Render ni Supabase, y así se puede ir
+   * diciendo cuántas van.
+   */
+  async function accionEnLote(accion) {
+    const ids = [...plantillasElegidas];
+    if (!ids.length) return;
+
+    if (accion === "borrar") {
+      const seguro = confirm(
+        `Vas a borrar ${ids.length} plantilla(s) para siempre, junto con su archivo. Esto no se puede deshacer.\n\n¿Le seguimos?`
+      );
+      if (!seguro) return;
+    }
+
+    const avance = document.getElementById("avance-seleccion");
+    const botones = document.querySelectorAll("#barra-seleccion [data-lote], #chk-todas");
+    botones.forEach((b) => (b.disabled = true));
+
+    let hechas = 0;
+    const fallas = [];
+    for (const id of ids) {
+      const pl = plantillas.find((x) => x.id === id);
+      try {
+        if (accion === "borrar") {
+          await llamar(`/api/admin/plantillas/${id}`, { method: "DELETE" });
+        } else {
+          await llamar(`/api/admin/plantillas/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ publicada: accion === "publicar" }),
+          });
+        }
+        hechas++;
+      } catch (err) {
+        fallas.push(`${pl?.nombre || id}: ${err.message}`);
+      }
+      if (avance) {
+        avance.innerHTML = `<p class="ayuda" style="margin:8px 0 0;"><strong>${hechas + fallas.length} de ${ids.length}</strong>${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}</p>`;
+      }
+    }
+
+    plantillasElegidas = new Set();
+    await cargarPlantillas();
+    dibujarGridPlantillas();
+
+    const av = document.getElementById("avance-seleccion");
+    if (av) {
+      const verbo = accion === "borrar" ? "borrada" : accion === "publicar" ? "publicada" : "ocultada";
+      av.innerHTML =
+        `<div class="exito" style="margin-top:6px;">${hechas} plantilla(s) ${verbo}(s).</div>` +
+        (fallas.length ? `<div class="error" style="margin-top:6px; text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : "");
+    }
   }
 
   /**

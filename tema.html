@@ -405,12 +405,7 @@
   .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
   #buscar-historial { margin-bottom: 8px; }
   .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; cursor: pointer; }
-  /* Plantillas enganchadas a un tema (ver cargarPlantillasDelTema) */
-  .plantilla-tema { display: flex; gap: 10px; align-items: center; border: 2px solid var(--linea); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
-  .plantilla-tema:last-child { margin-bottom: 0; }
-  .plantilla-tema .icono-plantilla { font-size: 1.3rem; flex: 0 0 auto; }
-  /* tema.html no tenía la regla de botón chiquito que sí trae grupo.html */
-  .plantilla-tema button.chico { padding: 8px 14px; font-size: 0.85rem; margin-top: 0; width: auto; }
+  /* Las plantillas traen sus propios estilos desde plantillas.js */
 </style>
 </head>
 <body>
@@ -835,6 +830,11 @@
         <h2 style="margin-top:0;">📊 Cómo va</h2>
         <div id="zona-mi-progreso"><div class="cargando">Cargando…</div></div>
       </div>
+      <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
+        <h2>📄 Plantillas para imprimir <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
+        <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir. No dependen de ningún tema: busca la que te sirva y descárgala.</p>
+        <div id="lista-plantillas"></div>
+      </div>
       <div class="tarjeta" id="tarjeta-mis-temas">
         <h2>Mis temas</h2>
         <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
@@ -859,6 +859,35 @@
     cargarHistorial();
     cargarGamificacion();
     cargarMiProgreso();
+    cargarBibliotecaPlantillas();
+  }
+
+  /**
+   * La biblioteca completa dentro del perfil (4-sep-2026). La pinta
+   * plantillas.js, el mismo módulo que usa grupo.html: los papás ven lo
+   * mismo que los maestros, con su buscador y sus filtros.
+   *
+   * El catálogo completo es del plan Ilimitado. A los demás el módulo les
+   * pinta cuántas hojas hay y el botón para mejorar el plan — quién ve qué
+   * lo decide el servidor, no esta pantalla.
+   */
+  async function cargarBibliotecaPlantillas() {
+    const tarjeta = document.getElementById("tarjeta-plantillas");
+    const cont = document.getElementById("lista-plantillas");
+    if (!tarjeta || !cont || !window.EnsenaiPlantillas || !sesionActual) return;
+
+    await window.EnsenaiPlantillas.biblioteca({
+      cont,
+      API_BASE,
+      token: () => sesionActual.access_token,
+      onUpgrade: () => (window.location.href = "comprador.html?cuenta=1"),
+    });
+
+    if (cont.dataset.plHay === "1") {
+      const cuenta = document.getElementById("cuenta-plantillas");
+      if (cuenta && cont.dataset.plTotal) cuenta.textContent = `· ${cont.dataset.plTotal}`;
+      tarjeta.style.display = "block";
+    }
   }
 
   /**
@@ -3387,98 +3416,20 @@
    * puede romper la pantalla del tema en sí.
    */
   /**
-   * Bajar una plantilla (3-sep-2026, schema_v40).
-   *
-   * El bucket es privado: el servidor revisa el plan y firma una liga que
-   * dura 5 minutos. La pestaña se abre ANTES de pedirla porque abrirla
-   * después del await cuenta como ventana emergente y el navegador la
-   * bloquea. Si se acabó el cupo del mes, el servidor contesta 402 y aquí
-   * se muestra tal cual su mensaje, que ya trae la invitación a mejorar
-   * el plan.
+   * "📎 Para imprimir": las hojas que embonan con ESTE tema. La pinta
+   * plantillas.js (4-sep-2026); antes vivía duplicada aquí y en grupo.html.
+   * Estas SÍ son para todos los planes: es el material que le toca a lo
+   * que la persona está viendo.
    */
-  async function descargarPlantilla(id, boton) {
-    const ventana = window.open("", "_blank");
-    const textoOriginal = boton.textContent;
-    boton.disabled = true;
-    boton.textContent = "Preparando…";
-    try {
-      const res = await fetch(`${API_BASE}/api/recursos/plantillas/${id}/descargar`, {
-        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo preparar la descarga.");
-      if (ventana) {
-        ventana.location.href = data.url;
-      } else {
-        // Si el navegador bloqueó la pestaña, NO nos llevamos a la persona
-        // fuera de la app: se le deja una liga para que la abra ella.
-        const liga = document.createElement("a");
-        liga.href = data.url;
-        liga.target = "_blank";
-        liga.rel = "noopener";
-        liga.textContent = "👉 Abrir la hoja";
-        liga.style.cssText = "display:inline-block; margin-top:6px; font-weight:800;";
-        boton.closest(".plantilla-tema")?.after(liga);
-        setTimeout(() => liga.remove(), 60000);
-      }
-    } catch (err) {
-      if (ventana) ventana.close();
-      const aviso = document.createElement("div");
-      aviso.className = "error";
-      aviso.style.marginTop = "8px";
-      aviso.textContent = err.message;
-      boton.closest(".plantilla-tema")?.after(aviso);
-      setTimeout(() => aviso.remove(), 9000);
-    } finally {
-      boton.disabled = false;
-      boton.textContent = textoOriginal;
-    }
-  }
-
-  async function cargarPlantillasDelTema(contenido) {
+  function cargarPlantillasDelTema(contenido) {
     const zona = document.getElementById("zona-plantillas-tema");
-    if (!zona || !sesionActual) return;
-    try {
-      const params = new URLSearchParams({ tema: contenido?.tema || "" });
-      if (contenido?.nivel) params.set("nivel", contenido.nivel);
-      if (contenido?.enfoque) params.set("enfoque", contenido.enfoque);
-
-      const res = await fetch(`${API_BASE}/api/recursos/plantillas/para-tema?${params}`, {
-        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
-      });
-      const data = await res.json();
-      const lista = data.plantillas || [];
-      if (!lista.length) return;
-
-      // La zona pudo haberse re-dibujado mientras llegaba la respuesta.
-      const zonaAhora = document.getElementById("zona-plantillas-tema");
-      if (!zonaAhora) return;
-
-      zonaAhora.innerHTML = `
-        <div style="margin-top:18px; border-top:2px solid var(--linea); padding-top:14px;">
-          <h3 style="margin:0 0 2px; font-size:1rem;">📎 Para imprimir</h3>
-          <p class="ayuda" style="margin:0 0 10px; font-size:0.85rem;">Hojas de nuestra biblioteca que le quedan a este tema.</p>
-          ${lista
-            .map(
-              (p) => `
-            <div class="plantilla-tema">
-              <div class="icono-plantilla">${p.tipo_mime === "application/pdf" ? "📄" : "🖼️"}</div>
-              <div style="flex:1 1 auto; min-width:0;">
-                <div style="font-weight:800; font-size:0.92rem; line-height:1.3;">${escapeHtml(p.nombre)}</div>
-                ${p.descripcion ? `<div class="ayuda" style="margin:2px 0 0; font-size:0.82rem;">${escapeHtml(p.descripcion)}</div>` : ""}
-              </div>
-              <button type="button" class="secundario chico" data-descargar="${p.id}" style="flex:0 0 auto;">Descargar</button>
-            </div>`
-            )
-            .join("")}
-        </div>`;
-
-      zonaAhora.querySelectorAll("[data-descargar]").forEach((b) =>
-        b.addEventListener("click", () => descargarPlantilla(b.dataset.descargar, b))
-      );
-    } catch (err) {
-      /* el material extra nunca puede tumbar el tema */
-    }
+    if (!zona || !window.EnsenaiPlantillas || !sesionActual) return;
+    window.EnsenaiPlantillas.delTema({
+      cont: zona,
+      API_BASE,
+      token: () => sesionActual.access_token,
+      contenido,
+    });
   }
 
   function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
@@ -3896,6 +3847,7 @@
 <!-- Botón flotante de comentarios del piloto (ver feedback.js). Va al final
      y en archivo aparte: así los tres paneles comparten el mismo widget y
      puede leer API_BASE y sesionActual del script de arriba. -->
+<script src="plantillas.js"></script>
 <script src="feedback.js"></script>
 </body>
 </html>
