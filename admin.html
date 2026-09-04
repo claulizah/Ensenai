@@ -471,6 +471,10 @@
           <label for="chk-lote-ia">✨ Que la IA les ponga nombre y descripción mirando cada hoja (tarda unos segundos por archivo)</label>
         </div>
         <div class="check">
+          <input type="checkbox" id="chk-lote-marcar" checked>
+          <label for="chk-lote-marcar">Ponerles la marca de EnseñAI, y saltarse las que ya estén en la biblioteca</label>
+        </div>
+        <div class="check">
           <input type="checkbox" id="chk-lote-publicar">
           <label for="chk-lote-publicar">Publicarlas de inmediato (si no, las revisas aquí abajo antes)</label>
         </div>
@@ -513,6 +517,10 @@
           <label>Archivo (SVG, PNG, JPG, WEBP o PDF — máx. 2 MB)</label>
           <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp,.pdf" required>
           <p class="ayuda" id="estado-analisis" style="margin:4px 0 0;">Al elegir el archivo, la IA mira la hoja y llena los campos de arriba. Todo queda editable.</p>
+          <div class="check">
+            <input type="checkbox" name="marcar" id="chk-marcar" checked>
+            <label for="chk-marcar">Ponerle la marca de EnseñAI (pastilla abajo a la derecha, solo en PDF)</label>
+          </div>
           <div class="check">
             <input type="checkbox" name="publicada" id="chk-publicada">
             <label for="chk-publicada">Publicar de inmediato (si no, solo tú la ves)</label>
@@ -808,6 +816,7 @@
     const boton = document.getElementById("btn-lote");
     const publicar = document.getElementById("chk-lote-publicar").checked;
     const conIA = document.getElementById("chk-lote-ia").checked;
+    const conMarca = document.getElementById("chk-lote-marcar").checked;
     const archivos = Array.from(input.files || []);
 
     if (!archivos.length) {
@@ -817,11 +826,15 @@
 
     boton.disabled = true;
     const fallas = [];
+    // Una hoja repetida no es una falla: se cuenta aparte para que el
+    // resumen final no parezca un desastre cuando todo salió bien.
+    const repetidas = [];
     let subidas = 0;
 
     const pintar = (i) => {
       avance.innerHTML = `
-        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${repetidas.length ? ` · ⏭️ ${repetidas.length} ya estaban` : ""}${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
+        ${repetidas.length ? `<div class="aviso" style="text-align:left;">${repetidas.map((r) => escapeHtml(r)).join("<br>")}</div>` : ""}
         ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
       `;
     };
@@ -863,13 +876,15 @@
             nivel: datos.nivel || null,
             enfoque: datos.enfoque || null,
             publicada: publicar,
+            marcar: conMarca,
             archivoBase64,
             tipoMime: file.type,
           }),
         });
         subidas++;
       } catch (err) {
-        fallas.push(`${file.name}: ${err.message}`);
+        if (/ya está en la biblioteca/i.test(err.message || "")) repetidas.push(`${file.name}: ${err.message}`);
+        else fallas.push(`${file.name}: ${err.message}`);
       }
       pintar(i + 1);
     }
@@ -878,7 +893,7 @@
     input.value = "";
     await cargarPlantillas();
     dibujarGridPlantillas();
-    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} plantilla(s) en la biblioteca${publicar ? " y ya publicadas" : " sin publicar — revísalas abajo y publícalas"}.</div>`;
+    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} plantilla(s) en la biblioteca${publicar ? " y ya publicadas" : " sin publicar — revísalas abajo y publícalas"}${repetidas.length ? `, y ${repetidas.length} que ya tenías se saltaron` : ""}.</div>`;
   }
 
   async function subirPlantilla(ev) {
@@ -896,7 +911,7 @@
       boton.disabled = true;
       boton.textContent = "Subiendo…";
 
-      await llamar("/api/admin/plantillas", {
+      const respuesta = await llamar("/api/admin/plantillas", {
         method: "POST",
         body: JSON.stringify({
           nombre: form.nombre.value.trim(),
@@ -905,12 +920,15 @@
           nivel: form.nivel.value || null,
           enfoque: form.enfoque.value || null,
           publicada: form.publicada.checked,
+          marcar: form.marcar.checked,
           archivoBase64: archivo.archivoBase64,
           tipoMime: archivo.tipoMime,
         }),
       });
 
-      msg.innerHTML = `<div class="exito">Plantilla subida ✓</div>`;
+      msg.innerHTML =
+        `<div class="exito">Plantilla subida ✓${respuesta?.marcada ? " (con marca)" : ""}</div>` +
+        (respuesta?.aviso ? `<div class="aviso" style="margin-top:6px;">${escapeHtml(respuesta.aviso)}</div>` : "");
       form.reset();
       await cargarPlantillas();
       dibujarGridPlantillas();
