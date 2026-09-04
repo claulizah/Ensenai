@@ -467,6 +467,10 @@
         <p class="ayuda">Para cargar un cuadernillo completo sin llenar un formulario por hoja. Si el archivo se llama <code>nivel__categoria__enfoque__Nombre.pdf</code>, esos datos se llenan solos; si no, se usa el nombre del archivo tal cual y queda en categoría "otros".</p>
         <input type="file" id="pl-lote" multiple accept=".svg,.png,.jpg,.jpeg,.webp,.pdf">
         <div class="check">
+          <input type="checkbox" id="chk-lote-ia">
+          <label for="chk-lote-ia">✨ Que la IA les ponga nombre y descripción mirando cada hoja (tarda unos segundos por archivo)</label>
+        </div>
+        <div class="check">
           <input type="checkbox" id="chk-lote-publicar">
           <label for="chk-lote-publicar">Publicarlas de inmediato (si no, las revisas aquí abajo antes)</label>
         </div>
@@ -508,6 +512,7 @@
           </div>
           <label>Archivo (SVG, PNG, JPG, WEBP o PDF — máx. 2 MB)</label>
           <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp,.pdf" required>
+          <p class="ayuda" id="estado-analisis" style="margin:4px 0 0;">Al elegir el archivo, la IA mira la hoja y llena los campos de arriba. Todo queda editable.</p>
           <div class="check">
             <input type="checkbox" name="publicada" id="chk-publicada">
             <label for="chk-publicada">Publicar de inmediato (si no, solo tú la ves)</label>
@@ -524,6 +529,7 @@
     `;
 
     document.getElementById("form-plantilla").addEventListener("submit", subirPlantilla);
+    document.getElementById("form-plantilla").archivo.addEventListener("change", analizarArchivoElegido);
     document.getElementById("btn-lote").addEventListener("click", subirLotePlantillas);
     dibujarGridPlantillas();
   }
@@ -621,11 +627,67 @@
     });
   }
 
+  /**
+   * Le pide a la IA que proponga los datos de una hoja (4-sep-2026).
+   *
+   * Devuelve la propuesta o null; nunca lanza, porque esto es una ayuda:
+   * si falla, la persona llena los campos a mano y sube igual.
+   */
+  async function proponerDatos(archivoBase64, tipoMime, nombreArchivo) {
+    try {
+      const { propuesta } = await llamar("/api/admin/plantillas/analizar", {
+        method: "POST",
+        body: JSON.stringify({ archivoBase64, tipoMime, nombreArchivo }),
+      });
+      return propuesta || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * Al elegir un archivo en el formulario de una sola plantilla, se llenan
+   * los campos solos. Solo se pisan los que estén VACÍOS o con su valor por
+   * omisión: si la persona ya escribió algo, su texto manda.
+   */
+  async function analizarArchivoElegido(ev) {
+    const form = document.getElementById("form-plantilla");
+    const estado = document.getElementById("estado-analisis");
+    const file = ev.target.files && ev.target.files[0];
+    if (!file || !estado) return;
+
+    if (file.size > MAX_BYTES) {
+      estado.textContent = `Ese archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo son 2 MB.`;
+      return;
+    }
+
+    estado.textContent = "✨ Mirando la hoja para proponerte los datos…";
+    const archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
+    if (!archivoBase64) {
+      estado.textContent = "No pude leer el archivo. Llena los campos a mano.";
+      return;
+    }
+
+    const p = await proponerDatos(archivoBase64, file.type, file.name);
+    if (!p) {
+      estado.textContent = "No pude proponerte los datos. Llénalos a mano y súbela igual.";
+      return;
+    }
+
+    if (!form.nombre.value.trim()) form.nombre.value = p.nombre;
+    if (!form.descripcion.value.trim()) form.descripcion.value = p.descripcion || "";
+    if (!form.categoria.value.trim() || form.categoria.value.trim() === "otros") form.categoria.value = p.categoria;
+    if (!form.nivel.value) form.nivel.value = p.nivel || "";
+    if (!form.enfoque.value) form.enfoque.value = p.enfoque || "";
+    estado.textContent = "✨ Datos propuestos — revísalos y corrige lo que quieras antes de subir.";
+  }
+
   async function subirLotePlantillas() {
     const input = document.getElementById("pl-lote");
     const avance = document.getElementById("avance-lote");
     const boton = document.getElementById("btn-lote");
     const publicar = document.getElementById("chk-lote-publicar").checked;
+    const conIA = document.getElementById("chk-lote-ia").checked;
     const archivos = Array.from(input.files || []);
 
     if (!archivos.length) {
@@ -639,7 +701,7 @@
 
     const pintar = (i) => {
       avance.innerHTML = `
-        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}</p>
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
         ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
       `;
     };
@@ -654,13 +716,29 @@
         if (!TIPOS_PLANTILLA.includes(file.type)) {
           throw new Error("ese tipo de archivo no se acepta");
         }
-        const datos = datosDesdeNombre(file.name);
+        let datos = datosDesdeNombre(file.name);
         const archivoBase64 = await leerArchivoSuelto(file);
+
+        // Con la IA prendida, su propuesta manda sobre lo que dice el
+        // nombre del archivo — salvo el nivel y el enfoque, que si venían
+        // en el nombre los puso una persona y esos ganan.
+        if (conIA) {
+          const p = await proponerDatos(archivoBase64, file.type, file.name);
+          if (p) {
+            datos = {
+              nombre: p.nombre,
+              categoria: p.categoria || datos.categoria,
+              nivel: datos.nivel || p.nivel || "",
+              enfoque: datos.enfoque || p.enfoque || "",
+              descripcion: p.descripcion || "",
+            };
+          }
+        }
         await llamar("/api/admin/plantillas", {
           method: "POST",
           body: JSON.stringify({
             nombre: datos.nombre,
-            descripcion: "",
+            descripcion: datos.descripcion || "",
             categoria: datos.categoria,
             nivel: datos.nivel || null,
             enfoque: datos.enfoque || null,
