@@ -358,6 +358,7 @@
 
       <div class="tarjeta">
         <h2>Biblioteca (${ilustraciones.length})</h2>
+        <p class="ayuda">Cuando dos ilustraciones son del mismo concepto, el tema muestra <strong>solo una</strong>. Gana la de prioridad más alta; si todas están en 0, gana la más reciente. Sube la prioridad solo cuando quieras mandar tú.</p>
         <div class="filtros">
           <input type="text" id="buscar-ilustracion" placeholder="Buscar por nombre o palabra clave…">
           <select id="filtro-categoria">
@@ -402,7 +403,12 @@
         <div class="nombre">${escapeHtml(i.nombre)}</div>
         <div class="meta">${CATEGORIAS_ILUSTRACION.find(c => c.value === i.categoria)?.label || i.categoria} · ${fmtBytes(i.tamano_bytes)}</div>
         <div class="claves">${(i.palabras_clave || []).slice(0, 5).map(k => `<span>${escapeHtml(k)}</span>`).join("")}</div>
+        <div class="meta" style="margin-top:4px;">
+          Prioridad: <strong>${i.prioridad || 0}</strong>${(i.prioridad || 0) > 0 ? " ⭐" : ""}
+        </div>
         <div class="acciones">
+          <button class="secundario chico" data-accion="subir" title="Gana esta cuando haya otra del mismo concepto">▲ Prioridad</button>
+          <button class="secundario chico" data-accion="bajar" ${(i.prioridad || 0) === 0 ? "disabled" : ""}>▼</button>
           <button class="secundario chico" data-accion="toggle">${i.activa ? "Desactivar" : "Activar"}</button>
           <button class="secundario chico peligro" data-accion="borrar">Borrar</button>
         </div>
@@ -412,9 +418,161 @@
     cont.querySelectorAll(".item").forEach((el) => {
       const id = el.dataset.id;
       const ilu = ilustraciones.find((x) => x.id === id);
+      el.querySelector('[data-accion="subir"]').onclick = () => cambiarPrioridad(ilu, +1);
+      const bajar = el.querySelector('[data-accion="bajar"]');
+      if (bajar && !bajar.disabled) bajar.onclick = () => cambiarPrioridad(ilu, -1);
       el.querySelector('[data-accion="toggle"]').onclick = () => alternarActivaIlustracion(ilu);
       el.querySelector('[data-accion="borrar"]').onclick = () => borrarIlustracion(ilu);
     });
+  }
+
+  /* ═══════════════ Homologar imágenes ═══════════════
+
+     Que todas las ilustraciones salgan del mismo tamaño, con el mismo
+     margen y en el mismo formato — las genere la IA o las suba Claudia a
+     mano (5-sep-2026).
+
+     Se hace AQUÍ, en el navegador, con canvas. No en el servidor: Render
+     no trae ninguna librería de imágenes instalada y meter una nativa
+     (sharp) a un backend que ya está en producción es justo el tipo de
+     cambio que tumba el despliegue. El navegador ya sabe hacer esto.
+
+     Además arregla un problema que estaba rompiendo el estudio: un PNG de
+     1024×1024 con transparencia pesa de 1.5 a 3 MB, y el backend tiene
+     tope de 2 MB. Todas las imágenes generadas rebotaban con "No pude
+     catalogarla" sin decir por qué. Al homologarlas quedan bien por
+     debajo del tope.
+
+     Los cuatro pasos:
+       1. RECORTAR el aire de las orillas — sin esto, una lámina con mucho
+          margen se ve chiquita al lado de una apretada.
+       2. ESCALAR para que el dibujo ocupe siempre la misma proporción.
+       3. CENTRAR en un lienzo cuadrado del mismo tamaño para todas.
+       4. EXPORTAR como PNG, bajando la resolución si no cabe en el tope.  */
+
+  // La versión homologada del archivo elegido en el formulario suelto,
+  // guardada hasta que se le da a Subir.
+  let homologadaPendiente = null;
+
+  const LIENZO = 1024;          // todas quedan de 1024 × 1024
+  const OCUPACION = 0.86;       // cuánto del lienzo ocupa el dibujo
+  const TOPE_BYTES = 1.8 * 1024 * 1024;   // con holgura bajo los 2 MB del backend
+
+  function cargarImagen(fuente) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("No pude leer esa imagen."));
+      img.src = fuente;
+    });
+  }
+
+  /**
+   * Dónde empieza y termina el dibujo de verdad, ignorando el aire.
+   *
+   * Si la imagen trae transparencia se recorta por ahí. Si no (un JPG con
+   * fondo blanco, por ejemplo), se recorta por lo que sea casi blanco. Ese
+   * segundo caso es el que hace que las imágenes que TÚ subes queden
+   * parejas con las generadas, que sí vienen sin fondo.
+   */
+  function bordesDelDibujo(ctx, w, h) {
+    const datos = ctx.getImageData(0, 0, w, h).data;
+    let hayAlfa = false;
+    for (let i = 3; i < datos.length; i += 4) {
+      if (datos[i] < 250) { hayAlfa = true; break; }
+    }
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const vacio = hayAlfa
+          ? datos[i + 3] < 12
+          : datos[i] > 246 && datos[i + 1] > 246 && datos[i + 2] > 246;
+        if (vacio) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    // Si salió todo vacío (o todo lleno), se devuelve la imagen entera:
+    // vale más dejarla como está que recortarla a nada.
+    if (x1 < x0 || y1 < y0) return { x: 0, y: 0, w, h };
+    return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+
+  /**
+   * Devuelve la imagen homologada como data URL PNG.
+   * @param {string} fuente - data URL o URL de la imagen original
+   */
+  async function homologarImagen(fuente) {
+    const img = await cargarImagen(fuente);
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) throw new Error("Esa imagen no tiene tamaño.");
+
+    // Paso 1: medir el dibujo sin su aire
+    const medidor = document.createElement("canvas");
+    medidor.width = w; medidor.height = h;
+    const mctx = medidor.getContext("2d", { willReadFrequently: true });
+    mctx.drawImage(img, 0, 0);
+    let caja;
+    try {
+      caja = bordesDelDibujo(mctx, w, h);
+    } catch (err) {
+      // getImageData truena si la imagen viene de otro dominio sin CORS.
+      // No es motivo para no homologar: se usa la imagen completa.
+      caja = { x: 0, y: 0, w, h };
+    }
+
+    // Pasos 2 y 3: escalar y centrar en el lienzo cuadrado
+    const dibujar = (lado) => {
+      const lienzo = document.createElement("canvas");
+      lienzo.width = lado; lienzo.height = lado;
+      const ctx = lienzo.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      const escala = (lado * OCUPACION) / Math.max(caja.w, caja.h);
+      const dw = caja.w * escala, dh = caja.h * escala;
+      ctx.drawImage(img, caja.x, caja.y, caja.w, caja.h,
+                    (lado - dw) / 2, (lado - dh) / 2, dw, dh);
+      return lienzo.toDataURL("image/png");
+    };
+
+    // Paso 4: si no cabe en el tope, se baja la resolución. Un ícono de
+    // 512 px se sigue viendo bien impreso y pesa la cuarta parte.
+    for (const lado of [LIENZO, 768, 512, 384]) {
+      const url = dibujar(lado);
+      if (pesoDeDataUrl(url) <= TOPE_BYTES) return url;
+    }
+    return dibujar(384);
+  }
+
+  /** Cuánto pesa de verdad un data URL en base64. */
+  function pesoDeDataUrl(url) {
+    const coma = url.indexOf(",");
+    const b64 = coma >= 0 ? url.slice(coma + 1) : url;
+    const relleno = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+    return Math.floor((b64.length * 3) / 4) - relleno;
+  }
+
+  /** Dispara la descarga de un data URL con el nombre que se le dé. */
+  function descargarDataUrl(dataUrl, nombreArchivo) {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  /** Un nombre de archivo decente a partir de la descripción. */
+  function nombreDeArchivo(texto) {
+    const base = String(texto || "ilustracion")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+    return (base || "ilustracion") + ".png";
   }
 
   /**
@@ -432,7 +590,10 @@
         body: JSON.stringify({ archivoBase64, tipoMime, nombreArchivo }),
       });
     } catch (err) {
-      return null;
+      // Antes devolvía null y el motivo se perdía. Costó caro: 46
+      // imágenes rebotando por pesar más de 2 MB y en pantalla solo se
+      // leía "No pude catalogarla". El error viaja de regreso.
+      return { propuesta: null, repetida: null, error: err.message };
     }
   }
 
@@ -448,11 +609,26 @@
       return;
     }
 
-    estado.textContent = "✨ Mirando la imagen para proponerte los datos…";
-    const archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
+    estado.textContent = "✨ Emparejando la imagen y mirándola…";
+    let archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
     if (!archivoBase64) {
       estado.textContent = "No pude leer el archivo. Llena los campos a mano.";
       return;
+    }
+    // Se homologa lo que TÚ subes igual que lo que genera la IA: mismo
+    // lienzo, mismo margen, mismo formato. Si no, tu biblioteca acaba con
+    // unas láminas grandes y otras chiquitas.
+    if (file.type !== "image/svg+xml") {
+      try {
+        archivoBase64 = await homologarImagen(archivoBase64);
+        homologadaPendiente = archivoBase64;
+      } catch (err) {
+        homologadaPendiente = null;   // se sube tal cual, mejor que nada
+      }
+    } else {
+      // Un SVG ya es vectorial y se escala solo: recortarlo en un canvas
+      // lo convertiría en mapa de bits y perdería justo su ventaja.
+      homologadaPendiente = null;
     }
 
     const r = await proponerDatosIlustracion(archivoBase64, file.type, file.name);
@@ -475,7 +651,9 @@
     if (!form.palabrasClave.value.trim()) form.palabrasClave.value = (p.palabras_clave || []).join(", ");
     if (!form.categoria.value || form.categoria.value === "otros") form.categoria.value = p.categoria;
     if (!r.repetida) {
-      estado.textContent = "✨ Datos propuestos — revisa sobre todo las palabras clave: son lo que la conecta con los temas.";
+      estado.textContent = homologadaPendiente
+        ? "✨ Imagen emparejada al formato de la biblioteca y datos propuestos — revisa sobre todo las palabras clave."
+        : "✨ Datos propuestos — revisa sobre todo las palabras clave: son lo que la conecta con los temas.";
     }
   }
 
@@ -535,7 +713,16 @@
         if (!TIPOS_ILUSTRACION.includes(file.type)) {
           throw new Error("ese tipo de archivo no se acepta");
         }
-        const archivoBase64 = await leerArchivoSuelto(file);
+        let archivoBase64 = await leerArchivoSuelto(file);
+        let tipoSubida = file.type;
+        if (file.type !== "image/svg+xml") {
+          try {
+            archivoBase64 = await homologarImagen(archivoBase64);
+            tipoSubida = "image/png";
+          } catch (err) {
+            /* si no se pudo emparejar, se sube tal cual */
+          }
+        }
 
         let nombre = nombreDesdeArchivo(file.name);
         let categoria = "otros";
@@ -543,7 +730,7 @@
         let claves = clavesDesdeNombre(file.name);
 
         if (conIA) {
-          const r = await proponerDatosIlustracion(archivoBase64, file.type, file.name);
+          const r = await proponerDatosIlustracion(archivoBase64, tipoSubida, file.name);
           if (r && r.repetida) {
             // Ya está: ni se intenta subir. Se ahorra la subida y el 409.
             repetidas.push(`${file.name}: ya está como "${r.repetida.nombre}"`);
@@ -574,7 +761,7 @@
             descripcion,
             activa,
             archivoBase64,
-            tipoMime: file.type,
+            tipoMime: tipoSubida,
           }),
         });
         subidas++;
@@ -607,6 +794,12 @@
       boton.disabled = true;
       boton.textContent = "Subiendo…";
 
+      // Se sube la versión emparejada si la hay. Se prepara al elegir el
+      // archivo (analizarIlustracionElegida); si eso falló, o si es un SVG,
+      // se sube el original — mejor eso que no subirla.
+      const subir = homologadaPendiente || archivo.archivoBase64;
+      const tipo = homologadaPendiente ? "image/png" : archivo.tipoMime;
+
       await llamar("/api/admin/ilustraciones", {
         method: "POST",
         body: JSON.stringify({
@@ -617,12 +810,13 @@
           licencia: form.licencia.value.trim(),
           autor: form.autor.value.trim(),
           fuenteUrl: form.fuenteUrl.value.trim(),
-          archivoBase64: archivo.archivoBase64,
-          tipoMime: archivo.tipoMime,
+          archivoBase64: subir,
+          tipoMime: tipo,
         }),
       });
 
-      msg.innerHTML = `<div class="exito">Ilustración subida ✓</div>`;
+      msg.innerHTML = `<div class="exito">Ilustración subida ✓${homologadaPendiente ? " y emparejada al formato de la biblioteca" : ""}</div>`;
+      homologadaPendiente = null;
       form.reset();
       await cargarIlustraciones();
       dibujarGridIlustraciones();
@@ -632,6 +826,28 @@
     } finally {
       boton.disabled = false;
       boton.textContent = "Subir ilustración";
+    }
+  }
+
+  /**
+   * Sube o baja la prioridad de una ilustración (schema_v43).
+   *
+   * Es el desempate manual: cuando dos láminas son del mismo concepto, el
+   * tema enseña una sola y gana la de prioridad más alta. Se mueve de uno
+   * en uno a propósito — no es una escala fina, es "esta antes que esa".
+   */
+  async function cambiarPrioridad(ilu, delta) {
+    const nueva = Math.max(0, Math.min(100, (ilu.prioridad || 0) + delta));
+    if (nueva === (ilu.prioridad || 0)) return;
+    try {
+      await llamar(`/api/admin/ilustraciones/${ilu.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ prioridad: nueva }),
+      });
+      ilu.prioridad = nueva;
+      dibujarGridIlustraciones();
+    } catch (err) {
+      alert(err.message);
     }
   }
 
@@ -1418,6 +1634,7 @@
           ? `<div class="exito" style="margin:6px 0 0;">✓ Ya está en la biblioteca</div>`
           : `<div class="acciones">
                <button class="primario chico" data-accion="aprobar">Aprobar</button>
+               <button class="secundario chico" data-accion="descargar">⬇ Descargar</button>
                <button class="secundario chico peligro" data-accion="tirar">Tirar</button>
              </div>`}
         <div class="msg-mini"></div>
@@ -1426,6 +1643,23 @@
 
     cont.querySelectorAll('[data-accion="aprobar"]').forEach((b) => {
       b.onclick = () => aprobarGenerada(b.closest("[data-id]").dataset.id, b);
+    });
+    cont.querySelectorAll('[data-accion="descargar"]').forEach((b) => {
+      b.onclick = async () => {
+        const g = generadas.find((x) => String(x.id) === String(b.closest("[data-id]").dataset.id));
+        if (!g) return;
+        b.disabled = true;
+        try {
+          // Se descarga la versión homologada, no la cruda: si la vas a
+          // usar en otro lado, la que sirve es la que ya está pareja con
+          // el resto de tu biblioteca.
+          g.homologada = g.homologada || (await homologarImagen(`data:image/png;base64,${g.base64}`));
+          descargarDataUrl(g.homologada, nombreDeArchivo(g.descripcion));
+        } catch (err) {
+          alert(err.message);
+        }
+        b.disabled = false;
+      };
     });
     cont.querySelectorAll('[data-accion="tirar"]').forEach((b) => {
       b.onclick = () => {
@@ -1495,10 +1729,18 @@
     msg.innerHTML = `<p class="ayuda" style="margin:6px 0 0;">✨ Catalogándola…</p>`;
 
     try {
-      const dataUrl = `data:image/png;base64,${g.base64}`;
+      // Se homologa ANTES de catalogar: así lo que la IA mira es
+      // exactamente lo que se va a guardar, y de paso baja del tope de
+      // 2 MB del backend — un PNG de 1024 con transparencia pesa más y
+      // por eso todas rebotaban con un error que no decía nada.
+      const dataUrl = g.homologada || (await homologarImagen(`data:image/png;base64,${g.base64}`));
+      g.homologada = dataUrl;
+
       const r = await proponerDatosIlustracion(dataUrl, "image/png", "");
       const p = r && r.propuesta;
-      if (!p) throw new Error("No pude catalogarla. Descárgala y súbela a mano desde Ilustraciones.");
+      // El motivo real, no un mensaje genérico: sin esto, un archivo muy
+      // pesado y un modelo que no contestó se ven igual desde afuera.
+      if (!p) throw new Error((r && r.error) || "No pude catalogarla. Descárgala y súbela a mano desde Ilustraciones.");
 
       await llamar("/api/admin/ilustraciones", {
         method: "POST",
