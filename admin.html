@@ -276,6 +276,7 @@
         <button data-tab="ilustraciones" class="${pestañaActiva === "ilustraciones" ? "activo" : ""}">🖼️ Ilustraciones <span class="cuenta">(${ilustraciones.length})</span></button>
         <button data-tab="plantillas" class="${pestañaActiva === "plantillas" ? "activo" : ""}">📄 Plantillas <span class="cuenta">(${plantillas.length})</span></button>
         <button data-tab="faltantes" class="${pestañaActiva === "faltantes" ? "activo" : ""}">🧩 Faltantes <span class="cuenta">(${faltantes.filter(f => !f.resuelta).length})</span></button>
+        <button data-tab="estudio" class="${pestañaActiva === "estudio" ? "activo" : ""}">✨ Estudio</button>
       </div>
       <div id="panel"></div>
     `;
@@ -285,6 +286,7 @@
     if (pestañaActiva === "ilustraciones") renderIlustraciones();
     if (pestañaActiva === "plantillas") renderPlantillas();
     if (pestañaActiva === "faltantes") renderFaltantes();
+    if (pestañaActiva === "estudio") renderEstudio();
   }
 
   /* ═══════════════ Panel: Ilustraciones ═══════════════ */
@@ -1265,6 +1267,262 @@
   }
 
   /* ═══════════════ Panel: Faltantes ═══════════════ */
+
+  /* ═══════════════ Panel: Estudio de ilustraciones ═══════════════
+
+     Generar imágenes con IA para llenar la biblioteca (5-sep-2026).
+
+     Regla del panel: GENERA Y ENSEÑA, no guarda. Cada imagen se queda en
+     la pantalla hasta que la persona la aprueba a mano. Un modelo de
+     imagen falla de formas raras y esto lo ven niños; además así el bucket
+     no se llena de descartes.
+
+     El costo se enseña ANTES de generar, no después. Es dinero de la
+     usuaria y tiene que poder decidir con el número enfrente.             */
+
+  let modelosEstudio = [];
+  let estudioConfigurado = false;
+  let tipoCambio = 17;
+  let generadas = [];          // { id, descripcion, base64, costoUsd, estado }
+
+  async function cargarModelosEstudio() {
+    try {
+      const d = await llamar("/api/admin/estudio/modelos");
+      modelosEstudio = d.modelos || [];
+      estudioConfigurado = !!d.configurado;
+      tipoCambio = d.tipoCambioAproximado || 17;
+    } catch (err) {
+      modelosEstudio = [];
+      estudioConfigurado = false;
+    }
+  }
+
+  function precioElegido() {
+    const modelo = document.getElementById("es-modelo")?.value;
+    const calidad = document.getElementById("es-calidad")?.value;
+    const m = modelosEstudio.find((x) => x.id === modelo);
+    const usd = m && m.precios ? m.precios[calidad] : null;
+    return typeof usd === "number" ? usd : null;
+  }
+
+  /** Cuántas descripciones hay escritas ahorita en la caja. */
+  function lineasPedidas() {
+    const txt = document.getElementById("es-lista")?.value || "";
+    return txt.split("\n").map((l) => l.trim()).filter(Boolean);
+  }
+
+  function actualizarEstimado() {
+    const caja = document.getElementById("es-estimado");
+    if (!caja) return;
+    const n = lineasPedidas().length;
+    const usd = precioElegido();
+    if (!n) { caja.textContent = "Escribe una descripción por renglón."; return; }
+    if (usd == null) { caja.textContent = `${n} imagen(es).`; return; }
+    const totalUsd = usd * n;
+    caja.innerHTML = `<strong>${n} imagen(es)</strong> · ~$${totalUsd.toFixed(3)} USD ` +
+      `(≈ $${(totalUsd * tipoCambio).toFixed(2)} MXN) · $${usd.toFixed(3)} c/u`;
+  }
+
+  async function renderEstudio() {
+    const panel = document.getElementById("panel");
+    panel.innerHTML = `<div class="cargando">Cargando el estudio…</div>`;
+    await cargarModelosEstudio();
+
+    const opcModelos = modelosEstudio.map((m) =>
+      `<option value="${escapeHtml(m.id)}">${escapeHtml(m.etiqueta)}</option>`).join("");
+
+    // Los temas que se quedaron sin ilustración: es la lista de la
+    // siguiente tanda, escrita sola por el sistema.
+    const pendientes = faltantes.filter((f) => !f.resuelta).slice(0, 12);
+
+    panel.innerHTML = `
+      ${estudioConfigurado ? "" : `
+      <div class="tarjeta" style="border-color:#F5A524;">
+        <h2>⚠️ Falta la llave de OpenAI</h2>
+        <p class="ayuda">El estudio no puede generar nada hasta que exista la variable <code>OPENAI_API_KEY</code> en Render. Se saca en <strong>platform.openai.com → API keys</strong>, y hay que cargarle saldo en <strong>Billing</strong>. Todo lo demás del panel funciona igual.</p>
+      </div>`}
+
+      <div class="tarjeta">
+        <h2>✨ Generar ilustraciones</h2>
+        <p class="ayuda">Una descripción por renglón. Se genera una por una y aquí abajo las apruebas o las tiras — <strong>nada se guarda hasta que tú digas</strong>. El estilo de EnseñAI y el fondo transparente se aplican solos a todas.</p>
+
+        <label>Qué quieres que dibuje (un renglón por imagen)</label>
+        <textarea id="es-lista" rows="5" placeholder="una manzana roja&#10;el sistema solar con los ocho planetas&#10;un vaso con agua y un termómetro"></textarea>
+
+        <div class="fila">
+          <div>
+            <label>Modelo</label>
+            <select id="es-modelo">${opcModelos}</select>
+          </div>
+          <div>
+            <label>Calidad</label>
+            <select id="es-calidad">
+              <option value="low">Baja — la más barata</option>
+              <option value="medium" selected>Media</option>
+              <option value="high">Alta</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="aviso" id="es-estimado" style="text-align:left;">Escribe una descripción por renglón.</div>
+        <button class="primario" type="button" id="btn-estudio" ${estudioConfigurado ? "" : "disabled"}>Generar</button>
+        <div id="es-avance"></div>
+      </div>
+
+      ${pendientes.length ? `
+      <div class="tarjeta">
+        <h2>Temas que se quedaron sin ilustración</h2>
+        <p class="ayuda">Escritos solos por el sistema cuando un tema no encontró nada. Da clic para agregarlos a la caja de arriba.</p>
+        <div class="claves">
+          ${pendientes.map((f) => `<span class="chip-faltante" data-tema="${escapeHtml(f.tema_ejemplo)}" style="cursor:pointer;">${escapeHtml(f.tema_ejemplo)} · ${f.veces}×</span>`).join("")}
+        </div>
+      </div>` : ""}
+
+      <div class="tarjeta">
+        <h2>Resultados <span class="cuenta" id="es-cuenta">(${generadas.length})</span></h2>
+        <p class="ayuda">Al aprobar una, se sube a la biblioteca y el agente le pone nombre, categoría y palabras clave solo.</p>
+        <div id="es-grid" class="grid"></div>
+      </div>
+    `;
+
+    document.getElementById("es-lista").addEventListener("input", actualizarEstimado);
+    document.getElementById("es-modelo").addEventListener("change", actualizarEstimado);
+    document.getElementById("es-calidad").addEventListener("change", actualizarEstimado);
+    document.getElementById("btn-estudio").addEventListener("click", generarLoteEstudio);
+    panel.querySelectorAll(".chip-faltante").forEach((chip) => {
+      chip.onclick = () => {
+        const caja = document.getElementById("es-lista");
+        caja.value = (caja.value.trim() ? caja.value.replace(/\s*$/, "\n") : "") + chip.dataset.tema;
+        actualizarEstimado();
+      };
+    });
+    actualizarEstimado();
+    dibujarGridEstudio();
+  }
+
+  function dibujarGridEstudio() {
+    const cont = document.getElementById("es-grid");
+    if (!cont) return;
+    const cuenta = document.getElementById("es-cuenta");
+    if (cuenta) cuenta.textContent = `(${generadas.length})`;
+
+    if (!generadas.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado nada.</p>`;
+      return;
+    }
+    cont.innerHTML = generadas.map((g) => `
+      <div class="item" data-id="${g.id}">
+        <div class="miniatura"><img src="data:image/png;base64,${g.base64}" alt="${escapeHtml(g.descripcion)}"></div>
+        <div class="nombre">${escapeHtml(g.descripcion)}</div>
+        ${g.estado === "guardada"
+          ? `<div class="exito" style="margin:6px 0 0;">✓ Ya está en la biblioteca</div>`
+          : `<div class="acciones">
+               <button class="primario chico" data-accion="aprobar">Aprobar</button>
+               <button class="secundario chico peligro" data-accion="tirar">Tirar</button>
+             </div>`}
+        <div class="msg-mini"></div>
+      </div>
+    `).join("");
+
+    cont.querySelectorAll('[data-accion="aprobar"]').forEach((b) => {
+      b.onclick = () => aprobarGenerada(b.closest("[data-id]").dataset.id, b);
+    });
+    cont.querySelectorAll('[data-accion="tirar"]').forEach((b) => {
+      b.onclick = () => {
+        const id = b.closest("[data-id]").dataset.id;
+        generadas = generadas.filter((g) => String(g.id) !== String(id));
+        dibujarGridEstudio();
+      };
+    });
+  }
+
+  async function generarLoteEstudio() {
+    const boton = document.getElementById("btn-estudio");
+    const avance = document.getElementById("es-avance");
+    const lista = lineasPedidas();
+    if (!lista.length) {
+      avance.innerHTML = `<div class="error">Escribe al menos una descripción.</div>`;
+      return;
+    }
+    const modelo = document.getElementById("es-modelo").value;
+    const calidad = document.getElementById("es-calidad").value;
+
+    boton.disabled = true;
+    let gastoUsd = 0, fallas = [];
+
+    for (let i = 0; i < lista.length; i++) {
+      avance.innerHTML = `<p class="ayuda" style="margin:8px 0 4px;">Generando <strong>${i + 1} de ${lista.length}</strong> — cada una tarda entre 10 y 30 segundos…</p>`;
+      try {
+        const r = await llamar("/api/admin/estudio/generar", {
+          method: "POST",
+          body: JSON.stringify({ descripcion: lista[i], modelo, calidad }),
+        });
+        gastoUsd += r.costoUsd || 0;
+        generadas.unshift({
+          id: `g${Date.now()}_${i}`,
+          descripcion: lista[i],
+          base64: r.imagen,
+          costoUsd: r.costoUsd,
+          estado: "pendiente",
+        });
+        dibujarGridEstudio();
+      } catch (err) {
+        fallas.push(`${lista[i]}: ${err.message}`);
+        // Si la llave está mal o se acabó el saldo, TODAS las demás van a
+        // fallar igual. Cortar aquí evita gastar el rato en 20 errores.
+        if (/OPENAI_API_KEY|saldo|no es válida/i.test(err.message)) break;
+      }
+    }
+
+    boton.disabled = false;
+    avance.innerHTML = `
+      <div class="exito" style="margin-top:6px;">Listo. Gastaste ~$${gastoUsd.toFixed(3)} USD (≈ $${(gastoUsd * tipoCambio).toFixed(2)} MXN). Revísalas abajo antes de guardarlas.</div>
+      ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}`;
+  }
+
+  /**
+   * Aprobar = subirla de verdad. Pasa por el POST /ilustraciones normal, así
+   * que hereda el dedupe por huella y el rechazo si no tiene palabras clave.
+   * Los datos los propone el agente describirIlustracion mirando la imagen
+   * recién generada — la persona no escribe nada.
+   */
+  async function aprobarGenerada(id, boton) {
+    const g = generadas.find((x) => String(x.id) === String(id));
+    if (!g) return;
+    const tarjeta = boton.closest("[data-id]");
+    const msg = tarjeta.querySelector(".msg-mini");
+    boton.disabled = true;
+    msg.innerHTML = `<p class="ayuda" style="margin:6px 0 0;">✨ Catalogándola…</p>`;
+
+    try {
+      const dataUrl = `data:image/png;base64,${g.base64}`;
+      const r = await proponerDatosIlustracion(dataUrl, "image/png", "");
+      const p = r && r.propuesta;
+      if (!p) throw new Error("No pude catalogarla. Descárgala y súbela a mano desde Ilustraciones.");
+
+      await llamar("/api/admin/ilustraciones", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: p.nombre,
+          categoria: p.categoria,
+          palabrasClave: (p.palabras_clave || []).join(", "),
+          descripcion: p.descripcion || "",
+          activa: true,
+          // Queda anotado de dónde salió: si algún día hay que revisar qué
+          // se generó con IA y qué se subió a mano, esto es la única pista.
+          autor: "Generada con IA (EnseñAI)",
+          archivoBase64: dataUrl,
+          tipoMime: "image/png",
+        }),
+      });
+      g.estado = "guardada";
+      await cargarIlustraciones();
+      dibujarGridEstudio();
+    } catch (err) {
+      boton.disabled = false;
+      msg.innerHTML = `<div class="error" style="margin:6px 0 0;">${escapeHtml(err.message)}</div>`;
+    }
+  }
 
   function renderFaltantes() {
     const panel = document.getElementById("panel");
