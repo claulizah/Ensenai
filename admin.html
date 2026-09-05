@@ -293,6 +293,22 @@
     const panel = document.getElementById("panel");
     panel.innerHTML = `
       <div class="tarjeta">
+        <h2>📦 Subir varias a la vez</h2>
+        <p class="ayuda">Aquí la IA no es opcional de adorno: una ilustración sin palabras clave no se engancha a ningún tema, y ponerle diez a mano por imagen es lo que hace que la biblioteca se quede a medias. Con la casilla prendida, mira cada dibujo y le pone nombre, categoría y de 8 a 15 palabras clave. Todo queda editable después.</p>
+        <input type="file" id="il-lote" multiple accept=".svg,.png,.jpg,.jpeg,.webp">
+        <div class="check">
+          <input type="checkbox" id="chk-il-ia" checked>
+          <label for="chk-il-ia">✨ Que la IA las catalogue (sin esto, solo se suben las que traigan palabras clave en el nombre del archivo)</label>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="chk-il-activa" checked>
+          <label for="chk-il-activa">Dejarlas activas (si no, no se enganchan a ningún tema hasta que las prendas)</label>
+        </div>
+        <button class="primario" type="button" id="btn-il-lote">Subir las que elegí</button>
+        <div id="avance-il-lote"></div>
+      </div>
+
+      <div class="tarjeta">
         <h2>Subir ilustración</h2>
         <p class="ayuda">Se engancha sola a los temas que mencionen sus palabras clave — el maestro nunca la pide directamente.</p>
         <form id="form-ilustracion">
@@ -304,6 +320,12 @@
             <div>
               <label>Categoría</label>
               <select name="categoria" required>
+                <!-- Arranca vacío a propósito: sin esta opción, el select se
+                     queda en la primera de la lista y todo lo que se subía sin
+                     tocarla terminaba en "emociones" sin que nadie lo pidiera.
+                     Vacío + required obliga a elegir, y deja que la IA la
+                     llene sin pisar una elección que nunca se hizo. -->
+                <option value="">Elige una…</option>
                 ${CATEGORIAS_ILUSTRACION.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
               </select>
             </div>
@@ -326,6 +348,7 @@
           <input type="url" name="fuenteUrl" placeholder="https://...">
           <label>Archivo (SVG, PNG, JPG o WEBP — máx. 2 MB)</label>
           <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp" required>
+          <p class="ayuda" id="estado-analisis-il" style="margin:4px 0 0;">Al elegir el archivo, la IA lo mira y llena los campos de arriba. Todo queda editable.</p>
           <button class="primario" type="submit">Subir ilustración</button>
           <div id="msg-ilustracion"></div>
         </form>
@@ -345,6 +368,8 @@
     `;
 
     document.getElementById("form-ilustracion").addEventListener("submit", subirIlustracion);
+    document.getElementById("form-ilustracion").archivo.addEventListener("change", analizarIlustracionElegida);
+    document.getElementById("btn-il-lote").addEventListener("click", subirLoteIlustraciones);
     document.getElementById("buscar-ilustracion").addEventListener("input", debounce(refiltrarIlustraciones, 350));
     document.getElementById("filtro-categoria").addEventListener("change", refiltrarIlustraciones);
     dibujarGridIlustraciones();
@@ -388,6 +413,181 @@
       el.querySelector('[data-accion="toggle"]').onclick = () => alternarActivaIlustracion(ilu);
       el.querySelector('[data-accion="borrar"]').onclick = () => borrarIlustracion(ilu);
     });
+  }
+
+  /**
+   * Catalogar ilustraciones con IA (5-sep-2026).
+   *
+   * Lo pidió Claudia después de ver funcionar el de plantillas: "para las
+   * ilustraciones podríamos hacer lo mismo?". La diferencia está en QUÉ es
+   * lo valioso. En una plantilla, el nombre; aquí, las palabras clave: son
+   * lo único que conecta la imagen con un tema (utils/iconMatcher.js).
+   */
+  async function proponerDatosIlustracion(archivoBase64, tipoMime, nombreArchivo) {
+    try {
+      return await llamar("/api/admin/ilustraciones/analizar", {
+        method: "POST",
+        body: JSON.stringify({ archivoBase64, tipoMime, nombreArchivo }),
+      });
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /** Solo pisa los campos VACÍOS: si ya escribiste algo, tu texto manda. */
+  async function analizarIlustracionElegida(ev) {
+    const form = document.getElementById("form-ilustracion");
+    const estado = document.getElementById("estado-analisis-il");
+    const file = ev.target.files && ev.target.files[0];
+    if (!file || !estado) return;
+
+    if (file.size > MAX_BYTES) {
+      estado.textContent = `Esa imagen pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo son 2 MB.`;
+      return;
+    }
+
+    estado.textContent = "✨ Mirando la imagen para proponerte los datos…";
+    const archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
+    if (!archivoBase64) {
+      estado.textContent = "No pude leer el archivo. Llena los campos a mano.";
+      return;
+    }
+
+    const r = await proponerDatosIlustracion(archivoBase64, file.type, file.name);
+    if (!r) {
+      estado.textContent = "No pude proponerte los datos. Llénalos a mano y súbela igual.";
+      return;
+    }
+
+    // Que ya esté subida es lo primero que hay que saber: llenar el
+    // formulario de algo que va a rebotar es trabajo tirado.
+    if (r.repetida) {
+      estado.textContent = `⏭️ Esa imagen ya está en la biblioteca como "${r.repetida.nombre}". Si la subes se va a rechazar.`;
+      if (!r.propuesta) return;
+    }
+
+    const p = r.propuesta;
+    if (!p) return;
+    if (!form.nombre.value.trim()) form.nombre.value = p.nombre;
+    if (!form.descripcion.value.trim()) form.descripcion.value = p.descripcion || "";
+    if (!form.palabrasClave.value.trim()) form.palabrasClave.value = (p.palabras_clave || []).join(", ");
+    if (!form.categoria.value || form.categoria.value === "otros") form.categoria.value = p.categoria;
+    if (!r.repetida) {
+      estado.textContent = "✨ Datos propuestos — revisa sobre todo las palabras clave: son lo que la conecta con los temas.";
+    }
+  }
+
+  /**
+   * Las palabras clave del nombre del archivo, para quien no quiera usar la
+   * IA: "sistema-solar-planetas-orbita.png" → esas tres. Es un respaldo
+   * pobre a propósito; lo bueno lo hace el modelo mirando el dibujo.
+   */
+  function clavesDesdeNombre(nombreArchivo) {
+    const base = String(nombreArchivo || "").replace(/\.[^.]+$/, "");
+    const palabras = base
+      .split(/[-_\s]+/)
+      .map((x) => x.trim().toLowerCase())
+      .filter((x) => x.length >= 3 && !/^\d+$/.test(x));
+    return [...new Set(palabras)];
+  }
+
+  /** Título legible desde el nombre del archivo: "sistema-solar" → "Sistema solar". */
+  function nombreDesdeArchivo(nombreArchivo) {
+    const base = String(nombreArchivo || "").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+    return base ? base.charAt(0).toUpperCase() + base.slice(1) : "";
+  }
+
+  async function subirLoteIlustraciones() {
+    const input = document.getElementById("il-lote");
+    const avance = document.getElementById("avance-il-lote");
+    const boton = document.getElementById("btn-il-lote");
+    const conIA = document.getElementById("chk-il-ia").checked;
+    const activa = document.getElementById("chk-il-activa").checked;
+    const archivos = Array.from(input.files || []);
+
+    if (!archivos.length) {
+      avance.innerHTML = `<div class="error">Primero elige los archivos.</div>`;
+      return;
+    }
+
+    boton.disabled = true;
+    const fallas = [];
+    const repetidas = [];
+    let subidas = 0;
+
+    const pintar = (i) => {
+      avance.innerHTML = `
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${repetidas.length ? ` · ⏭️ ${repetidas.length} ya estaban` : ""}${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
+        ${repetidas.length ? `<div class="aviso" style="text-align:left;">${repetidas.map((r) => escapeHtml(r)).join("<br>")}</div>` : ""}
+        ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
+      `;
+    };
+    pintar(0);
+
+    for (let i = 0; i < archivos.length; i++) {
+      const file = archivos[i];
+      try {
+        if (file.size > MAX_BYTES) {
+          throw new Error(`pesa ${(file.size / 1024 / 1024).toFixed(1)} MB (máx. 2 MB)`);
+        }
+        if (!TIPOS_ILUSTRACION.includes(file.type)) {
+          throw new Error("ese tipo de archivo no se acepta");
+        }
+        const archivoBase64 = await leerArchivoSuelto(file);
+
+        let nombre = nombreDesdeArchivo(file.name);
+        let categoria = "otros";
+        let descripcion = "";
+        let claves = clavesDesdeNombre(file.name);
+
+        if (conIA) {
+          const r = await proponerDatosIlustracion(archivoBase64, file.type, file.name);
+          if (r && r.repetida) {
+            // Ya está: ni se intenta subir. Se ahorra la subida y el 409.
+            repetidas.push(`${file.name}: ya está como "${r.repetida.nombre}"`);
+            pintar(i + 1);
+            continue;
+          }
+          const p = r && r.propuesta;
+          if (p) {
+            nombre = p.nombre || nombre;
+            categoria = p.categoria || categoria;
+            descripcion = p.descripcion || "";
+            claves = p.palabras_clave && p.palabras_clave.length ? p.palabras_clave : claves;
+          }
+        }
+
+        // Sin palabras clave el servidor la rechaza — y hace bien: sería un
+        // archivo que nunca aparecería en ningún tema.
+        if (!claves.length) {
+          throw new Error("no le pude sacar palabras clave; súbela con el formulario de abajo");
+        }
+
+        await llamar("/api/admin/ilustraciones", {
+          method: "POST",
+          body: JSON.stringify({
+            nombre,
+            categoria,
+            palabrasClave: claves.join(", "),
+            descripcion,
+            activa,
+            archivoBase64,
+            tipoMime: file.type,
+          }),
+        });
+        subidas++;
+      } catch (err) {
+        if (/ya está en la biblioteca/i.test(err.message || "")) repetidas.push(`${file.name}: ${err.message}`);
+        else fallas.push(`${file.name}: ${err.message}`);
+      }
+      pintar(i + 1);
+    }
+
+    boton.disabled = false;
+    input.value = "";
+    await cargarIlustraciones();
+    dibujarGridIlustraciones();
+    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} ilustración(es) en la biblioteca${repetidas.length ? `, y ${repetidas.length} que ya tenías se saltaron` : ""}. Revisa sus palabras clave abajo antes de darlo por bueno.</div>`;
   }
 
   async function subirIlustracion(ev) {
