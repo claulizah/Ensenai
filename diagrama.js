@@ -45,6 +45,11 @@
      las filas que tienen "nombre + explicación" se parten en dos columnas.  */
   var CSS = [
     ".dg-caja{border:2px solid var(--linea,#DCEEFC);border-radius:16px;padding:14px;margin-bottom:18px;background:#fff;}",
+    /* Figuras y gráficas (figuras.js). El SVG se escala solo; el centrado
+       y el scroll horizontal son por si una gráfica ancha cae en un celular
+       angosto — vale más que se pueda arrastrar a que se encoja ilegible. */
+    ".dg-figura{display:flex;justify-content:center;overflow-x:auto;padding:4px 0;}",
+    ".dg-figura svg{max-width:100%;height:auto;}",
     ".dg-caja h3.dg-titulo{font-family:'Grandstander',sans-serif;font-size:1rem;margin:0 0 10px;color:var(--profundo,#1E3A8A);}",
     ".dg-todo{background:var(--profundo,#1E3A8A);color:#fff;border-radius:12px;padding:10px 14px;font-weight:800;font-size:0.95rem;line-height:1.3;text-align:center;margin-bottom:10px;}",
     ".dg-lista{display:flex;flex-direction:column;gap:8px;}",
@@ -273,7 +278,30 @@
     );
   }
 
+  /**
+   * Figuras geométricas y gráficas — las dibuja figuras.js (5-sep-2026).
+   *
+   * Vive aparte porque es mucho código de geometría y porque el backend usa
+   * ESE MISMO archivo para meter la figura al PDF. Aquí solo se envuelve.
+   *
+   * Si figuras.js no cargó, devuelve "" y el tema sale sin figura: nunca se
+   * rompe la vista por una imagen.
+   */
+  function figuraSVG(datos) {
+    if (!window.EnsenaiFiguras) return "";
+    var svg = window.EnsenaiFiguras.figura(datos || {});
+    return svg ? '<div class="dg-figura">' + svg + "</div>" : "";
+  }
+
+  function graficaSVG(datos) {
+    if (!window.EnsenaiFiguras) return "";
+    var svg = window.EnsenaiFiguras.grafica(datos || {});
+    return svg ? '<div class="dg-figura">' + svg + "</div>" : "";
+  }
+
   var DIBUJANTES = {
+    figura: figuraSVG,
+    grafica: graficaSVG,
     mapa_mental: mapaMental,
     linea_tiempo: lineaTiempo,
     comparativo: comparativo,
