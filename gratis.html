@@ -93,6 +93,13 @@ footer a{ color:var(--gris-claro); text-decoration:none; margin-left:16px; }
 footer a:hover{ color:var(--profundo); }
 :focus-visible{ outline:3px solid var(--coral); outline-offset:3px; border-radius:6px; }
 @media (prefers-reduced-motion:reduce){ html{ scroll-behavior:auto; } *{ transition:none!important; } }
+
+/* Salidas de la barra. Se esconden en pantallas angostas: con las tres
+   visibles la barra no cabe en 390px y la página se movía de lado. */
+.salidas{ display:flex; align-items:center; gap:18px; }
+.salida{ color:var(--gris); text-decoration:none; font-weight:700; font-size:.94rem; white-space:nowrap; }
+.salida:hover{ color:var(--profundo); }
+@media (max-width:620px){ .salida{ display:none; } }
 </style>
 </head>
 <body>
@@ -100,7 +107,12 @@ footer a:hover{ color:var(--profundo); }
 <div class="barra">
   <div class="envoltura">
     <a class="marca" href="/"><img src="/assets/favicon-32.png" alt=""> EnseñAI</a>
-    <a class="btn chico azul" href="/#precios-individual">Empieza gratis</a>
+    <span class="salidas">
+      <a class="salida" href="/hojas/">Hojas por tema</a>
+      <a class="salida" href="/#precios-individual">Cómo funciona</a>
+      <a class="salida" href="/blog/">Blog</a>
+      <a class="btn chico azul" href="/comprador.html?despues=tema">Empieza gratis</a>
+    </span>
   </div>
 </div>
 
@@ -138,6 +150,26 @@ footer a:hover{ color:var(--profundo); }
     <p style="margin-top:26px;color:var(--gris);max-width:64ch;">
       Se imprimen en blanco y negro, traen línea para nombre y fecha, y ninguna manda
       al alumno a buscar nada en internet. Están hechas para fotocopiarse.
+    </p>
+  </div>
+</section>
+
+
+<section id="demo" style="display:none;">
+  <div class="envoltura">
+    <p class="ojo">Antes de registrarte</p>
+    <h2 style="font-size:1.7rem;">Mira un tema de verdad, sin dar tus datos</h2>
+    <p style="color:var(--gris);max-width:64ch;margin-top:12px;">
+      Este es un tema completo generado con EnseñAI, tal como te llegaría a ti. Ábrelo
+      y revísalo con calma: el resumen, los ejercicios, la trivia y el material para
+      imprimir. No te pide correo ni contraseña.
+    </p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:24px;">
+      <a class="btn" id="ligaDemo" href="#" target="_blank" rel="noopener">👀 Ver el tema de ejemplo</a>
+      <a class="btn azul" href="/comprador.html?despues=tema">Generar el mío gratis</a>
+    </div>
+    <p class="sin-letra" style="margin-top:16px;">
+      Es el mismo material que reciben los alumnos cuando un maestro comparte su liga.
     </p>
   </div>
 </section>
@@ -182,8 +214,38 @@ footer a:hover{ color:var(--profundo); }
     <div class="cierre">
       <h2>Pruébalo con tu tema de esta semana</h2>
       <p>El plan gratis te da dos temas al mes. Sin tarjeta, sin compromiso.</p>
-      <a class="btn" href="/#precios-individual">Empieza gratis</a>
+      <a class="btn" href="/comprador.html?despues=tema">Empieza gratis</a>
     </div>
+  </div>
+</section>
+
+
+<section style="border-top:1px solid var(--linea);">
+  <div class="envoltura">
+    <p class="ojo">Si quieres ver más</p>
+    <h2 style="font-size:1.7rem;margin-bottom:26px;">Hay bastante más de dónde salieron estas</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;">
+      <a href="/hojas/" style="text-decoration:none;display:block;border:1px solid var(--linea);border-radius:16px;padding:24px 22px;background:#fff;">
+        <h3 style="font-size:1.08rem;margin-bottom:8px;color:var(--profundo);">Ocho cuadernillos más 📚</h3>
+        <p style="color:var(--gris);font-size:.95rem;">Tablas, fracciones, el reloj, área y perímetro, división, dinero y gráficas. Todos gratis.</p>
+      </a>
+      <a href="/#precios-individual" style="text-decoration:none;display:block;border:1px solid var(--linea);border-radius:16px;padding:24px 22px;background:#fff;">
+        <h3 style="font-size:1.08rem;margin-bottom:8px;color:var(--profundo);">Cómo funciona 🧩</h3>
+        <p style="color:var(--gris);font-size:.95rem;">El mismo tema explicado de 8 formas distintas, según cómo aprende cada quien.</p>
+      </a>
+      <a href="/blog/material-psicoeducativo-personalizado-ia.html" style="text-decoration:none;display:block;border:1px solid var(--linea);border-radius:16px;padding:24px 22px;background:#fff;">
+        <h3 style="font-size:1.08rem;margin-bottom:8px;color:var(--profundo);">Para psicólogos 🧠</h3>
+        <p style="color:var(--gris);font-size:.95rem;">Cómo se arma material psicoeducativo personalizado para terapia infantil.</p>
+      </a>
+      <a href="/comprador.html?despues=grupo" style="text-decoration:none;display:block;border:1px solid var(--linea);border-radius:16px;padding:24px 22px;background:#fff;">
+        <h3 style="font-size:1.08rem;margin-bottom:8px;color:var(--profundo);">¿Das clase? 🏫</h3>
+        <p style="color:var(--gris);font-size:.95rem;">Genera el material una vez y compártelo con una liga. Tus alumnos no necesitan cuenta.</p>
+      </a>
+    </div>
+    <p class="sin-letra" style="margin-top:22px;">
+      Dentro de la plataforma hay una biblioteca con cientos de hojas más, organizadas
+      por tema y por edad.
+    </p>
   </div>
 </section>
 
@@ -197,6 +259,30 @@ footer a:hover{ color:var(--profundo); }
     </span>
   </div>
 </footer>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   PEGA AQUÍ EL SLUG DE TU GRUPO DE EJEMPLO
+   ══════════════════════════════════════════════════════════════════
+   1. En EnseñAI crea un grupo, por ejemplo "Ejemplo — Fracciones".
+   2. Genera ahí un tema bueno y compártelo al grupo.
+   3. Copia la liga que te da; termina en  g.html?slug=ALGO
+   4. Pon ese ALGO aquí abajo, entre las comillas.
+
+   Mientras esté vacío, la sección NO se muestra — así puedes subir
+   este archivo hoy y llenar el dato cuando tengas el tema listo.
+   ══════════════════════════════════════════════════════════════════ */
+var GRUPO_DEMO = "";
+
+(function () {
+  if (!GRUPO_DEMO) return;
+  var s = document.getElementById("demo");
+  var a = document.getElementById("ligaDemo");
+  if (!s || !a) return;
+  a.href = "/g.html?slug=" + encodeURIComponent(GRUPO_DEMO);
+  s.style.display = "block";
+})();
+</script>
 
 <script>
   document.getElementById("anio").textContent = new Date().getFullYear();

@@ -230,6 +230,26 @@
     header .nav-link { font-size: 0.7rem; white-space: nowrap; }
     header .pill-btn.primario { padding: 7px 10px; font-size: 0.7rem; white-space: nowrap; }
   }
+
+/* ── Franja de las hojas gratis (conecta la portada con gratis.html) ── */
+.regalo-section{ padding:46px 0; background:#fff; }
+.regalo-card{
+  display:grid; grid-template-columns:1.35fr .65fr; gap:34px; align-items:center;
+  background:var(--hielo, #F0FDF4); border:1px solid var(--linea, #DCEEFC);
+  border-radius:22px; padding:34px 36px;
+}
+@media (max-width:760px){ .regalo-card{ grid-template-columns:1fr; gap:22px; text-align:center; } }
+.regalo-ojo{
+  display:block; font-size:.76rem; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--coral, #F97066); font-weight:800; margin-bottom:10px;
+}
+.regalo-card h2{ font-size:1.6rem; margin:0 0 10px; }
+.regalo-card p{ color:#4A6A85; margin:0 0 20px; max-width:52ch; }
+@media (max-width:760px){ .regalo-card p{ margin-inline:auto; } }
+.regalo-img img{
+  width:100%; max-width:210px; display:block; margin:0 auto; border-radius:12px;
+  border:1px solid var(--linea, #DCEEFC); box-shadow:0 12px 30px rgba(30,58,138,.14);
+}
 </style>
 <script type="application/ld+json">
 {
@@ -317,7 +337,9 @@
   <div class="contenedor fila">
     <a class="marca" href="#"><span>Enseñ<span class="ai">AI</span></span></a>
     <nav>
-      <a class="nav-link" href="blog/">Blog</a>
+      <a class="nav-link" href="gratis.html">Hojas gratis</a>
+      <a class="nav-link" href="hojas/">Hojas por tema</a>
+        <a class="nav-link" href="blog/">Blog</a>
       <a class="nav-link" href="comprador.html">Iniciar sesión</a>
       <a class="pill-btn primario" href="comprador.html?despues=tema">Empezar gratis</a>
     </nav>
@@ -345,6 +367,31 @@
       <span class="chip-inteligencia" style="background:var(--i-logica);">Lógica</span>
     </div>
     <p class="nota-honestidad">Nos basamos en la teoría de inteligencias múltiples como guía práctica para personalizar el contenido — no es un diagnóstico ni una prueba clínica.</p>
+  </div>
+</section>
+
+
+<section class="regalo-section">
+  <div class="contenedor">
+    <div class="regalo-card">
+      <div class="regalo-texto">
+        <span class="regalo-ojo">Antes de decidir nada</span>
+        <h2>Llévate 6 hojas de trabajo, gratis</h2>
+        <p>
+          Tablas, áreas, el reloj, fracciones y dinero. En español, tamaño carta
+          y con hoja de respuestas. Sin registrarte y sin dejar tu correo.
+        </p>
+        <a class="pill-btn primario" href="gratis.html">Ver las 6 hojas</a>
+        <p style="margin-top:14px; font-size:.95rem; color:#4A6A85;">
+          ¿Buscas un tema en particular?
+          <a href="hojas/" style="color:var(--profundo); font-weight:700;">Hay ocho cuadernillos completos</a>
+          — tablas, fracciones, el reloj, área y perímetro, división y más.
+        </p>
+      </div>
+      <div class="regalo-img">
+        <img src="assets/muestra-portada.png" alt="Portada del cuadernillo de seis hojas gratis" loading="lazy">
+      </div>
+    </div>
   </div>
 </section>
 
