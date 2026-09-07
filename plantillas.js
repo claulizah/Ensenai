@@ -35,6 +35,34 @@
   };
   const etiquetaCategoria = (c) => ETIQUETAS_CATEGORIA[c] || `📎 ${c}`;
 
+  /**
+   * Tramos de edad para filtrar (schema_v45).
+   *
+   * Claudia pidió filtrar por edad Y por grado. Son EL MISMO EJE — un niño
+   * de 7 años está en primaria baja — así que en vez de dos filas de chips
+   * peleándose por el ancho de un celular, cada chip dice las dos cosas:
+   * la mamá lee "5 años" y la maestra lee "Preescolar".
+   *
+   * Una plantilla entra en el tramo cuando su rango se CRUZA con él, no
+   * cuando coincide exacto: una hoja de "4 a 10 años" sale en preescolar,
+   * en primaria baja y en primaria alta, que es la verdad.
+   */
+  const TRAMOS = [
+    { id: "3-5",  edad: [3, 5],   corta: "3 a 5",   grado: "Preescolar" },
+    { id: "6-8",  edad: [6, 8],   corta: "6 a 8",   grado: "Primaria baja" },
+    { id: "9-12", edad: [9, 12],  corta: "9 a 12",  grado: "Primaria alta" },
+    { id: "13+",  edad: [13, 99], corta: "13+",     grado: "Secundaria y más" },
+  ];
+
+  /** ¿Esta plantilla sirve para este tramo? Sin edad = sirve para todos. */
+  function entraEnTramo(p, tramo) {
+    if (!tramo) return true;
+    if (p.edad_min == null && p.edad_max == null) return true;
+    var min = p.edad_min == null ? 0 : p.edad_min;
+    var max = p.edad_max == null ? 99 : p.edad_max;
+    return !(max < tramo.edad[0] || min > tramo.edad[1]);
+  }
+
   const ETIQUETAS_NIVEL = {
     preescolar: "Preescolar",
     primaria_baja: "Primaria baja",
@@ -47,7 +75,24 @@
   const ESTILOS = `
   .pl-caja { margin: 0; }
   .pl-buscador { width: 100%; padding: 10px 12px; font-size: 0.95rem; font-family: inherit; margin-bottom: 8px; }
-  .pl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .pl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; }
+  /* Fila de edad. Los chips traen dos renglones (edad arriba, grado abajo)
+     porque son el mismo filtro dicho en los dos idiomas: el de la mamá y el
+     de la maestra. En celular la fila se arrastra de lado en vez de
+     apretujarse. */
+  .pl-edades { display: flex; gap: 6px; margin-bottom: 10px; align-items: center;
+               overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .pl-edades::-webkit-scrollbar { height: 4px; }
+  .pl-edades::-webkit-scrollbar-thumb { background: var(--linea, #dfe7ef); border-radius: 2px; }
+  @media (max-width: 560px) {
+    .pl-edades { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+                 mask-image: linear-gradient(to right, #000 88%, transparent 100%); }
+  }
+  .pl-et { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+           color: #8aa0b8; flex: 0 0 auto; margin-right: 2px; }
+  .pl-chip.pl-edad { display: flex; flex-direction: column; align-items: center; line-height: 1.15;
+                     padding: 5px 13px; flex: 0 0 auto; }
+  .pl-chip.pl-edad small { font-size: 0.66rem; font-weight: 600; opacity: 0.72; margin-top: 1px; }
   .pl-chip { border: 2px solid var(--linea, #dfe7ef); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 0.82rem; font-weight: 700; font-family: inherit; cursor: pointer; color: #4A6A85; margin: 0; width: auto; }
   .pl-chip.activo { background: var(--profundo, #2b3f8c); border-color: var(--profundo, #2b3f8c); color: #fff; }
   .pl-grupo { border: 2px solid var(--linea, #dfe7ef); border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
@@ -159,6 +204,7 @@
 
     let todas = [];
     let categoria = "";
+    let tramoId = "";
     let busqueda = "";
 
     let data;
@@ -195,16 +241,56 @@
 
     cont.innerHTML = `
       <input type="search" class="pl-buscador" placeholder="Busca por nombre… (ej. laberinto, emociones, tijeras)" autocomplete="off">
+      <div class="pl-edades"></div>
       <div class="pl-chips"></div>
       <div class="pl-lista"></div>`;
 
     const inputBuscar = cont.querySelector(".pl-buscador");
     const contChips = cont.querySelector(".pl-chips");
+    const contEdades = cont.querySelector(".pl-edades");
     const contLista = cont.querySelector(".pl-lista");
 
-    function pintarChips() {
+    function pintarEdades() {
+      // Si el backend avisó que no existen las columnas de edad
+      // (schema_v45 sin correr), no se pinta un filtro que no filtraría.
+      if (data.sinEdad) { contEdades.innerHTML = ""; return; }
       const cuenta = {};
-      todas.forEach((p) => {
+      TRAMOS.forEach((t) => {
+        cuenta[t.id] = todas.filter((p) => entraEnTramo(p, t)).length;
+      });
+      const conAlgo = TRAMOS.filter((t) => cuenta[t.id] > 0);
+      if (conAlgo.length < 2) { contEdades.innerHTML = ""; return; }
+
+      contEdades.innerHTML =
+        '<span class="pl-et">Edad</span>' +
+        [
+          `<button type="button" class="pl-chip pl-edad ${tramoId === "" ? "activo" : ""}" data-tramo="">Cualquiera</button>`,
+          ...conAlgo.map(
+            (t) =>
+              `<button type="button" class="pl-chip pl-edad ${tramoId === t.id ? "activo" : ""}" data-tramo="${t.id}">` +
+              `<b>${t.corta} años</b><small>${escapar(t.grado)}</small></button>`
+          ),
+        ].join("");
+
+      contEdades.querySelectorAll("[data-tramo]").forEach((b) =>
+        b.addEventListener("click", () => {
+          tramoId = b.dataset.tramo;
+          pintarEdades();
+          pintarChips();
+          pintarLista();
+        })
+      );
+    }
+
+    function pintarChips() {
+      // Las cuentas se calculan SOBRE EL TRAMO YA ELEGIDO: si filtras por
+      // 3 a 5 años, "Lenguaje (4)" tiene que decir cuántas hay de esa edad,
+      // no cuántas hay en total. Un número que no cuadra con lo que se ve
+      // abajo destruye la confianza en el filtro.
+      const tramo = TRAMOS.find((t) => t.id === tramoId) || null;
+      const visibles = todas.filter((p) => entraEnTramo(p, tramo));
+      const cuenta = {};
+      visibles.forEach((p) => {
         const c = p.categoria || "otros";
         cuenta[c] = (cuenta[c] || 0) + 1;
       });
@@ -214,7 +300,8 @@
         return;
       }
       contChips.innerHTML = [
-        `<button type="button" class="pl-chip ${categoria === "" ? "activo" : ""}" data-categoria="">Todas (${todas.length})</button>`,
+        `<span class="pl-et">Tema</span>`,
+        `<button type="button" class="pl-chip ${categoria === "" ? "activo" : ""}" data-categoria="">Todos (${visibles.length})</button>`,
         ...cats.map(
           (c) =>
             `<button type="button" class="pl-chip ${categoria === c ? "activo" : ""}" data-categoria="${escapar(c)}">${escapar(etiquetaCategoria(c))} (${cuenta[c]})</button>`
@@ -231,7 +318,9 @@
 
     function pintarLista() {
       const q = normalizar(busqueda).trim();
+      const tramo = TRAMOS.find((t) => t.id === tramoId) || null;
       const lista = todas.filter((p) => {
+        if (!entraEnTramo(p, tramo)) return false;
         if (categoria && (p.categoria || "otros") !== categoria) return false;
         if (!q) return true;
         return normalizar(`${p.nombre} ${p.descripcion || ""} ${p.categoria || ""}`).includes(q);
@@ -274,6 +363,7 @@
       pintarLista();
     });
 
+    pintarEdades();
     pintarChips();
     pintarLista();
     cont.dataset.plHay = "1";
