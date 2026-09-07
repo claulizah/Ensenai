@@ -924,6 +924,13 @@
               </select>
             </div>
             <div>
+              <label>Edad (de … a …)</label>
+              <div style="display:flex;gap:8px;">
+                <input type="number" name="edadMin" min="2" max="99" placeholder="3" style="width:100%;">
+                <input type="number" name="edadMax" min="2" max="99" placeholder="6" style="width:100%;">
+              </div>
+            </div>
+            <div>
               <label>Enfoque</label>
               <select name="enfoque">
                 <option value="">Escolar y psicoeducativo</option>
@@ -934,6 +941,7 @@
           </div>
           <label>Archivo (SVG, PNG, JPG, WEBP o PDF — máx. 2 MB)</label>
           <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp,.pdf" required>
+          <p class="ayuda" style="margin:2px 0 6px;">La edad puede cruzar varios grados: una hoja de recortar sirve de los 4 a los 10. Si la dejas vacía se deduce del nivel.</p>
           <p class="ayuda" id="estado-analisis" style="margin:4px 0 0;">Al elegir el archivo, la IA mira la hoja y llena los campos de arriba. Todo queda editable.</p>
           <div class="check">
             <input type="checkbox" name="marcar" id="chk-marcar" checked>
@@ -1095,7 +1103,7 @@
         </div>
         <span class="pill-estado ${p.publicada ? "pill-si" : "pill-no"}">${p.publicada ? "Publicada" : "Borrador"}</span>
         <div class="nombre">${escapeHtml(p.nombre)}</div>
-        <div class="meta">${escapeHtml(p.categoria)} · ${p.nivel ? NIVELES.find(n => n.value === p.nivel)?.label || p.nivel : "Cualquier nivel"} · ${p.descargas || 0} descargas</div>
+        <div class="meta">${escapeHtml(p.categoria)} · ${p.edad_min != null && p.edad_max != null ? `${p.edad_min} a ${p.edad_max} años` : (p.nivel ? NIVELES.find(n => n.value === p.nivel)?.label || p.nivel : "Cualquier edad")} · ${p.descargas || 0} descargas</div>
         <div class="acciones">
           ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><button class="secundario chico">Ver</button></a>` : ""}
           <button class="secundario chico" data-accion="toggle">${p.publicada ? "Ocultar" : "Publicar"}</button>
@@ -1317,6 +1325,8 @@
     if (!form.categoria.value.trim() || form.categoria.value.trim() === "otros") form.categoria.value = p.categoria;
     if (!form.nivel.value) form.nivel.value = p.nivel || "";
     if (!form.enfoque.value) form.enfoque.value = p.enfoque || "";
+    if (!form.edadMin.value && p.edad_min) form.edadMin.value = p.edad_min;
+    if (!form.edadMax.value && p.edad_max) form.edadMax.value = p.edad_max;
     estado.textContent = "✨ Datos propuestos — revísalos y corrige lo que quieras antes de subir.";
   }
 
@@ -1382,6 +1392,12 @@
               nivel: datos.nivel || p.nivel || "",
               enfoque: datos.enfoque || p.enfoque || "",
               descripcion: p.descripcion || "",
+              // La edad SÍ la decide la IA aunque el nombre traiga nivel:
+              // el nivel es una etiqueta gruesa y la edad es lo que de
+              // verdad se filtra. Si no la propuso, el backend la deduce
+              // del nivel y no se pierde nada.
+              edadMin: p.edad_min || null,
+              edadMax: p.edad_max || null,
             };
           }
         }
@@ -1393,6 +1409,8 @@
             categoria: datos.categoria,
             nivel: datos.nivel || null,
             enfoque: datos.enfoque || null,
+            edadMin: datos.edadMin || null,
+            edadMax: datos.edadMax || null,
             publicada: publicar,
             marcar: conMarca,
             archivoBase64,
@@ -1437,6 +1455,8 @@
           categoria: form.categoria.value.trim() || "otros",
           nivel: form.nivel.value || null,
           enfoque: form.enfoque.value || null,
+          edadMin: form.edadMin.value || null,
+          edadMax: form.edadMax.value || null,
           publicada: form.publicada.checked,
           marcar: form.marcar.checked,
           archivoBase64: archivo.archivoBase64,
