@@ -1,0 +1,15 @@
+REPO:  github.com/claulizah/Ensenai
+SITIO: ensenai.com
+TOKEN: 57b9bff54f8e4f85ae01d63bf13fa973
+
+Estos 6 archivos llevan la analítica de EnseñAI.
+
+  index.html        -> a la RAIZ del repo   (portada de EnseñAI)
+  gratis.html       -> a la RAIZ del repo   (descarga de las 6 hojas)
+  tema.html         -> a la RAIZ del repo
+  grupo.html        -> a la RAIZ del repo
+  comprador.html    -> a la RAIZ del repo
+  blog/index.html   -> a la carpeta blog/   (NO a la raiz)
+
+OJO: el index.html de esta carpeta es el de EnseñAI.
+     NO lo subas al repo Dragonflailabs.
