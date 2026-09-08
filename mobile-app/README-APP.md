@@ -14,21 +14,8 @@ splash screen, etc.).
 
 ## Estructura
 
-- `www/` — copia del sitio estático (es una **copia**, no un symlink, del
-  contenido en la raíz del repo — `index.html`, `tema.html`, `grupo.html`,
-  `assets/`, `hojas/`, `blog/`, etc.). Cada vez que cambie algo en la raíz
-  del repo hay que volver a copiarlo aquí, por ejemplo:
-  ```bash
-  cd mobile-app
-  rsync -a --delete --exclude 'www' --exclude 'node_modules' \
-    --exclude 'android' --exclude 'ios' --exclude '.git' \
-    --exclude 'mobile-app' --exclude 'README-APP.md' --exclude 'README.md' \
-    --exclude 'LEEME.txt' ../ www/
-  npx cap sync
-  ```
-  (si no tienen `rsync`, un `cp -r ../*.html ../*.js ../assets ../hojas ../blog www/`
-  hace lo mismo de forma más manual). Vale la pena automatizar esto con un
-  GitHub Action más adelante para que `www/` nunca quede desactualizado.
+- `www/` — copia del sitio estático (esto es lo que hay que actualizar
+  cada vez que cambie el repo original).
 - `android/` — proyecto nativo de Android (Android Studio / Gradle).
 - `ios/` — proyecto nativo de iOS (Xcode).
 - `capacitor.config.ts` — configuración de Capacitor (appId, nombre,
