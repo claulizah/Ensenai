@@ -1,0 +1,2 @@
+# /c/nombre-del-curso → curso.html?slug=nombre-del-curso
+/c/:slug  /curso.html?slug=:slug  200

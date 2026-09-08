@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Restablecer contraseña</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 26px; max-width: 400px; width: 100%; box-shadow: 0 3px 0 var(--linea); }
+  .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.3rem; color: var(--profundo); text-align: center; display: block; margin-bottom: 6px; }
+  .marca .ai { color: var(--bosque); }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.3rem; margin: 10px 0 6px; text-align: center; }
+  p.ayuda { color: #4A6A85; text-align: center; margin: 0 0 20px; font-size: 0.92rem; }
+  label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
+  input { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  button.primario {
+    width: 100%; background: var(--profundo); color: #fff; border: none; padding: 14px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 18px;
+    box-shadow: 0 4px 0 var(--profundo-oscuro);
+  }
+  button.primario:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 14px; font-size: 0.9rem; }
+  .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); text-align: center; }
+  a.enlace { display: block; text-align: center; color: var(--profundo); font-weight: 700; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<div class="tarjeta">
+  <span class="marca">Enseñ<span class="ai">AI</span></span>
+  <h1>Pon tu contraseña nueva</h1>
+  <p class="ayuda" id="ayudaTexto">Verificando tu liga de recuperación…</p>
+  <div id="contenido"></div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  function mostrarFormulario() {
+    document.getElementById("ayudaTexto").textContent = "Escribe tu contraseña nueva.";
+    document.getElementById("contenido").innerHTML = `
+      <div id="error-reset"></div>
+      <label for="nueva">Contraseña nueva</label>
+      <input type="password" id="nueva" placeholder="Mínimo 6 caracteres">
+      <label for="confirmar">Confirma la contraseña</label>
+      <input type="password" id="confirmar" placeholder="Repítela">
+      <button class="primario" id="btnGuardar">Guardar contraseña nueva</button>
+    `;
+    document.getElementById("btnGuardar").addEventListener("click", guardarContrasenaNueva);
+  }
+
+  async function guardarContrasenaNueva() {
+    const nueva = document.getElementById("nueva").value;
+    const confirmar = document.getElementById("confirmar").value;
+    const errorDiv = document.getElementById("error-reset");
+    errorDiv.innerHTML = "";
+
+    if (nueva.length < 6) {
+      errorDiv.innerHTML = `<div class="error">La contraseña debe tener al menos 6 caracteres.</div>`;
+      return;
+    }
+    if (nueva !== confirmar) {
+      errorDiv.innerHTML = `<div class="error">Las contraseñas no coinciden.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById("btnGuardar");
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+
+    try {
+      const { error } = await supabaseClient.auth.updateUser({ password: nueva });
+      if (error) throw new Error(error.message);
+
+      document.getElementById("contenido").innerHTML = `
+        <div class="aviso">✓ Tu contraseña se actualizó. Ya puedes iniciar sesión con la nueva.</div>
+        <a class="enlace" href="comprador.html">Ir a iniciar sesión →</a>
+      `;
+      document.getElementById("ayudaTexto").textContent = "";
+    } catch (err) {
+      errorDiv.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Guardar contraseña nueva";
+    }
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      mostrarFormulario();
+    }
+  });
+
+  supabaseClient.auth.getSession().then(({ data }) => {
+    if (data.session && document.getElementById("contenido").innerHTML === "") {
+      mostrarFormulario();
+    }
+  });
+
+  setTimeout(() => {
+    if (document.getElementById("contenido").innerHTML === "") {
+      document.getElementById("ayudaTexto").textContent = "";
+      document.getElementById("contenido").innerHTML = `
+        <div class="error">Esta liga ya expiró o no es válida. Pide una nueva desde "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.</div>
+        <a class="enlace" href="comprador.html">Regresar →</a>
+      `;
+    }
+  }, 4000);
+</script>
+</body>
+</html>

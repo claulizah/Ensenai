@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Admin biblioteca</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+    --coral: #FF8A70; --rojo: #DC2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.25) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.22) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai {
+    display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14);
+    padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle;
+  }
+  header .etiqueta { font-size: 0.8rem; opacity: .8; margin-left: 4px; }
+  #btnSalir { background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tabs button {
+    background: #fff; border: 2px solid var(--linea); color: var(--profundo);
+    padding: 9px 18px; border-radius: 999px; font-family: 'Nunito', sans-serif;
+    font-weight: 700; font-size: 0.92rem; cursor: pointer;
+  }
+  .tabs button.activo { background: var(--profundo); border-color: var(--profundo); color: #fff; }
+  .tabs button .cuenta { opacity: .7; font-weight: 600; }
+
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.35rem; margin: 0 0 6px; }
+  h2 { font-family: 'Grandstander', sans-serif; font-size: 1.1rem; margin: 0 0 8px; color: var(--profundo); }
+  p.ayuda { color: #4A6A85; margin: 0 0 16px; font-size: 0.92rem; line-height: 1.5; }
+
+  label { display: block; font-weight: 700; font-size: 0.85rem; margin: 12px 0 4px; color: var(--profundo-oscuro); }
+  input[type=text], input[type=url], textarea, select {
+    width: 100%; padding: 10px 12px; border: 2px solid var(--linea); border-radius: 10px;
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem; background: #fff; color: var(--tinta);
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  input[type=file] { margin-top: 4px; }
+  .fila { display: flex; gap: 12px; flex-wrap: wrap; }
+  .fila > div { flex: 1; min-width: 180px; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; }
+  .check input { width: auto; }
+  .check label { margin: 0; }
+
+  button.primario {
+    background: var(--profundo); color: #fff; border: none; border-radius: 999px;
+    padding: 11px 22px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem;
+    cursor: pointer; margin-top: 16px;
+  }
+  button.primario:disabled { opacity: .5; cursor: default; }
+  button.secundario {
+    background: #fff; color: var(--profundo); border: 2px solid var(--linea); border-radius: 999px;
+    padding: 6px 14px; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.82rem; cursor: pointer;
+  }
+  button.peligro { color: var(--rojo); border-color: #FBD5D5; }
+  button.chico { padding: 5px 12px; font-size: 0.78rem; }
+
+  .error { background: #FEF2F2; color: var(--rojo); border: 2px solid #FBD5D5; border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 0.88rem; }
+  .exito { background: #ECFDF5; color: var(--bosque); border: 2px solid #A7F3D0; border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 0.88rem; }
+  .cargando { color: #6B85A6; font-size: 0.9rem; padding: 10px 0; }
+
+  .filtros { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filtros input, .filtros select { width: auto; min-width: 160px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .item {
+    border: 2px solid var(--linea); border-radius: 14px; padding: 14px; background: #fbfdff;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .item.inactiva { opacity: .5; }
+  .item .miniatura {
+    width: 100%; height: 90px; border-radius: 10px; background: #fff; border: 1px solid var(--linea);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .item .miniatura img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .item .miniatura .pdf-tag { font-size: 0.75rem; font-weight: 800; color: var(--profundo); }
+  .item .nombre { font-weight: 800; font-size: 0.95rem; }
+  .item .meta { font-size: 0.78rem; color: #6B85A6; }
+  .item .claves { display: flex; flex-wrap: wrap; gap: 4px; }
+  .item .claves span { background: var(--linea); color: var(--profundo-oscuro); font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .item .acciones { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .pill-estado { font-size: 0.72rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; align-self: flex-start; }
+  .pill-si { background: #ECFDF5; color: var(--bosque); }
+  .pill-no { background: #FEF3C7; color: #92400E; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--linea); }
+  th { color: var(--profundo-oscuro); font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; }
+
+  .pantalla-bloqueo { max-width: 480px; margin: 90px auto; text-align: center; }
+  .pantalla-bloqueo h1 { font-size: 1.5rem; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">
+    <span class="marca">Enseñ<span class="ai">AI</span></span>
+    <span class="etiqueta">Admin biblioteca</span>
+  </a>
+  <button id="btnSalir" style="display:none;">Cerrar sesión</button>
+</header>
+
+<main id="app">
+  <div class="cargando">Cargando…</div>
+</main>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const CATEGORIAS_ILUSTRACION = [
+    { value: "emociones", label: "Emociones" },
+    { value: "cuerpo_vida", label: "Cuerpo y vida" },
+    { value: "tierra_espacio", label: "Tierra y espacio" },
+    { value: "matematicas", label: "Matemáticas" },
+    { value: "mexico", label: "México" },
+    { value: "lenguaje", label: "Lenguaje" },
+    { value: "convivencia", label: "Convivencia" },
+    { value: "otros", label: "Otros" },
+  ];
+  const NIVELES = [
+    { value: "", label: "Cualquier nivel" },
+    { value: "preescolar", label: "Preescolar (3-5 años)" },
+    { value: "primaria_baja", label: "Primaria baja (6-8 años)" },
+    { value: "primaria_alta", label: "Primaria alta (9-12 años)" },
+    { value: "secundaria", label: "Secundaria (12-15 años)" },
+    { value: "preparatoria", label: "Preparatoria (15-18 años)" },
+    { value: "universidad", label: "Universidad / autodidacta (18+)" },
+  ];
+  const TIPOS_ILUSTRACION = ["image/svg+xml", "image/png", "image/jpeg", "image/webp"];
+  const TIPOS_PLANTILLA = [...TIPOS_ILUSTRACION, "application/pdf"];
+  const MAX_BYTES = 2 * 1024 * 1024;
+
+  let sesionActual = null;
+  let pestañaActiva = "ilustraciones";
+  let ilustraciones = [];
+  let plantillas = [];
+  let faltantes = [];
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  function fmtFecha(iso) {
+    try { return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }); }
+    catch (e) { return ""; }
+  }
+
+  function fmtBytes(n) {
+    if (!n) return "";
+    if (n < 1024) return `${n} B`;
+    return `${(n / 1024).toFixed(0)} KB`;
+  }
+
+  async function llamar(ruta, opciones = {}) {
+    const res = await fetch(`${API_BASE}${ruta}`, {
+      ...opciones,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sesionActual.access_token}`,
+        ...(opciones.headers || {}),
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `No se pudo completar la operación (${res.status}).`);
+    return data;
+  }
+
+  /** Lee un <input type=file> y regresa { archivoBase64, tipoMime } o null. */
+  function leerArchivo(input) {
+    return new Promise((resolve, reject) => {
+      const file = input.files && input.files[0];
+      if (!file) return resolve(null);
+      if (file.size > MAX_BYTES) {
+        return reject(new Error(`El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo son 2 MB.`));
+      }
+      const lector = new FileReader();
+      lector.onload = () => resolve({ archivoBase64: lector.result, tipoMime: file.type });
+      lector.onerror = () => reject(new Error("No se pudo leer el archivo."));
+      lector.readAsDataURL(file);
+    });
+  }
+
+  async function init() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      window.location.href = "comprador.html?despues=admin";
+      return;
+    }
+    sesionActual = data.session;
+
+    document.getElementById("btnSalir").onclick = async () => {
+      await supabaseClient.auth.signOut();
+      window.location.href = "comprador.html";
+    };
+
+    try {
+      const { admin } = await llamar("/api/admin/soy-admin");
+      if (!admin) {
+        mostrarBloqueo();
+        return;
+      }
+    } catch (err) {
+      mostrarBloqueo("No pudimos confirmar tu acceso. Intenta de nuevo en un momento.");
+      return;
+    }
+
+    document.getElementById("btnSalir").style.display = "inline-block";
+    await Promise.all([cargarIlustraciones(), cargarPlantillas(), cargarFaltantes()]);
+    render();
+  }
+
+  function mostrarBloqueo(msg) {
+    document.getElementById("app").innerHTML = `
+      <div class="pantalla-bloqueo">
+        <h1>🔒 Esta sección es solo para administradores</h1>
+        <p class="ayuda">${escapeHtml(msg || "Tu cuenta no tiene permisos para ver la biblioteca. Si crees que esto es un error, revisa que tu correo esté en ADMIN_EMAILS.")}</p>
+        <a href="app.html"><button class="primario">Volver a EnseñAI</button></a>
+      </div>
+    `;
+    document.getElementById("btnSalir").style.display = "inline-block";
+  }
+
+  /* ═══════════════ Ilustraciones ═══════════════ */
+
+  async function cargarIlustraciones(categoria, q) {
+    const params = new URLSearchParams();
+    if (categoria) params.set("categoria", categoria);
+    if (q) params.set("q", q);
+    const data = await llamar(`/api/admin/ilustraciones${params.toString() ? "?" + params : ""}`);
+    ilustraciones = data.ilustraciones || [];
+  }
+
+  async function cargarPlantillas() {
+    const data = await llamar("/api/admin/plantillas");
+    plantillas = data.plantillas || [];
+  }
+
+  async function cargarFaltantes() {
+    const data = await llamar("/api/admin/faltantes");
+    faltantes = data.faltantes || [];
+  }
+
+  /* ═══════════════ Render principal ═══════════════ */
+
+  function render() {
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <div class="tabs">
+        <button data-tab="ilustraciones" class="${pestañaActiva === "ilustraciones" ? "activo" : ""}">🖼️ Ilustraciones <span class="cuenta">(${ilustraciones.length})</span></button>
+        <button data-tab="plantillas" class="${pestañaActiva === "plantillas" ? "activo" : ""}">📄 Plantillas <span class="cuenta">(${plantillas.length})</span></button>
+        <button data-tab="faltantes" class="${pestañaActiva === "faltantes" ? "activo" : ""}">🧩 Faltantes <span class="cuenta">(${faltantes.filter(f => !f.resuelta).length})</span></button>
+        <button data-tab="estudio" class="${pestañaActiva === "estudio" ? "activo" : ""}">✨ Estudio</button>
+      </div>
+      <div id="panel"></div>
+    `;
+    app.querySelectorAll(".tabs button").forEach((b) => {
+      b.onclick = () => { pestañaActiva = b.dataset.tab; render(); };
+    });
+    if (pestañaActiva === "ilustraciones") renderIlustraciones();
+    if (pestañaActiva === "plantillas") renderPlantillas();
+    if (pestañaActiva === "faltantes") renderFaltantes();
+    if (pestañaActiva === "estudio") renderEstudio();
+  }
+
+  /* ═══════════════ Panel: Ilustraciones ═══════════════ */
+
+  function renderIlustraciones() {
+    const panel = document.getElementById("panel");
+    panel.innerHTML = `
+      <div class="tarjeta">
+        <h2>📦 Subir varias a la vez</h2>
+        <p class="ayuda">Aquí la IA no es opcional de adorno: una ilustración sin palabras clave no se engancha a ningún tema, y ponerle diez a mano por imagen es lo que hace que la biblioteca se quede a medias. Con la casilla prendida, mira cada dibujo y le pone nombre, categoría y de 8 a 15 palabras clave. Todo queda editable después.</p>
+        <input type="file" id="il-lote" multiple accept=".svg,.png,.jpg,.jpeg,.webp">
+        <div class="check">
+          <input type="checkbox" id="chk-il-ia" checked>
+          <label for="chk-il-ia">✨ Que la IA las catalogue (sin esto, solo se suben las que traigan palabras clave en el nombre del archivo)</label>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="chk-il-activa" checked>
+          <label for="chk-il-activa">Dejarlas activas (si no, no se enganchan a ningún tema hasta que las prendas)</label>
+        </div>
+        <button class="primario" type="button" id="btn-il-lote">Subir las que elegí</button>
+        <div id="avance-il-lote"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Subir ilustración</h2>
+        <p class="ayuda">Se engancha sola a los temas que mencionen sus palabras clave — el maestro nunca la pide directamente.</p>
+        <form id="form-ilustracion">
+          <div class="fila">
+            <div>
+              <label>Nombre</label>
+              <input type="text" name="nombre" required placeholder="Ej. Sistema solar">
+            </div>
+            <div>
+              <label>Categoría</label>
+              <select name="categoria" required>
+                <!-- Arranca vacío a propósito: sin esta opción, el select se
+                     queda en la primera de la lista y todo lo que se subía sin
+                     tocarla terminaba en "emociones" sin que nadie lo pidiera.
+                     Vacío + required obliga a elegir, y deja que la IA la
+                     llene sin pisar una elección que nunca se hizo. -->
+                <option value="">Elige una…</option>
+                ${CATEGORIAS_ILUSTRACION.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <label>Palabras clave (separadas por coma)</label>
+          <input type="text" name="palabrasClave" required placeholder="sistema solar, planetas, orbita">
+          <label>Descripción (opcional)</label>
+          <textarea name="descripcion" placeholder="Para acordarte de qué es, no la ve nadie más."></textarea>
+          <div class="fila">
+            <div>
+              <label>Licencia (opcional)</label>
+              <input type="text" name="licencia" placeholder="Ej. CC BY-SA 4.0">
+            </div>
+            <div>
+              <label>Autor (opcional)</label>
+              <input type="text" name="autor" placeholder="Ej. Wikimedia Commons">
+            </div>
+          </div>
+          <label>Fuente / URL original (opcional)</label>
+          <input type="url" name="fuenteUrl" placeholder="https://...">
+          <label>Archivo (SVG, PNG, JPG o WEBP — máx. 2 MB)</label>
+          <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp" required>
+          <p class="ayuda" id="estado-analisis-il" style="margin:4px 0 0;">Al elegir el archivo, la IA lo mira y llena los campos de arriba. Todo queda editable.</p>
+          <button class="primario" type="submit">Subir ilustración</button>
+          <div id="msg-ilustracion"></div>
+        </form>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Biblioteca (${ilustraciones.length})</h2>
+        <p class="ayuda">Cuando dos ilustraciones son del mismo concepto, el tema muestra <strong>solo una</strong>. Gana la de prioridad más alta; si todas están en 0, gana la más reciente. Sube la prioridad solo cuando quieras mandar tú.</p>
+        <div class="filtros">
+          <input type="text" id="buscar-ilustracion" placeholder="Buscar por nombre o palabra clave…">
+          <select id="filtro-categoria">
+            <option value="">Todas las categorías</option>
+            ${CATEGORIAS_ILUSTRACION.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
+          </select>
+        </div>
+        <div id="grid-ilustraciones" class="grid"></div>
+      </div>
+    `;
+
+    document.getElementById("form-ilustracion").addEventListener("submit", subirIlustracion);
+    document.getElementById("form-ilustracion").archivo.addEventListener("change", analizarIlustracionElegida);
+    document.getElementById("btn-il-lote").addEventListener("click", subirLoteIlustraciones);
+    document.getElementById("buscar-ilustracion").addEventListener("input", debounce(refiltrarIlustraciones, 350));
+    document.getElementById("filtro-categoria").addEventListener("change", refiltrarIlustraciones);
+    dibujarGridIlustraciones();
+  }
+
+  async function refiltrarIlustraciones() {
+    const q = document.getElementById("buscar-ilustracion").value.trim();
+    const categoria = document.getElementById("filtro-categoria").value;
+    document.getElementById("grid-ilustraciones").innerHTML = `<div class="cargando">Buscando…</div>`;
+    try {
+      await cargarIlustraciones(categoria, q);
+      dibujarGridIlustraciones();
+    } catch (err) {
+      document.getElementById("grid-ilustraciones").innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function dibujarGridIlustraciones() {
+    const cont = document.getElementById("grid-ilustraciones");
+    if (!ilustraciones.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no hay ilustraciones aquí.</p>`;
+      return;
+    }
+    cont.innerHTML = ilustraciones.map((i) => `
+      <div class="item ${i.activa ? "" : "inactiva"}" data-id="${i.id}">
+        <div class="miniatura"><img src="${i.image_url}" alt="${escapeHtml(i.nombre)}" loading="lazy"></div>
+        <span class="pill-estado ${i.activa ? "pill-si" : "pill-no"}">${i.activa ? "Activa" : "Desactivada"}</span>
+        <div class="nombre">${escapeHtml(i.nombre)}</div>
+        <div class="meta">${CATEGORIAS_ILUSTRACION.find(c => c.value === i.categoria)?.label || i.categoria} · ${fmtBytes(i.tamano_bytes)}</div>
+        <div class="claves">${(i.palabras_clave || []).slice(0, 5).map(k => `<span>${escapeHtml(k)}</span>`).join("")}</div>
+        <div class="meta" style="margin-top:4px;">
+          Prioridad: <strong>${i.prioridad || 0}</strong>${(i.prioridad || 0) > 0 ? " ⭐" : ""}
+        </div>
+        <div class="acciones">
+          <button class="secundario chico" data-accion="subir" title="Gana esta cuando haya otra del mismo concepto">▲ Prioridad</button>
+          <button class="secundario chico" data-accion="bajar" ${(i.prioridad || 0) === 0 ? "disabled" : ""}>▼</button>
+          <button class="secundario chico" data-accion="toggle">${i.activa ? "Desactivar" : "Activar"}</button>
+          <button class="secundario chico peligro" data-accion="borrar">Borrar</button>
+        </div>
+      </div>
+    `).join("");
+
+    cont.querySelectorAll(".item").forEach((el) => {
+      const id = el.dataset.id;
+      const ilu = ilustraciones.find((x) => x.id === id);
+      el.querySelector('[data-accion="subir"]').onclick = () => cambiarPrioridad(ilu, +1);
+      const bajar = el.querySelector('[data-accion="bajar"]');
+      if (bajar && !bajar.disabled) bajar.onclick = () => cambiarPrioridad(ilu, -1);
+      el.querySelector('[data-accion="toggle"]').onclick = () => alternarActivaIlustracion(ilu);
+      el.querySelector('[data-accion="borrar"]').onclick = () => borrarIlustracion(ilu);
+    });
+  }
+
+  /* ═══════════════ Homologar imágenes ═══════════════
+
+     Que todas las ilustraciones salgan del mismo tamaño, con el mismo
+     margen y en el mismo formato — las genere la IA o las suba Claudia a
+     mano (5-sep-2026).
+
+     Se hace AQUÍ, en el navegador, con canvas. No en el servidor: Render
+     no trae ninguna librería de imágenes instalada y meter una nativa
+     (sharp) a un backend que ya está en producción es justo el tipo de
+     cambio que tumba el despliegue. El navegador ya sabe hacer esto.
+
+     Además arregla un problema que estaba rompiendo el estudio: un PNG de
+     1024×1024 con transparencia pesa de 1.5 a 3 MB, y el backend tiene
+     tope de 2 MB. Todas las imágenes generadas rebotaban con "No pude
+     catalogarla" sin decir por qué. Al homologarlas quedan bien por
+     debajo del tope.
+
+     Los cuatro pasos:
+       1. RECORTAR el aire de las orillas — sin esto, una lámina con mucho
+          margen se ve chiquita al lado de una apretada.
+       2. ESCALAR para que el dibujo ocupe siempre la misma proporción.
+       3. CENTRAR en un lienzo cuadrado del mismo tamaño para todas.
+       4. EXPORTAR como PNG, bajando la resolución si no cabe en el tope.  */
+
+  // La versión homologada del archivo elegido en el formulario suelto,
+  // guardada hasta que se le da a Subir.
+  let homologadaPendiente = null;
+
+  const LIENZO = 1024;          // todas quedan de 1024 × 1024
+  const OCUPACION = 0.86;       // cuánto del lienzo ocupa el dibujo
+  const TOPE_BYTES = 1.8 * 1024 * 1024;   // con holgura bajo los 2 MB del backend
+
+  function cargarImagen(fuente) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("No pude leer esa imagen."));
+      img.src = fuente;
+    });
+  }
+
+  /**
+   * Dónde empieza y termina el dibujo de verdad, ignorando el aire.
+   *
+   * Si la imagen trae transparencia se recorta por ahí. Si no (un JPG con
+   * fondo blanco, por ejemplo), se recorta por lo que sea casi blanco. Ese
+   * segundo caso es el que hace que las imágenes que TÚ subes queden
+   * parejas con las generadas, que sí vienen sin fondo.
+   */
+  function bordesDelDibujo(ctx, w, h) {
+    const datos = ctx.getImageData(0, 0, w, h).data;
+    let hayAlfa = false;
+    for (let i = 3; i < datos.length; i += 4) {
+      if (datos[i] < 250) { hayAlfa = true; break; }
+    }
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const vacio = hayAlfa
+          ? datos[i + 3] < 12
+          : datos[i] > 246 && datos[i + 1] > 246 && datos[i + 2] > 246;
+        if (vacio) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    // Si salió todo vacío (o todo lleno), se devuelve la imagen entera:
+    // vale más dejarla como está que recortarla a nada.
+    if (x1 < x0 || y1 < y0) return { x: 0, y: 0, w, h };
+    return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+
+  /**
+   * Devuelve la imagen homologada como data URL PNG.
+   * @param {string} fuente - data URL o URL de la imagen original
+   */
+  async function homologarImagen(fuente) {
+    const img = await cargarImagen(fuente);
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) throw new Error("Esa imagen no tiene tamaño.");
+
+    // Paso 1: medir el dibujo sin su aire
+    const medidor = document.createElement("canvas");
+    medidor.width = w; medidor.height = h;
+    const mctx = medidor.getContext("2d", { willReadFrequently: true });
+    mctx.drawImage(img, 0, 0);
+    let caja;
+    try {
+      caja = bordesDelDibujo(mctx, w, h);
+    } catch (err) {
+      // getImageData truena si la imagen viene de otro dominio sin CORS.
+      // No es motivo para no homologar: se usa la imagen completa.
+      caja = { x: 0, y: 0, w, h };
+    }
+
+    // Pasos 2 y 3: escalar y centrar en el lienzo cuadrado
+    const dibujar = (lado) => {
+      const lienzo = document.createElement("canvas");
+      lienzo.width = lado; lienzo.height = lado;
+      const ctx = lienzo.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      const escala = (lado * OCUPACION) / Math.max(caja.w, caja.h);
+      const dw = caja.w * escala, dh = caja.h * escala;
+      ctx.drawImage(img, caja.x, caja.y, caja.w, caja.h,
+                    (lado - dw) / 2, (lado - dh) / 2, dw, dh);
+      return lienzo.toDataURL("image/png");
+    };
+
+    // Paso 4: si no cabe en el tope, se baja la resolución. Un ícono de
+    // 512 px se sigue viendo bien impreso y pesa la cuarta parte.
+    for (const lado of [LIENZO, 768, 512, 384]) {
+      const url = dibujar(lado);
+      if (pesoDeDataUrl(url) <= TOPE_BYTES) return url;
+    }
+    return dibujar(384);
+  }
+
+  /** Cuánto pesa de verdad un data URL en base64. */
+  function pesoDeDataUrl(url) {
+    const coma = url.indexOf(",");
+    const b64 = coma >= 0 ? url.slice(coma + 1) : url;
+    const relleno = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+    return Math.floor((b64.length * 3) / 4) - relleno;
+  }
+
+  /** Dispara la descarga de un data URL con el nombre que se le dé. */
+  function descargarDataUrl(dataUrl, nombreArchivo) {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  /** Un nombre de archivo decente a partir de la descripción. */
+  function nombreDeArchivo(texto) {
+    const base = String(texto || "ilustracion")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+    return (base || "ilustracion") + ".png";
+  }
+
+  /**
+   * Catalogar ilustraciones con IA (5-sep-2026).
+   *
+   * Lo pidió Claudia después de ver funcionar el de plantillas: "para las
+   * ilustraciones podríamos hacer lo mismo?". La diferencia está en QUÉ es
+   * lo valioso. En una plantilla, el nombre; aquí, las palabras clave: son
+   * lo único que conecta la imagen con un tema (utils/iconMatcher.js).
+   */
+  async function proponerDatosIlustracion(archivoBase64, tipoMime, nombreArchivo) {
+    try {
+      return await llamar("/api/admin/ilustraciones/analizar", {
+        method: "POST",
+        body: JSON.stringify({ archivoBase64, tipoMime, nombreArchivo }),
+      });
+    } catch (err) {
+      // Antes devolvía null y el motivo se perdía. Costó caro: 46
+      // imágenes rebotando por pesar más de 2 MB y en pantalla solo se
+      // leía "No pude catalogarla". El error viaja de regreso.
+      return { propuesta: null, repetida: null, error: err.message };
+    }
+  }
+
+  /** Solo pisa los campos VACÍOS: si ya escribiste algo, tu texto manda. */
+  async function analizarIlustracionElegida(ev) {
+    const form = document.getElementById("form-ilustracion");
+    const estado = document.getElementById("estado-analisis-il");
+    const file = ev.target.files && ev.target.files[0];
+    if (!file || !estado) return;
+
+    if (file.size > MAX_BYTES) {
+      estado.textContent = `Esa imagen pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo son 2 MB.`;
+      return;
+    }
+
+    estado.textContent = "✨ Emparejando la imagen y mirándola…";
+    let archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
+    if (!archivoBase64) {
+      estado.textContent = "No pude leer el archivo. Llena los campos a mano.";
+      return;
+    }
+    // Se homologa lo que TÚ subes igual que lo que genera la IA: mismo
+    // lienzo, mismo margen, mismo formato. Si no, tu biblioteca acaba con
+    // unas láminas grandes y otras chiquitas.
+    if (file.type !== "image/svg+xml") {
+      try {
+        archivoBase64 = await homologarImagen(archivoBase64);
+        homologadaPendiente = archivoBase64;
+      } catch (err) {
+        homologadaPendiente = null;   // se sube tal cual, mejor que nada
+      }
+    } else {
+      // Un SVG ya es vectorial y se escala solo: recortarlo en un canvas
+      // lo convertiría en mapa de bits y perdería justo su ventaja.
+      homologadaPendiente = null;
+    }
+
+    const r = await proponerDatosIlustracion(archivoBase64, file.type, file.name);
+    if (!r) {
+      estado.textContent = "No pude proponerte los datos. Llénalos a mano y súbela igual.";
+      return;
+    }
+
+    // Que ya esté subida es lo primero que hay que saber: llenar el
+    // formulario de algo que va a rebotar es trabajo tirado.
+    if (r.repetida) {
+      estado.textContent = `⏭️ Esa imagen ya está en la biblioteca como "${r.repetida.nombre}". Si la subes se va a rechazar.`;
+      if (!r.propuesta) return;
+    }
+
+    const p = r.propuesta;
+    if (!p) return;
+    if (!form.nombre.value.trim()) form.nombre.value = p.nombre;
+    if (!form.descripcion.value.trim()) form.descripcion.value = p.descripcion || "";
+    if (!form.palabrasClave.value.trim()) form.palabrasClave.value = (p.palabras_clave || []).join(", ");
+    if (!form.categoria.value || form.categoria.value === "otros") form.categoria.value = p.categoria;
+    if (!r.repetida) {
+      estado.textContent = homologadaPendiente
+        ? "✨ Imagen emparejada al formato de la biblioteca y datos propuestos — revisa sobre todo las palabras clave."
+        : "✨ Datos propuestos — revisa sobre todo las palabras clave: son lo que la conecta con los temas.";
+    }
+  }
+
+  /**
+   * Las palabras clave del nombre del archivo, para quien no quiera usar la
+   * IA: "sistema-solar-planetas-orbita.png" → esas tres. Es un respaldo
+   * pobre a propósito; lo bueno lo hace el modelo mirando el dibujo.
+   */
+  function clavesDesdeNombre(nombreArchivo) {
+    const base = String(nombreArchivo || "").replace(/\.[^.]+$/, "");
+    const palabras = base
+      .split(/[-_\s]+/)
+      .map((x) => x.trim().toLowerCase())
+      .filter((x) => x.length >= 3 && !/^\d+$/.test(x));
+    return [...new Set(palabras)];
+  }
+
+  /** Título legible desde el nombre del archivo: "sistema-solar" → "Sistema solar". */
+  function nombreDesdeArchivo(nombreArchivo) {
+    const base = String(nombreArchivo || "").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+    return base ? base.charAt(0).toUpperCase() + base.slice(1) : "";
+  }
+
+  async function subirLoteIlustraciones() {
+    const input = document.getElementById("il-lote");
+    const avance = document.getElementById("avance-il-lote");
+    const boton = document.getElementById("btn-il-lote");
+    const conIA = document.getElementById("chk-il-ia").checked;
+    const activa = document.getElementById("chk-il-activa").checked;
+    const archivos = Array.from(input.files || []);
+
+    if (!archivos.length) {
+      avance.innerHTML = `<div class="error">Primero elige los archivos.</div>`;
+      return;
+    }
+
+    boton.disabled = true;
+    const fallas = [];
+    const repetidas = [];
+    let subidas = 0;
+
+    const pintar = (i) => {
+      avance.innerHTML = `
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${repetidas.length ? ` · ⏭️ ${repetidas.length} ya estaban` : ""}${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
+        ${repetidas.length ? `<div class="aviso" style="text-align:left;">${repetidas.map((r) => escapeHtml(r)).join("<br>")}</div>` : ""}
+        ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
+      `;
+    };
+    pintar(0);
+
+    for (let i = 0; i < archivos.length; i++) {
+      const file = archivos[i];
+      try {
+        if (file.size > MAX_BYTES) {
+          throw new Error(`pesa ${(file.size / 1024 / 1024).toFixed(1)} MB (máx. 2 MB)`);
+        }
+        if (!TIPOS_ILUSTRACION.includes(file.type)) {
+          throw new Error("ese tipo de archivo no se acepta");
+        }
+        let archivoBase64 = await leerArchivoSuelto(file);
+        let tipoSubida = file.type;
+        if (file.type !== "image/svg+xml") {
+          try {
+            archivoBase64 = await homologarImagen(archivoBase64);
+            tipoSubida = "image/png";
+          } catch (err) {
+            /* si no se pudo emparejar, se sube tal cual */
+          }
+        }
+
+        let nombre = nombreDesdeArchivo(file.name);
+        let categoria = "otros";
+        let descripcion = "";
+        let claves = clavesDesdeNombre(file.name);
+
+        if (conIA) {
+          const r = await proponerDatosIlustracion(archivoBase64, tipoSubida, file.name);
+          if (r && r.repetida) {
+            // Ya está: ni se intenta subir. Se ahorra la subida y el 409.
+            repetidas.push(`${file.name}: ya está como "${r.repetida.nombre}"`);
+            pintar(i + 1);
+            continue;
+          }
+          const p = r && r.propuesta;
+          if (p) {
+            nombre = p.nombre || nombre;
+            categoria = p.categoria || categoria;
+            descripcion = p.descripcion || "";
+            claves = p.palabras_clave && p.palabras_clave.length ? p.palabras_clave : claves;
+          }
+        }
+
+        // Sin palabras clave el servidor la rechaza — y hace bien: sería un
+        // archivo que nunca aparecería en ningún tema.
+        if (!claves.length) {
+          throw new Error("no le pude sacar palabras clave; súbela con el formulario de abajo");
+        }
+
+        await llamar("/api/admin/ilustraciones", {
+          method: "POST",
+          body: JSON.stringify({
+            nombre,
+            categoria,
+            palabrasClave: claves.join(", "),
+            descripcion,
+            activa,
+            archivoBase64,
+            tipoMime: tipoSubida,
+          }),
+        });
+        subidas++;
+      } catch (err) {
+        if (/ya está en la biblioteca/i.test(err.message || "")) repetidas.push(`${file.name}: ${err.message}`);
+        else fallas.push(`${file.name}: ${err.message}`);
+      }
+      pintar(i + 1);
+    }
+
+    boton.disabled = false;
+    input.value = "";
+    await cargarIlustraciones();
+    dibujarGridIlustraciones();
+    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} ilustración(es) en la biblioteca${repetidas.length ? `, y ${repetidas.length} que ya tenías se saltaron` : ""}. Revisa sus palabras clave abajo antes de darlo por bueno.</div>`;
+  }
+
+  async function subirIlustracion(ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const msg = document.getElementById("msg-ilustracion");
+    msg.innerHTML = "";
+    const boton = form.querySelector("button[type=submit]");
+
+    try {
+      const archivo = await leerArchivo(form.archivo);
+      if (!archivo) throw new Error("Elige un archivo.");
+      if (!TIPOS_ILUSTRACION.includes(archivo.tipoMime)) throw new Error("Ese tipo de archivo no se acepta. Usa SVG, PNG, JPG o WEBP.");
+
+      boton.disabled = true;
+      boton.textContent = "Subiendo…";
+
+      // Se sube la versión emparejada si la hay. Se prepara al elegir el
+      // archivo (analizarIlustracionElegida); si eso falló, o si es un SVG,
+      // se sube el original — mejor eso que no subirla.
+      const subir = homologadaPendiente || archivo.archivoBase64;
+      const tipo = homologadaPendiente ? "image/png" : archivo.tipoMime;
+
+      await llamar("/api/admin/ilustraciones", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: form.nombre.value.trim(),
+          categoria: form.categoria.value,
+          palabrasClave: form.palabrasClave.value,
+          descripcion: form.descripcion.value.trim(),
+          licencia: form.licencia.value.trim(),
+          autor: form.autor.value.trim(),
+          fuenteUrl: form.fuenteUrl.value.trim(),
+          archivoBase64: subir,
+          tipoMime: tipo,
+        }),
+      });
+
+      msg.innerHTML = `<div class="exito">Ilustración subida ✓${homologadaPendiente ? " y emparejada al formato de la biblioteca" : ""}</div>`;
+      homologadaPendiente = null;
+      form.reset();
+      await cargarIlustraciones();
+      dibujarGridIlustraciones();
+      document.getElementById("panel").querySelector("h2").scrollIntoView({ behavior: "smooth" });
+    } catch (err) {
+      msg.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    } finally {
+      boton.disabled = false;
+      boton.textContent = "Subir ilustración";
+    }
+  }
+
+  /**
+   * Sube o baja la prioridad de una ilustración (schema_v43).
+   *
+   * Es el desempate manual: cuando dos láminas son del mismo concepto, el
+   * tema enseña una sola y gana la de prioridad más alta. Se mueve de uno
+   * en uno a propósito — no es una escala fina, es "esta antes que esa".
+   */
+  async function cambiarPrioridad(ilu, delta) {
+    const nueva = Math.max(0, Math.min(100, (ilu.prioridad || 0) + delta));
+    if (nueva === (ilu.prioridad || 0)) return;
+    try {
+      await llamar(`/api/admin/ilustraciones/${ilu.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ prioridad: nueva }),
+      });
+      ilu.prioridad = nueva;
+      dibujarGridIlustraciones();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function alternarActivaIlustracion(ilu) {
+    try {
+      await llamar(`/api/admin/ilustraciones/${ilu.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ activa: !ilu.activa }),
+      });
+      ilu.activa = !ilu.activa;
+      dibujarGridIlustraciones();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function borrarIlustracion(ilu) {
+    if (!confirm(`¿Borrar "${ilu.nombre}"? No se puede deshacer.`)) return;
+    try {
+      await llamar(`/api/admin/ilustraciones/${ilu.id}`, { method: "DELETE" });
+      ilustraciones = ilustraciones.filter((x) => x.id !== ilu.id);
+      render();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  /* ═══════════════ Panel: Plantillas ═══════════════ */
+
+  function renderPlantillas() {
+    const panel = document.getElementById("panel");
+    panel.innerHTML = `
+      <div class="tarjeta">
+        <h2>📦 Subir varias a la vez</h2>
+        <p class="ayuda">Para cargar un cuadernillo completo sin llenar un formulario por hoja. Si el archivo se llama <code>nivel__categoria__enfoque__Nombre.pdf</code>, esos datos se llenan solos; si no, se usa el nombre del archivo tal cual y queda en categoría "otros".</p>
+        <input type="file" id="pl-lote" multiple accept=".svg,.png,.jpg,.jpeg,.webp,.pdf">
+        <div class="check">
+          <input type="checkbox" id="chk-lote-ia">
+          <label for="chk-lote-ia">✨ Que la IA les ponga nombre y descripción mirando cada hoja (tarda unos segundos por archivo)</label>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="chk-lote-marcar" checked>
+          <label for="chk-lote-marcar">Ponerles la marca de EnseñAI, y saltarse las que ya estén en la biblioteca</label>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="chk-lote-publicar">
+          <label for="chk-lote-publicar">Publicarlas de inmediato (si no, las revisas aquí abajo antes)</label>
+        </div>
+        <button class="primario" type="button" id="btn-lote">Subir las que elegí</button>
+        <div id="avance-lote"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Subir plantilla</h2>
+        <p class="ayuda">El maestro la busca y la descarga tal cual — formatos, fichas, planeaciones. Puedes subirla sin publicar para revisarla antes.</p>
+        <form id="form-plantilla">
+          <div class="fila">
+            <div>
+              <label>Nombre</label>
+              <input type="text" name="nombre" required placeholder="Ej. Ficha de seguimiento semanal">
+            </div>
+            <div>
+              <label>Categoría</label>
+              <input type="text" name="categoria" placeholder="Ej. planeacion, evaluacion…" value="otros">
+            </div>
+          </div>
+          <label>Descripción (opcional)</label>
+          <textarea name="descripcion" placeholder="Para qué sirve y cómo se usa."></textarea>
+          <div class="fila">
+            <div>
+              <label>Nivel</label>
+              <select name="nivel">
+                ${NIVELES.map(n => `<option value="${n.value}">${n.label}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label>Edad (de … a …)</label>
+              <div style="display:flex;gap:8px;">
+                <input type="number" name="edadMin" min="2" max="99" placeholder="3" style="width:100%;">
+                <input type="number" name="edadMax" min="2" max="99" placeholder="6" style="width:100%;">
+              </div>
+            </div>
+            <div>
+              <label>Enfoque</label>
+              <select name="enfoque">
+                <option value="">Escolar y psicoeducativo</option>
+                <option value="escolar">Solo escolar</option>
+                <option value="psicoeducativo">Solo psicoeducativo</option>
+              </select>
+            </div>
+          </div>
+          <label>Archivo (SVG, PNG, JPG, WEBP o PDF — máx. 2 MB)</label>
+          <input type="file" name="archivo" accept=".svg,.png,.jpg,.jpeg,.webp,.pdf" required>
+          <p class="ayuda" style="margin:2px 0 6px;">La edad puede cruzar varios grados: una hoja de recortar sirve de los 4 a los 10. Si la dejas vacía se deduce del nivel.</p>
+          <p class="ayuda" id="estado-analisis" style="margin:4px 0 0;">Al elegir el archivo, la IA mira la hoja y llena los campos de arriba. Todo queda editable.</p>
+          <div class="check">
+            <input type="checkbox" name="marcar" id="chk-marcar" checked>
+            <label for="chk-marcar">Ponerle la marca de EnseñAI (pastilla abajo a la derecha, solo en PDF)</label>
+          </div>
+          <div class="check">
+            <input type="checkbox" name="publicada" id="chk-publicada">
+            <label for="chk-publicada">Publicar de inmediato (si no, solo tú la ves)</label>
+          </div>
+          <button class="primario" type="submit">Subir plantilla</button>
+          <div id="msg-plantilla"></div>
+        </form>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Biblioteca (<span id="cuenta-biblioteca">${plantillas.length}</span>)</h2>
+        <input type="search" id="buscar-biblioteca" placeholder="Busca por nombre o categoría…" autocomplete="off" style="margin-bottom:8px;">
+        <button type="button" class="secundario chico" id="btn-repetidas" style="width:auto; margin:0 0 10px;">🔎 Encontrar repetidas</button>
+        <div id="barra-seleccion"></div>
+        <div id="grid-plantillas" class="grid"></div>
+      </div>
+    `;
+
+    document.getElementById("form-plantilla").addEventListener("submit", subirPlantilla);
+    document.getElementById("form-plantilla").archivo.addEventListener("change", analizarArchivoElegido);
+    document.getElementById("btn-lote").addEventListener("click", subirLotePlantillas);
+    document.getElementById("btn-repetidas").addEventListener("click", marcarRepetidas);
+    document.getElementById("buscar-biblioteca").addEventListener("input", (ev) => {
+      filtroBiblioteca = ev.target.value;
+      dibujarGridPlantillas();
+    });
+    dibujarGridPlantillas();
+  }
+
+  /**
+   * Selección múltiple en la biblioteca (4-sep-2026).
+   *
+   * Con 230 hojas, publicarlas de una en una son 230 clics; y si algo sale
+   * mal en una tanda, deshacerlo a mano es peor. Los ids seleccionados
+   * viven aquí afuera para que sobrevivan a los redibujados del grid.
+   */
+  let plantillasElegidas = new Set();
+  let filtroBiblioteca = "";
+
+  /** Sin acentos ni signos: para buscar y para comparar nombres. */
+  function normalizarTexto(t) {
+    return String(t || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  /**
+   * "🔎 Encontrar repetidas" (4-sep-2026).
+   *
+   * Agrupa por nombre normalizado y DEJA UNA de cada grupo —la más vieja,
+   * que es la que ya podría estar enganchada a un tema— y selecciona las
+   * demás. No borra nada: solo las marca para que las revises y decidas
+   * tú con el botón Borrar de abajo.
+   *
+   * Compara por NOMBRE, no por archivo, a propósito: las que subiste antes
+   * del chequeo de repetidas no tienen huella guardada, así que el nombre
+   * es lo único que tienen en común. De aquí en adelante el servidor ya
+   * rechaza el mismo archivo al subirlo (schema_v41).
+   */
+  function marcarRepetidas() {
+    const grupos = {};
+    [...plantillas]
+      .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")))
+      .forEach((p) => {
+        const clave = normalizarTexto(p.nombre);
+        (grupos[clave] = grupos[clave] || []).push(p);
+      });
+
+    const sobran = [];
+    Object.values(grupos).forEach((lista) => {
+      if (lista.length > 1) sobran.push(...lista.slice(1));
+    });
+
+    const avance = document.getElementById("avance-seleccion");
+    if (!sobran.length) {
+      plantillasElegidas = new Set();
+      dibujarGridPlantillas();
+      const av = document.getElementById("avance-seleccion");
+      if (av) av.innerHTML = `<div class="exito" style="margin-top:6px;">No encontré ninguna repetida por nombre. 👌</div>`;
+      return;
+    }
+
+    plantillasElegidas = new Set(sobran.map((p) => p.id));
+    filtroBiblioteca = "";
+    const buscador = document.getElementById("buscar-biblioteca");
+    if (buscador) buscador.value = "";
+    dibujarGridPlantillas();
+
+    const cuantosGrupos = Object.values(grupos).filter((l) => l.length > 1).length;
+    const av = document.getElementById("avance-seleccion");
+    if (av) {
+      av.innerHTML = `
+        <div class="aviso" style="margin-top:6px; text-align:left;">
+          Encontré <strong>${sobran.length}</strong> repetida(s) en ${cuantosGrupos} grupo(s) de nombre igual.
+          Ya te dejé seleccionadas las que sobran (de cada grupo conservé la más antigua).
+          Revísalas y dale <strong>Borrar</strong> si estás de acuerdo.
+        </div>`;
+    }
+  }
+
+  function dibujarGridPlantillas() {
+    const cont = document.getElementById("grid-plantillas");
+    // El título se pinta una vez con renderPlantillas(), pero la lista se
+    // vuelve a cargar después de subir, publicar o borrar: sin esto, el
+    // encabezado se quedaba con el número viejo mientras la barra de abajo
+    // ya mostraba el nuevo (se veía "Biblioteca (210)" y "Seleccionar las 271").
+    const cuenta = document.getElementById("cuenta-biblioteca");
+    if (cuenta) cuenta.textContent = String(plantillas.length);
+    if (!plantillas.length) {
+      plantillasElegidas.clear();
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no hay plantillas aquí.</p>`;
+      const barra = document.getElementById("barra-seleccion");
+      if (barra) barra.innerHTML = "";
+      return;
+    }
+
+    // Se limpian los ids de plantillas que ya no existen (borradas).
+    const vivas = new Set(plantillas.map((p) => p.id));
+    plantillasElegidas = new Set([...plantillasElegidas].filter((id) => vivas.has(id)));
+
+    // El buscador solo cambia lo que se VE; la selección se respeta aunque
+    // una seleccionada quede fuera del filtro, para no perderla sin avisar.
+    const q = normalizarTexto(filtroBiblioteca);
+    const visibles = q
+      ? plantillas.filter((p) => normalizarTexto(`${p.nombre} ${p.categoria} ${p.descripcion || ""}`).includes(q))
+      : plantillas;
+
+    if (!visibles.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Ninguna plantilla coincide con "${escapeHtml(filtroBiblioteca)}".</p>`;
+      dibujarBarraSeleccion();
+      return;
+    }
+
+    cont.innerHTML = visibles.map((p) => {
+      // Desde schema_v40 el bucket es privado: la miniatura y el botón
+      // "Ver" usan la liga firmada que manda el backend, no archivo_url
+      // (que ahora es el marcador "privado:<ruta>", no una URL).
+      const url = p.vista_url || (String(p.archivo_url || "").startsWith("http") ? p.archivo_url : "");
+      return `
+      <div class="item" data-id="${p.id}">
+        <div class="check" style="margin:0 0 6px;">
+          <input type="checkbox" id="chk-pl-${p.id}" data-elegir="${p.id}" ${plantillasElegidas.has(p.id) ? "checked" : ""}>
+          <label for="chk-pl-${p.id}" style="font-size:0.8rem;">Seleccionar</label>
+        </div>
+        <div class="miniatura">
+          ${p.tipo_mime === "application/pdf"
+            ? `<span class="pdf-tag">📄 PDF</span>`
+            : url
+              ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(p.nombre)}" loading="lazy">`
+              : `<span class="pdf-tag">🖼️</span>`}
+        </div>
+        <span class="pill-estado ${p.publicada ? "pill-si" : "pill-no"}">${p.publicada ? "Publicada" : "Borrador"}</span>
+        <div class="nombre">${escapeHtml(p.nombre)}</div>
+        <div class="meta">${escapeHtml(p.categoria)} · ${p.edad_min != null && p.edad_max != null ? `${p.edad_min} a ${p.edad_max} años` : (p.nivel ? NIVELES.find(n => n.value === p.nivel)?.label || p.nivel : "Cualquier edad")} · ${p.descargas || 0} descargas</div>
+        <div class="acciones">
+          ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><button class="secundario chico">Ver</button></a>` : ""}
+          <button class="secundario chico" data-accion="toggle">${p.publicada ? "Ocultar" : "Publicar"}</button>
+          <button class="secundario chico peligro" data-accion="borrar">Borrar</button>
+        </div>
+      </div>
+    `;}).join("");
+
+    cont.querySelectorAll(".item").forEach((el) => {
+      const id = el.dataset.id;
+      const pl = plantillas.find((x) => x.id === id);
+      el.querySelector('[data-accion="toggle"]').onclick = () => alternarPublicadaPlantilla(pl);
+      el.querySelector('[data-accion="borrar"]').onclick = () => borrarPlantilla(pl);
+      el.querySelector("[data-elegir]").onchange = (ev) => {
+        if (ev.target.checked) plantillasElegidas.add(id);
+        else plantillasElegidas.delete(id);
+        dibujarBarraSeleccion();
+      };
+    });
+
+    dibujarBarraSeleccion();
+  }
+
+  function dibujarBarraSeleccion() {
+    const barra = document.getElementById("barra-seleccion");
+    if (!barra) return;
+    const n = plantillasElegidas.size;
+    const todas = n > 0 && n === plantillas.length;
+    const filtrando = normalizarTexto(filtroBiblioteca).length > 0;
+
+    barra.innerHTML = `
+      <div class="check" style="margin:0 0 8px;">
+        <input type="checkbox" id="chk-todas" ${todas ? "checked" : ""}>
+        <label for="chk-todas">${todas ? "Quitar la selección" : `Seleccionar las ${plantillas.length}`}</label>
+      </div>
+      <p class="ayuda" style="margin:0 0 8px;">${n ? `${n} seleccionada${n === 1 ? "" : "s"}` : "Ninguna seleccionada"}${filtrando ? " · el buscador solo esconde, no quita de la selección" : ""}</p>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <button type="button" class="secundario chico" data-lote="publicar" ${n ? "" : "disabled"}>Publicar</button>
+        <button type="button" class="secundario chico" data-lote="ocultar" ${n ? "" : "disabled"}>Ocultar</button>
+        <button type="button" class="secundario chico peligro" data-lote="borrar" ${n ? "" : "disabled"}>Borrar</button>
+      </div>
+      <div id="avance-seleccion"></div>`;
+
+    barra.querySelector("#chk-todas").onchange = (ev) => {
+      plantillasElegidas = ev.target.checked ? new Set(plantillas.map((p) => p.id)) : new Set();
+      dibujarGridPlantillas();
+    };
+    barra.querySelectorAll("[data-lote]").forEach((b) => {
+      b.onclick = () => accionEnLote(b.dataset.lote);
+    });
+  }
+
+  /**
+   * Publica, oculta o borra todas las seleccionadas, una por una con los
+   * endpoints de siempre. Va en serie a propósito: 230 peticiones en
+   * paralelo no las agradece ni Render ni Supabase, y así se puede ir
+   * diciendo cuántas van.
+   */
+  async function accionEnLote(accion) {
+    const ids = [...plantillasElegidas];
+    if (!ids.length) return;
+
+    if (accion === "borrar") {
+      const seguro = confirm(
+        `Vas a borrar ${ids.length} plantilla(s) para siempre, junto con su archivo. Esto no se puede deshacer.\n\n¿Le seguimos?`
+      );
+      if (!seguro) return;
+    }
+
+    const avance = document.getElementById("avance-seleccion");
+    const botones = document.querySelectorAll("#barra-seleccion [data-lote], #chk-todas");
+    botones.forEach((b) => (b.disabled = true));
+
+    let hechas = 0;
+    const fallas = [];
+    for (const id of ids) {
+      const pl = plantillas.find((x) => x.id === id);
+      try {
+        if (accion === "borrar") {
+          await llamar(`/api/admin/plantillas/${id}`, { method: "DELETE" });
+        } else {
+          await llamar(`/api/admin/plantillas/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ publicada: accion === "publicar" }),
+          });
+        }
+        hechas++;
+      } catch (err) {
+        fallas.push(`${pl?.nombre || id}: ${err.message}`);
+      }
+      if (avance) {
+        avance.innerHTML = `<p class="ayuda" style="margin:8px 0 0;"><strong>${hechas + fallas.length} de ${ids.length}</strong>${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}</p>`;
+      }
+    }
+
+    plantillasElegidas = new Set();
+    await cargarPlantillas();
+    dibujarGridPlantillas();
+
+    const av = document.getElementById("avance-seleccion");
+    if (av) {
+      const verbo = accion === "borrar" ? "borrada" : accion === "publicar" ? "publicada" : "ocultada";
+      av.innerHTML =
+        `<div class="exito" style="margin-top:6px;">${hechas} plantilla(s) ${verbo}(s).</div>` +
+        (fallas.length ? `<div class="error" style="margin-top:6px; text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : "");
+    }
+  }
+
+  /**
+   * Subida múltiple de plantillas (3-sep-2026).
+   *
+   * Nació de un problema real: los cuadernillos que Claudia hizo en Canva
+   * salen partidos en ~230 hojas sueltas, y llenar 230 veces el formulario
+   * de arriba no es un flujo, es un castigo. Esto sube todas de un jalón
+   * usando el MISMO endpoint de siempre (POST /api/admin/plantillas), una
+   * por una: no hace falta backend nuevo, y si una falla las demás siguen.
+   *
+   * La metadata viaja en el NOMBRE del archivo, separada por dobles guiones
+   * bajos, para que se pueda revisar y corregir desde el explorador de
+   * archivos antes de subir nada:
+   *
+   *   preescolar__lenguaje__escolar__Laberinto de la letra A.pdf
+   *   └ nivel      └ categoría └ enfoque  └ nombre que verá el maestro
+   *
+   * Todo es opcional de derecha a izquierda: con 3 partes se asume que
+   * falta el enfoque, con 2 que solo viene categoría, y un archivo sin
+   * ningún "__" se sube con su propio nombre y categoría "otros".
+   */
+  const NIVELES_VALIDOS = ["preescolar", "primaria_baja", "primaria_alta", "secundaria", "preparatoria", "universidad"];
+
+  function datosDesdeNombre(nombreArchivo) {
+    const sinExtension = nombreArchivo.replace(/\.[^.]+$/, "");
+    const partes = sinExtension.split("__").map((x) => x.trim()).filter((x, i, a) => i < a.length - 1 ? x !== "" : true);
+
+    let nivel = "", categoria = "", enfoque = "", nombre = sinExtension;
+
+    if (partes.length >= 4) {
+      [nivel, categoria, enfoque] = partes;
+      nombre = partes.slice(3).join(" — ");
+    } else if (partes.length === 3) {
+      [nivel, categoria] = partes;
+      nombre = partes[2];
+    } else if (partes.length === 2) {
+      categoria = partes[0];
+      nombre = partes[1];
+    }
+
+    // "todos" / "cualquiera" es la forma de decir "sirve para cualquier
+    // nivel", que en la base se guarda como null.
+    if (!NIVELES_VALIDOS.includes(nivel)) nivel = "";
+    if (enfoque !== "escolar" && enfoque !== "psicoeducativo") enfoque = "";
+
+    return {
+      nombre: nombre.trim() || sinExtension,
+      categoria: (categoria || "otros").toLowerCase(),
+      nivel,
+      enfoque,
+    };
+  }
+
+  function leerArchivoSuelto(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(lector.result);
+      lector.onerror = () => reject(new Error("No se pudo leer el archivo."));
+      lector.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Le pide a la IA que proponga los datos de una hoja (4-sep-2026).
+   *
+   * Devuelve la propuesta o null; nunca lanza, porque esto es una ayuda:
+   * si falla, la persona llena los campos a mano y sube igual.
+   */
+  async function proponerDatos(archivoBase64, tipoMime, nombreArchivo) {
+    try {
+      const { propuesta } = await llamar("/api/admin/plantillas/analizar", {
+        method: "POST",
+        body: JSON.stringify({ archivoBase64, tipoMime, nombreArchivo }),
+      });
+      return propuesta || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * Al elegir un archivo en el formulario de una sola plantilla, se llenan
+   * los campos solos. Solo se pisan los que estén VACÍOS o con su valor por
+   * omisión: si la persona ya escribió algo, su texto manda.
+   */
+  async function analizarArchivoElegido(ev) {
+    const form = document.getElementById("form-plantilla");
+    const estado = document.getElementById("estado-analisis");
+    const file = ev.target.files && ev.target.files[0];
+    if (!file || !estado) return;
+
+    if (file.size > MAX_BYTES) {
+      estado.textContent = `Ese archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo son 2 MB.`;
+      return;
+    }
+
+    estado.textContent = "✨ Mirando la hoja para proponerte los datos…";
+    const archivoBase64 = await leerArchivoSuelto(file).catch(() => null);
+    if (!archivoBase64) {
+      estado.textContent = "No pude leer el archivo. Llena los campos a mano.";
+      return;
+    }
+
+    const p = await proponerDatos(archivoBase64, file.type, file.name);
+    if (!p) {
+      estado.textContent = "No pude proponerte los datos. Llénalos a mano y súbela igual.";
+      return;
+    }
+
+    if (!form.nombre.value.trim()) form.nombre.value = p.nombre;
+    if (!form.descripcion.value.trim()) form.descripcion.value = p.descripcion || "";
+    if (!form.categoria.value.trim() || form.categoria.value.trim() === "otros") form.categoria.value = p.categoria;
+    if (!form.nivel.value) form.nivel.value = p.nivel || "";
+    if (!form.enfoque.value) form.enfoque.value = p.enfoque || "";
+    if (!form.edadMin.value && p.edad_min) form.edadMin.value = p.edad_min;
+    if (!form.edadMax.value && p.edad_max) form.edadMax.value = p.edad_max;
+    estado.textContent = "✨ Datos propuestos — revísalos y corrige lo que quieras antes de subir.";
+  }
+
+  async function subirLotePlantillas() {
+    const input = document.getElementById("pl-lote");
+    const avance = document.getElementById("avance-lote");
+    const boton = document.getElementById("btn-lote");
+    const publicar = document.getElementById("chk-lote-publicar").checked;
+    const conIA = document.getElementById("chk-lote-ia").checked;
+    const conMarca = document.getElementById("chk-lote-marcar").checked;
+    const archivos = Array.from(input.files || []);
+
+    if (!archivos.length) {
+      avance.innerHTML = `<div class="error">Primero elige los archivos.</div>`;
+      return;
+    }
+
+    boton.disabled = true;
+    const fallas = [];
+    // Una hoja repetida no es una falla: se cuenta aparte para que el
+    // resumen final no parezca un desastre cuando todo salió bien.
+    const repetidas = [];
+    let subidas = 0;
+
+    const pintar = (i) => {
+      avance.innerHTML = `
+        <p class="ayuda" style="margin:8px 0 4px;"><strong>${i} de ${archivos.length}</strong> · ✓ ${subidas} subidas${repetidas.length ? ` · ⏭️ ${repetidas.length} ya estaban` : ""}${fallas.length ? ` · ✗ ${fallas.length} con problema` : ""}${conIA && i < archivos.length ? " · ✨ con IA, tarda más" : ""}</p>
+        ${repetidas.length ? `<div class="aviso" style="text-align:left;">${repetidas.map((r) => escapeHtml(r)).join("<br>")}</div>` : ""}
+        ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}
+      `;
+    };
+    pintar(0);
+
+    for (let i = 0; i < archivos.length; i++) {
+      const file = archivos[i];
+      try {
+        if (file.size > MAX_BYTES) {
+          throw new Error(`pesa ${(file.size / 1024 / 1024).toFixed(1)} MB (máx. 2 MB)`);
+        }
+        if (!TIPOS_PLANTILLA.includes(file.type)) {
+          throw new Error("ese tipo de archivo no se acepta");
+        }
+        let datos = datosDesdeNombre(file.name);
+        const archivoBase64 = await leerArchivoSuelto(file);
+
+        // Con la IA prendida, su propuesta manda sobre lo que dice el
+        // nombre del archivo — salvo el nivel y el enfoque, que si venían
+        // en el nombre los puso una persona y esos ganan.
+        if (conIA) {
+          const p = await proponerDatos(archivoBase64, file.type, file.name);
+          if (p) {
+            // Lo que venga en el NOMBRE DEL ARCHIVO manda sobre la IA:
+            // categoría, nivel y enfoque los puso una persona a propósito.
+            // Sin esto pasaba algo confuso: dos hojas del mismo cuadernillo
+            // quedaban en categorías distintas porque el modelo veía una
+            // como "lenguaje" (por la palabra que se escribe) y otra como
+            // "matemáticas" (por la figura). De la IA se toma lo que sí
+            // requiere mirar la hoja: el nombre y la descripción.
+            const veniaEnElNombre = file.name.includes("__");
+            datos = {
+              nombre: p.nombre,
+              categoria: veniaEnElNombre ? datos.categoria : p.categoria || datos.categoria,
+              nivel: datos.nivel || p.nivel || "",
+              enfoque: datos.enfoque || p.enfoque || "",
+              descripcion: p.descripcion || "",
+              // La edad SÍ la decide la IA aunque el nombre traiga nivel:
+              // el nivel es una etiqueta gruesa y la edad es lo que de
+              // verdad se filtra. Si no la propuso, el backend la deduce
+              // del nivel y no se pierde nada.
+              edadMin: p.edad_min || null,
+              edadMax: p.edad_max || null,
+            };
+          }
+        }
+        await llamar("/api/admin/plantillas", {
+          method: "POST",
+          body: JSON.stringify({
+            nombre: datos.nombre,
+            descripcion: datos.descripcion || "",
+            categoria: datos.categoria,
+            nivel: datos.nivel || null,
+            enfoque: datos.enfoque || null,
+            edadMin: datos.edadMin || null,
+            edadMax: datos.edadMax || null,
+            publicada: publicar,
+            marcar: conMarca,
+            archivoBase64,
+            tipoMime: file.type,
+          }),
+        });
+        subidas++;
+      } catch (err) {
+        if (/ya está en la biblioteca/i.test(err.message || "")) repetidas.push(`${file.name}: ${err.message}`);
+        else fallas.push(`${file.name}: ${err.message}`);
+      }
+      pintar(i + 1);
+    }
+
+    boton.disabled = false;
+    input.value = "";
+    await cargarPlantillas();
+    dibujarGridPlantillas();
+    avance.innerHTML += `<div class="exito" style="margin-top:6px;">Listo: ${subidas} plantilla(s) en la biblioteca${publicar ? " y ya publicadas" : " sin publicar — revísalas abajo y publícalas"}${repetidas.length ? `, y ${repetidas.length} que ya tenías se saltaron` : ""}.</div>`;
+  }
+
+  async function subirPlantilla(ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const msg = document.getElementById("msg-plantilla");
+    msg.innerHTML = "";
+    const boton = form.querySelector("button[type=submit]");
+
+    try {
+      const archivo = await leerArchivo(form.archivo);
+      if (!archivo) throw new Error("Elige un archivo.");
+      if (!TIPOS_PLANTILLA.includes(archivo.tipoMime)) throw new Error("Ese tipo de archivo no se acepta. Usa SVG, PNG, JPG, WEBP o PDF.");
+
+      boton.disabled = true;
+      boton.textContent = "Subiendo…";
+
+      const respuesta = await llamar("/api/admin/plantillas", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: form.nombre.value.trim(),
+          descripcion: form.descripcion.value.trim(),
+          categoria: form.categoria.value.trim() || "otros",
+          nivel: form.nivel.value || null,
+          enfoque: form.enfoque.value || null,
+          edadMin: form.edadMin.value || null,
+          edadMax: form.edadMax.value || null,
+          publicada: form.publicada.checked,
+          marcar: form.marcar.checked,
+          archivoBase64: archivo.archivoBase64,
+          tipoMime: archivo.tipoMime,
+        }),
+      });
+
+      msg.innerHTML =
+        `<div class="exito">Plantilla subida ✓${respuesta?.marcada ? " (con marca)" : ""}</div>` +
+        (respuesta?.aviso ? `<div class="aviso" style="margin-top:6px;">${escapeHtml(respuesta.aviso)}</div>` : "");
+      form.reset();
+      await cargarPlantillas();
+      dibujarGridPlantillas();
+    } catch (err) {
+      msg.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    } finally {
+      boton.disabled = false;
+      boton.textContent = "Subir plantilla";
+    }
+  }
+
+  async function alternarPublicadaPlantilla(pl) {
+    try {
+      await llamar(`/api/admin/plantillas/${pl.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ publicada: !pl.publicada }),
+      });
+      pl.publicada = !pl.publicada;
+      dibujarGridPlantillas();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function borrarPlantilla(pl) {
+    if (!confirm(`¿Borrar "${pl.nombre}"? No se puede deshacer.`)) return;
+    try {
+      await llamar(`/api/admin/plantillas/${pl.id}`, { method: "DELETE" });
+      plantillas = plantillas.filter((x) => x.id !== pl.id);
+      render();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  /* ═══════════════ Panel: Faltantes ═══════════════ */
+
+  /* ═══════════════ Panel: Estudio de ilustraciones ═══════════════
+
+     Generar imágenes con IA para llenar la biblioteca (5-sep-2026).
+
+     Regla del panel: GENERA Y ENSEÑA, no guarda. Cada imagen se queda en
+     la pantalla hasta que la persona la aprueba a mano. Un modelo de
+     imagen falla de formas raras y esto lo ven niños; además así el bucket
+     no se llena de descartes.
+
+     El costo se enseña ANTES de generar, no después. Es dinero de la
+     usuaria y tiene que poder decidir con el número enfrente.             */
+
+  let modelosEstudio = [];
+  let estudioConfigurado = false;
+  let tipoCambio = 17;
+  let generadas = [];          // { id, descripcion, base64, costoUsd, estado }
+
+  async function cargarModelosEstudio() {
+    try {
+      const d = await llamar("/api/admin/estudio/modelos");
+      modelosEstudio = d.modelos || [];
+      estudioConfigurado = !!d.configurado;
+      tipoCambio = d.tipoCambioAproximado || 17;
+    } catch (err) {
+      modelosEstudio = [];
+      estudioConfigurado = false;
+    }
+  }
+
+  function precioElegido() {
+    const modelo = document.getElementById("es-modelo")?.value;
+    const calidad = document.getElementById("es-calidad")?.value;
+    const m = modelosEstudio.find((x) => x.id === modelo);
+    const usd = m && m.precios ? m.precios[calidad] : null;
+    return typeof usd === "number" ? usd : null;
+  }
+
+  /** Cuántas descripciones hay escritas ahorita en la caja. */
+  function lineasPedidas() {
+    const txt = document.getElementById("es-lista")?.value || "";
+    return txt.split("\n").map((l) => l.trim()).filter(Boolean);
+  }
+
+  function actualizarEstimado() {
+    const caja = document.getElementById("es-estimado");
+    if (!caja) return;
+    const n = lineasPedidas().length;
+    const usd = precioElegido();
+    if (!n) { caja.textContent = "Escribe una descripción por renglón."; return; }
+    if (usd == null) { caja.textContent = `${n} imagen(es).`; return; }
+    const totalUsd = usd * n;
+    caja.innerHTML = `<strong>${n} imagen(es)</strong> · ~$${totalUsd.toFixed(3)} USD ` +
+      `(≈ $${(totalUsd * tipoCambio).toFixed(2)} MXN) · $${usd.toFixed(3)} c/u`;
+  }
+
+  async function renderEstudio() {
+    const panel = document.getElementById("panel");
+    panel.innerHTML = `<div class="cargando">Cargando el estudio…</div>`;
+    await cargarModelosEstudio();
+
+    const opcModelos = modelosEstudio.map((m) =>
+      `<option value="${escapeHtml(m.id)}">${escapeHtml(m.etiqueta)}</option>`).join("");
+
+    // Los temas que se quedaron sin ilustración: es la lista de la
+    // siguiente tanda, escrita sola por el sistema.
+    const pendientes = faltantes.filter((f) => !f.resuelta).slice(0, 12);
+
+    panel.innerHTML = `
+      ${estudioConfigurado ? "" : `
+      <div class="tarjeta" style="border-color:#F5A524;">
+        <h2>⚠️ Falta la llave de OpenAI</h2>
+        <p class="ayuda">El estudio no puede generar nada hasta que exista la variable <code>OPENAI_API_KEY</code> en Render. Se saca en <strong>platform.openai.com → API keys</strong>, y hay que cargarle saldo en <strong>Billing</strong>. Todo lo demás del panel funciona igual.</p>
+      </div>`}
+
+      <div class="tarjeta">
+        <h2>✨ Generar ilustraciones</h2>
+        <p class="ayuda">Una descripción por renglón. Se genera una por una y aquí abajo las apruebas o las tiras — <strong>nada se guarda hasta que tú digas</strong>. El estilo de EnseñAI y el fondo transparente se aplican solos a todas.</p>
+
+        <label>Qué quieres que dibuje (un renglón por imagen)</label>
+        <textarea id="es-lista" rows="5" placeholder="una manzana roja&#10;el sistema solar con los ocho planetas&#10;un vaso con agua y un termómetro"></textarea>
+
+        <div class="fila">
+          <div>
+            <label>Modelo</label>
+            <select id="es-modelo">${opcModelos}</select>
+          </div>
+          <div>
+            <label>Calidad</label>
+            <select id="es-calidad">
+              <option value="low">Baja — la más barata</option>
+              <option value="medium" selected>Media</option>
+              <option value="high">Alta</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="aviso" id="es-estimado" style="text-align:left;">Escribe una descripción por renglón.</div>
+        <button class="primario" type="button" id="btn-estudio" ${estudioConfigurado ? "" : "disabled"}>Generar</button>
+        <div id="es-avance"></div>
+      </div>
+
+      ${pendientes.length ? `
+      <div class="tarjeta">
+        <h2>Temas que se quedaron sin ilustración</h2>
+        <p class="ayuda">Escritos solos por el sistema cuando un tema no encontró nada. Da clic para agregarlos a la caja de arriba.</p>
+        <div class="claves">
+          ${pendientes.map((f) => `<span class="chip-faltante" data-tema="${escapeHtml(f.tema_ejemplo)}" style="cursor:pointer;">${escapeHtml(f.tema_ejemplo)} · ${f.veces}×</span>`).join("")}
+        </div>
+      </div>` : ""}
+
+      <div class="tarjeta">
+        <h2>Resultados <span class="cuenta" id="es-cuenta">(${generadas.length})</span></h2>
+        <p class="ayuda">Al aprobar una, se sube a la biblioteca y el agente le pone nombre, categoría y palabras clave solo.</p>
+        <div id="es-grid" class="grid"></div>
+      </div>
+    `;
+
+    document.getElementById("es-lista").addEventListener("input", actualizarEstimado);
+    document.getElementById("es-modelo").addEventListener("change", actualizarEstimado);
+    document.getElementById("es-calidad").addEventListener("change", actualizarEstimado);
+    document.getElementById("btn-estudio").addEventListener("click", generarLoteEstudio);
+    panel.querySelectorAll(".chip-faltante").forEach((chip) => {
+      chip.onclick = () => {
+        const caja = document.getElementById("es-lista");
+        caja.value = (caja.value.trim() ? caja.value.replace(/\s*$/, "\n") : "") + chip.dataset.tema;
+        actualizarEstimado();
+      };
+    });
+    actualizarEstimado();
+    dibujarGridEstudio();
+  }
+
+  function dibujarGridEstudio() {
+    const cont = document.getElementById("es-grid");
+    if (!cont) return;
+    const cuenta = document.getElementById("es-cuenta");
+    if (cuenta) cuenta.textContent = `(${generadas.length})`;
+
+    if (!generadas.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado nada.</p>`;
+      return;
+    }
+    cont.innerHTML = generadas.map((g) => `
+      <div class="item" data-id="${g.id}">
+        <div class="miniatura"><img src="data:image/png;base64,${g.base64}" alt="${escapeHtml(g.descripcion)}"></div>
+        <div class="nombre">${escapeHtml(g.descripcion)}</div>
+        ${g.estado === "guardada"
+          ? `<div class="exito" style="margin:6px 0 0;">✓ Ya está en la biblioteca</div>`
+          : `<div class="acciones">
+               <button class="primario chico" data-accion="aprobar">Aprobar</button>
+               <button class="secundario chico" data-accion="descargar">⬇ Descargar</button>
+               <button class="secundario chico peligro" data-accion="tirar">Tirar</button>
+             </div>`}
+        <div class="msg-mini"></div>
+      </div>
+    `).join("");
+
+    cont.querySelectorAll('[data-accion="aprobar"]').forEach((b) => {
+      b.onclick = () => aprobarGenerada(b.closest("[data-id]").dataset.id, b);
+    });
+    cont.querySelectorAll('[data-accion="descargar"]').forEach((b) => {
+      b.onclick = async () => {
+        const g = generadas.find((x) => String(x.id) === String(b.closest("[data-id]").dataset.id));
+        if (!g) return;
+        b.disabled = true;
+        try {
+          // Se descarga la versión homologada, no la cruda: si la vas a
+          // usar en otro lado, la que sirve es la que ya está pareja con
+          // el resto de tu biblioteca.
+          g.homologada = g.homologada || (await homologarImagen(`data:image/png;base64,${g.base64}`));
+          descargarDataUrl(g.homologada, nombreDeArchivo(g.descripcion));
+        } catch (err) {
+          alert(err.message);
+        }
+        b.disabled = false;
+      };
+    });
+    cont.querySelectorAll('[data-accion="tirar"]').forEach((b) => {
+      b.onclick = () => {
+        const id = b.closest("[data-id]").dataset.id;
+        generadas = generadas.filter((g) => String(g.id) !== String(id));
+        dibujarGridEstudio();
+      };
+    });
+  }
+
+  async function generarLoteEstudio() {
+    const boton = document.getElementById("btn-estudio");
+    const avance = document.getElementById("es-avance");
+    const lista = lineasPedidas();
+    if (!lista.length) {
+      avance.innerHTML = `<div class="error">Escribe al menos una descripción.</div>`;
+      return;
+    }
+    const modelo = document.getElementById("es-modelo").value;
+    const calidad = document.getElementById("es-calidad").value;
+
+    boton.disabled = true;
+    let gastoUsd = 0, fallas = [];
+
+    for (let i = 0; i < lista.length; i++) {
+      avance.innerHTML = `<p class="ayuda" style="margin:8px 0 4px;">Generando <strong>${i + 1} de ${lista.length}</strong> — cada una tarda entre 10 y 30 segundos…</p>`;
+      try {
+        const r = await llamar("/api/admin/estudio/generar", {
+          method: "POST",
+          body: JSON.stringify({ descripcion: lista[i], modelo, calidad }),
+        });
+        gastoUsd += r.costoUsd || 0;
+        generadas.unshift({
+          id: `g${Date.now()}_${i}`,
+          descripcion: lista[i],
+          base64: r.imagen,
+          costoUsd: r.costoUsd,
+          estado: "pendiente",
+        });
+        dibujarGridEstudio();
+      } catch (err) {
+        fallas.push(`${lista[i]}: ${err.message}`);
+        // Si la llave está mal o se acabó el saldo, TODAS las demás van a
+        // fallar igual. Cortar aquí evita gastar el rato en 20 errores.
+        if (/OPENAI_API_KEY|saldo|no es válida/i.test(err.message)) break;
+      }
+    }
+
+    boton.disabled = false;
+    avance.innerHTML = `
+      <div class="exito" style="margin-top:6px;">Listo. Gastaste ~$${gastoUsd.toFixed(3)} USD (≈ $${(gastoUsd * tipoCambio).toFixed(2)} MXN). Revísalas abajo antes de guardarlas.</div>
+      ${fallas.length ? `<div class="error" style="text-align:left;">${fallas.map((f) => escapeHtml(f)).join("<br>")}</div>` : ""}`;
+  }
+
+  /**
+   * Aprobar = subirla de verdad. Pasa por el POST /ilustraciones normal, así
+   * que hereda el dedupe por huella y el rechazo si no tiene palabras clave.
+   * Los datos los propone el agente describirIlustracion mirando la imagen
+   * recién generada — la persona no escribe nada.
+   */
+  async function aprobarGenerada(id, boton) {
+    const g = generadas.find((x) => String(x.id) === String(id));
+    if (!g) return;
+    const tarjeta = boton.closest("[data-id]");
+    const msg = tarjeta.querySelector(".msg-mini");
+    boton.disabled = true;
+    msg.innerHTML = `<p class="ayuda" style="margin:6px 0 0;">✨ Catalogándola…</p>`;
+
+    try {
+      // Se homologa ANTES de catalogar: así lo que la IA mira es
+      // exactamente lo que se va a guardar, y de paso baja del tope de
+      // 2 MB del backend — un PNG de 1024 con transparencia pesa más y
+      // por eso todas rebotaban con un error que no decía nada.
+      const dataUrl = g.homologada || (await homologarImagen(`data:image/png;base64,${g.base64}`));
+      g.homologada = dataUrl;
+
+      const r = await proponerDatosIlustracion(dataUrl, "image/png", "");
+      const p = r && r.propuesta;
+      // El motivo real, no un mensaje genérico: sin esto, un archivo muy
+      // pesado y un modelo que no contestó se ven igual desde afuera.
+      if (!p) throw new Error((r && r.error) || "No pude catalogarla. Descárgala y súbela a mano desde Ilustraciones.");
+
+      await llamar("/api/admin/ilustraciones", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: p.nombre,
+          categoria: p.categoria,
+          palabrasClave: (p.palabras_clave || []).join(", "),
+          descripcion: p.descripcion || "",
+          activa: true,
+          // Queda anotado de dónde salió: si algún día hay que revisar qué
+          // se generó con IA y qué se subió a mano, esto es la única pista.
+          autor: "Generada con IA (EnseñAI)",
+          archivoBase64: dataUrl,
+          tipoMime: "image/png",
+        }),
+      });
+      g.estado = "guardada";
+      await cargarIlustraciones();
+      dibujarGridEstudio();
+    } catch (err) {
+      boton.disabled = false;
+      msg.innerHTML = `<div class="error" style="margin:6px 0 0;">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderFaltantes() {
+    const panel = document.getElementById("panel");
+    const pendientes = faltantes.filter(f => !f.resuelta);
+    const resueltas = faltantes.filter(f => f.resuelta);
+
+    panel.innerHTML = `
+      <div class="tarjeta">
+        <h2>Lo que falta ilustrar</h2>
+        <p class="ayuda">Temas que se generaron y no encontraron ninguna ilustración — ordenados de más pedidos a menos. Sube una ilustración con palabras clave que los cubra y márcalo como resuelto.</p>
+        ${!faltantes.length ? `<p class="ayuda" style="margin:0;">Nada pendiente todavía — o falta correr <code>db/schema_v38.sql</code> en Supabase.</p>` : `
+        <table>
+          <thead><tr><th>Tema</th><th>Nivel</th><th>Veces pedido</th><th>Última vez</th><th></th></tr></thead>
+          <tbody>
+            ${pendientes.map(f => `
+              <tr data-id="${f.id}">
+                <td>${escapeHtml(f.tema_ejemplo)}</td>
+                <td>${f.nivel ? NIVELES.find(n => n.value === f.nivel)?.label || f.nivel : "—"}</td>
+                <td>${f.veces}</td>
+                <td>${fmtFecha(f.ultima_vez)}</td>
+                <td><button class="secundario chico" data-accion="resolver">Marcar resuelto</button></td>
+              </tr>
+            `).join("")}
+            ${resueltas.map(f => `
+              <tr data-id="${f.id}" style="opacity:.45;">
+                <td>${escapeHtml(f.tema_ejemplo)}</td>
+                <td>${f.nivel ? NIVELES.find(n => n.value === f.nivel)?.label || f.nivel : "—"}</td>
+                <td>${f.veces}</td>
+                <td>${fmtFecha(f.ultima_vez)}</td>
+                <td><button class="secundario chico" data-accion="reabrir">Reabrir</button></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        `}
+      </div>
+    `;
+
+    panel.querySelectorAll('[data-accion="resolver"]').forEach((btn) => {
+      const id = btn.closest("tr").dataset.id;
+      btn.onclick = () => marcarFaltante(id, true);
+    });
+    panel.querySelectorAll('[data-accion="reabrir"]').forEach((btn) => {
+      const id = btn.closest("tr").dataset.id;
+      btn.onclick = () => marcarFaltante(id, false);
+    });
+  }
+
+  async function marcarFaltante(id, resuelta) {
+    try {
+      await llamar(`/api/admin/faltantes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resuelta }),
+      });
+      const f = faltantes.find((x) => x.id === id);
+      if (f) f.resuelta = resuelta;
+      renderFaltantes();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  /* ═══════════════ util ═══════════════ */
+
+  function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+
+  init();
+</script>
+</body>
+</html>

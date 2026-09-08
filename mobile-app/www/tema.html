@@ -1,0 +1,3917 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- viewport-fit=cover: sin esto, env(safe-area-inset-bottom) vale 0 en
+     iPhone y la barra de pestañas queda debajo de la rayita del home. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EnseñAI — Generar tema</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai {
+    display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14);
+    padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle;
+  }
+  #btnSalir { background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 80px; }
+  /* La racha vivía como una tarjeta más en medio de la lista de temas
+     (pedido de la usuaria, 2-sep-2026: "la racha puede estar fuera de la
+     sección de los temas"). Ahora es una franja propia debajo del header:
+     se ve en TODAS las pantallas de esta página — también mientras lees un
+     tema o contestas la trivia — y deja de competir por atención con
+     "Mis temas anteriores". */
+  /* ── Pantalla de perfil (2-sep-2026) ───────────────────────────────
+     Antes se entraba directo al formulario de generar, con seis tarjetas
+     encima. Ahora lo primero es el perfil: quién es, cómo aprende, cómo
+     va y sus temas; generar es UN botón. */
+  .hero-perfil { display: flex; gap: 14px; align-items: center; }
+  .hero-perfil .datos { flex: 1 1 auto; min-width: 0; }
+  .hero-perfil h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+  .chips-inteligencia { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .chip-inteligencia { border-radius: 999px; padding: 2px 10px; font-size: 0.72rem; font-weight: 800; color: #fff; }
+  /* Las tres tarjetas (racha / temas / medallas) tienen que verse del mismo
+     alto y con los numeros y las etiquetas alineados entre si. Dos cosas lo
+     rompian: el emoji de la racha crece la linea del numero solo en esa
+     tarjeta, y "temas completados" ocupa dos renglones donde "medallas"
+     ocupa uno. Por eso el numero va en una franja de alto fijo (con el
+     emoji a tamano controlado) y la etiqueta reserva siempre dos renglones. */
+  .rejilla-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin-top: 16px; }
+  .stat-perfil {
+    background: var(--hielo); border-radius: 14px; padding: 10px 6px; text-align: center;
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  }
+  .stat-perfil .num {
+    font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.25rem; color: var(--profundo);
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    height: 28px; line-height: 1; white-space: nowrap;
+  }
+  .stat-perfil .num .emoji { font-size: 1.05rem; line-height: 1; font-family: 'Nunito', sans-serif; }
+  .stat-perfil .lbl {
+    font-size: 0.7rem; color: #4A6A85; font-weight: 700; line-height: 1.25;
+    min-height: 2.5em; display: flex; align-items: center; justify-content: center;
+  }
+  .burbujas-perfil { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .burbuja-perfil {
+    display: flex; align-items: center; gap: 7px; background: #fff; border: 2px solid var(--linea);
+    border-radius: 999px; padding: 3px 12px 3px 3px; font-weight: 700; font-size: 0.82rem;
+    color: #4A6A85; cursor: pointer; font-family: inherit;
+  }
+  .burbuja-perfil.activa { border-color: var(--profundo); color: var(--profundo); font-weight: 800; }
+  .burbuja-perfil.nueva { padding: 3px 14px; border-style: dashed; }
+  .acciones-perfil { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .acciones-perfil .secundario { width: 100%; margin-top: 0; }
+  .barra-racha { background: #fff; border-bottom: 2px solid var(--linea); }
+  .barra-racha-interna { max-width: 640px; margin: 0 auto; padding: 12px 20px; }
+  .barra-racha-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.4rem; margin: 0 0 6px; }
+  h2 { font-family: 'Grandstander', sans-serif; font-size: 1.15rem; margin: 0 0 8px; color: var(--profundo); }
+  h3 { font-family: 'Grandstander', sans-serif; color: var(--bosque); font-size: 0.98rem; margin: 16px 0 8px; }
+  p.ayuda { color: #4A6A85; margin: 0 0 16px; }
+  label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
+  input, select, textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  textarea { resize: vertical; min-height: 76px; line-height: 1.45; }
+  .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
+  .zona-foto input[type="file"] { display: none; }
+  .zona-foto .btn-foto {
+    display: inline-block; background: var(--hielo); border: 2px solid var(--menta); color: var(--bosque);
+    padding: 9px 18px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  }
+  .miniaturas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+  .miniatura { position: relative; width: 74px; height: 74px; border-radius: 10px; overflow: hidden; border: 2px solid var(--linea); }
+  .miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .miniatura button {
+    position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.62); color: #fff; border: none; font-size: 0.72rem; line-height: 1; cursor: pointer; padding: 0;
+  }
+  button.primario {
+    width: 100%; background: var(--profundo); color: #fff; border: none; padding: 14px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 16px;
+    box-shadow: 0 4px 0 var(--profundo-oscuro);
+  }
+  button.secundario { background: none; border: 2px solid var(--linea); color: var(--profundo); padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
+  /* Campo obligatorio que se dejó vacío: el aviso va PEGADO al campo. El
+     error suelto al pie del formulario no se relacionaba con nada en
+     celular — ver marcarCampoFaltante(). */
+  .campo-faltante { border-color: #E86A4B !important; background: #FFF6F3 !important; }
+  .error-campo { color: #B94A2E; font-size: 0.85rem; font-weight: 700; margin: 4px 0 2px; }
+  .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-bottom: 16px; }
+  .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
+  .actividad-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  .actividad-box .inteligencia { display: inline-block; background: var(--menta); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
+  .barra-perfil-fila { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .barra-perfil-label { flex: 0 0 130px; font-size: 0.8rem; font-weight: 700; color: var(--profundo); }
+  .barra-perfil-track { flex: 1; background: var(--linea); border-radius: 999px; height: 10px; overflow: hidden; }
+  .barra-perfil-fill { height: 100%; background: var(--aqua); border-radius: 999px; }
+  .barra-perfil-fill.dominante { background: var(--profundo); }
+  .barra-perfil-pct { flex: 0 0 32px; text-align: right; font-size: 0.78rem; color: #4A6A85; }
+  .avatar-perfil {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    border-radius: 50%; color: #fff; overflow: hidden; vertical-align: middle;
+  }
+  .avatar-perfil img { width: 78%; height: 78%; object-fit: contain; display: block; }
+  .rejilla-avatares { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opcion-avatar {
+    width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--linea); background: #fff;
+    font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s, transform .15s;
+  }
+  .opcion-avatar img { width: 76%; height: 76%; object-fit: contain; }
+  .opcion-avatar:hover { transform: translateY(-2px); border-color: var(--cielo); }
+  .opcion-avatar.activa { border-color: var(--profundo); background: #EAF1FE; }
+
+  /* ── Intro al quiz (onboarding) ── */
+  .rejilla-intro { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .chip-intro {
+    width: 40px; height: 40px; border-radius: 50%; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem;
+  }
+
+  /* ── Tarjeta de perfil activo ── */
+  .perfil-activo {
+    display: flex; align-items: center; gap: 11px;
+    border: 2px solid var(--linea); border-radius: 14px; padding: 11px 14px; margin-top: 8px;
+    background: #fff;
+  }
+  .perfil-activo.neutro { border-style: dashed; }
+  .perfil-activo strong { display: block; font-size: 0.93rem; color: var(--profundo); }
+  .perfil-activo .pa-sub { display: block; font-size: 0.79rem; color: #5b7d99; margin-top: 1px; }
+  .pa-icono {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem;
+    background: var(--linea);
+  }
+  .pa-icono.chico { width: 24px; height: 24px; font-size: 0.75rem; vertical-align: middle; margin-right: 4px; }
+
+  /* ── Pestañas del material ── */
+  .pestanas { display: flex; gap: 4px; background: var(--hielo); border-radius: 999px; padding: 4px; margin: 14px 0 20px; }
+  .pestana {
+    flex: 1; border: none; background: none; padding: 10px 6px; border-radius: 999px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.86rem; color: #5b7d99;
+    transition: background .15s, color .15s;
+  }
+  .pestana.activa { background: #fff; color: var(--profundo); box-shadow: 0 2px 6px rgba(30,58,138,0.12); }
+  .pestana-num { display: inline-block; background: var(--menta); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.72rem; }
+
+  /* ── Bloques de la pestaña Estudiar ── */
+  .bloque-est { border-left: 4px solid var(--linea); padding: 2px 0 2px 14px; margin-bottom: 18px; }
+  .bloque-est p { margin: 0; line-height: 1.65; font-size: 0.95rem; }
+  .bloque-est.destacado { border-left-color: var(--menta); background: var(--hielo); border-radius: 0 12px 12px 0; padding: 14px 16px; }
+  .bloque-est.destacado p { font-size: 1rem; color: var(--bosque); font-weight: 600; }
+  .bloque-titulo { font-family: 'Grandstander', sans-serif; color: var(--profundo); font-size: 0.98rem; margin: 0 0 6px; }
+  .parrafo-largo { margin: 0 0 10px; line-height: 1.6; }
+  .parrafo-largo:last-child { margin-bottom: 0; }
+  .lista-pasos { margin: 0; padding-left: 20px; }
+  .lista-pasos li { margin-bottom: 7px; line-height: 1.55; font-size: 0.94rem; }
+  .lista-ideas { margin: 0; padding-left: 18px; list-style: none; }
+  .lista-ideas li { margin-bottom: 7px; line-height: 1.5; font-size: 0.94rem; position: relative; }
+  .lista-ideas li::before { content: "▪"; color: var(--menta); position: absolute; left: -14px; font-size: 1.1rem; }
+  .caja-ojo, .caja-truco { border-radius: 12px; padding: 13px 16px; margin-bottom: 16px; }
+  .caja-ojo { background: #FFF7E6; border: 2px solid #FFDFA0; }
+  .caja-truco { background: #F3F0FF; border: 2px solid #D9D2FF; }
+  .caja-ojo strong, .caja-truco strong { display: block; font-size: 0.88rem; margin-bottom: 4px; }
+  .caja-ojo strong { color: #8A6100; } .caja-truco strong { color: #4B3BA8; }
+  .caja-ojo p, .caja-truco p { margin: 0; font-size: 0.93rem; line-height: 1.55; }
+  .bloque-est.plegable { border-left-color: var(--cielo); }
+  .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
+
+
+  /* ── Ejercicios ── */
+  .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+  .ejercicio-cabeza { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+  .ejercicio-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-family: 'Grandstander', sans-serif; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ejercicio-enunciado { margin: 0; font-weight: 700; line-height: 1.5; font-size: 0.95rem; }
+  .btn-pista, .btn-solucion {
+    border: 2px solid var(--linea); background: #fff; border-radius: 999px; padding: 7px 16px;
+    font-family: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; color: #5b7d99; margin-right: 6px;
+  }
+  .btn-solucion { border-color: var(--menta); color: var(--bosque); }
+  .btn-revisar-mio { display: inline-block; margin-top: 8px; background: #fff; border: 2px solid var(--cielo); color: var(--profundo); font-family: inherit; font-weight: 700; font-size: 0.82rem; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+  .btn-solucion.abierta { background: var(--hielo); }
+  .pista-caja { background: #FFF7E6; border-radius: 10px; padding: 10px 13px; margin-top: 9px; font-size: 0.9rem; color: #8A6100; }
+  .solucion-caja { background: var(--hielo); border-radius: 10px; padding: 13px 15px; margin-top: 10px; }
+  .ejercicio-respuesta {
+    background: var(--menta); color: #fff; border-radius: 8px; padding: 8px 13px; margin-top: 10px;
+    font-weight: 700; font-size: 0.93rem;
+  }
+  .ejercicio-marcar {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85rem; font-weight: 700;
+    color: var(--bosque); cursor: pointer;
+  }
+  .ejercicio-marcar input { width: 17px; height: 17px; accent-color: var(--menta); cursor: pointer; }
+  .btn-guardar-progreso { width: 100%; margin-top: 4px; }
+  .progreso-aviso { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--bosque); margin-top: 8px; }
+
+  /* ── Espera con tips ── */
+  .zona-espera { padding: 20px 4px 8px; text-align: center; }
+  .espera-barra { height: 5px; border-radius: 999px; background: var(--linea); overflow: hidden; margin-bottom: 16px; }
+  .espera-barra span {
+    display: block; height: 100%; width: 38%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--cielo), var(--menta));
+    animation: espera-desliza 1.5s ease-in-out infinite;
+  }
+  @keyframes espera-desliza {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(265%); }
+  }
+  .espera-titulo { color: #4A6A85; font-size: 0.92rem; margin: 0 0 16px; }
+  .btn-seguir-navegando {
+    background: none; border: none; color: #5b7d99; font-family: inherit; font-weight: 700;
+    font-size: 0.83rem; text-decoration: underline; cursor: pointer; margin-top: 14px;
+  }
+  /* Aviso flotante de "se está generando en segundo plano" (31-ago-2026):
+     generar tarda ~1 min y antes eso dejaba la pantalla secuestrada. Ahora
+     se puede seguir navegando y este aviso avisa cuando el tema ya está. */
+  .aviso-generacion {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 60;
+    display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px);
+    background: #fff; border: 2px solid var(--aqua); border-radius: 999px; padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(30,58,138,0.18);
+    font-size: 0.86rem; font-weight: 700; color: var(--profundo);
+  }
+  .aviso-generacion.listo { border-color: var(--menta); }
+  .aviso-generacion.falla { border-color: #FFC4B5; color: #B94A2E; }
+  .aviso-generacion .texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aviso-generacion button {
+    flex-shrink: 0; border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.82rem;
+    background: var(--menta); color: #fff;
+  }
+  .aviso-generacion button.cerrar { background: none; color: #5b7d99; padding: 7px 4px; font-size: 1rem; }
+  .tip-caja {
+    display: flex; gap: 12px; text-align: left; align-items: flex-start;
+    background: var(--hielo); border: 2px dashed var(--menta); border-radius: 14px; padding: 14px 16px;
+    animation: tip-aparece .45s ease;
+  }
+  @keyframes tip-aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tip-icono { font-size: 1.15rem; line-height: 1.4; flex-shrink: 0; }
+  .tip-texto { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--bosque); }
+  .tip-puntos { display: flex; gap: 5px; justify-content: center; margin-top: 12px; }
+  .tip-puntos span { width: 6px; height: 6px; border-radius: 50%; background: var(--linea); transition: background .3s; }
+  .tip-puntos span.activo { background: var(--menta); }
+
+  /* ── Quiz de perfil ── */
+  .quiz-pregunta { border: 2px solid var(--linea); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .quiz-enunciado { font-weight: 700; font-size: 0.92rem; margin: 0 0 10px; line-height: 1.4; }
+  .quiz-opciones { display: grid; gap: 6px; }
+  .quiz-opcion {
+    display: flex; align-items: center; gap: 9px; text-align: left; width: 100%;
+    background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 9px 12px;
+    font-family: inherit; font-size: 0.9rem; color: var(--tinta); cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .quiz-opcion:hover { border-color: var(--cielo); background: var(--hielo); }
+  .quiz-marca {
+    flex-shrink: 0; width: 26px; height: 22px; border-radius: 999px; background: var(--linea);
+    font-size: 0.68rem; font-weight: 800; color: #5b7d99;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .quiz-opcion.primaria { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .quiz-opcion.primaria .quiz-marca { background: var(--profundo); color: #fff; }
+  .quiz-opcion.secundaria { border-color: var(--menta); background: #E7FBF3; }
+  .quiz-opcion.secundaria .quiz-marca { background: var(--menta); color: #fff; }
+
+  /* ── Resultado del perfil ── */
+  .perfil-principales { display: grid; gap: 10px; }
+  .perfil-principal { display: flex; align-items: center; gap: 12px; border: 2px solid; border-radius: 14px; padding: 12px 14px; background: #fff; }
+  .perfil-principal strong { display: block; font-size: 1rem; color: var(--profundo); font-family: 'Grandstander', sans-serif; }
+  .perfil-icono {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+  }
+  .perfil-icono.chico { width: 30px; height: 30px; font-size: 0.9rem; margin-bottom: 6px; }
+  .perfil-tipo-chico { display: block; font-size: 0.76rem; color: #5b7d99; margin-top: 1px; }
+  .chip-secundaria { background: var(--hielo); border: 1px solid var(--linea); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; color: #4A6A85; }
+  .detalle-quiz { margin-top: 14px; }
+  .detalle-quiz summary { cursor: pointer; font-size: 0.85rem; color: #5b7d99; font-weight: 700; }
+  .rejilla-ajuste { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .opcion-ajuste {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 11px;
+    font-family: inherit; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-ajuste strong { display: block; font-size: 0.86rem; color: var(--profundo); line-height: 1.25; }
+  .opcion-ajuste:hover { border-color: var(--cielo); }
+
+  .actividad-preview { background: var(--hielo); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .actividad-preview .actividad-preview-tipo { display: inline-block; background: var(--profundo); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
+  .actividad-preview p { margin: 0; font-size: 0.9rem; }
+  .trivia-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fff; }
+  .trivia-item:last-child { margin-bottom: 0; }
+  .trivia-pregunta { display: flex; align-items: flex-start; gap: 10px; font-weight: 700; margin-bottom: 12px; line-height: 1.4; }
+  .trivia-num {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-size: 0.78rem; font-family: 'Grandstander', sans-serif; display: flex; align-items: center; justify-content: center;
+  }
+  .opciones { display: grid; gap: 8px; }
+  .opcion-btn {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 14px;
+    font-family: inherit; font-size: 0.94rem; color: var(--tinta); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-btn:hover:not(:disabled) { border-color: var(--cielo); background: var(--hielo); }
+  .opcion-btn.seleccionada { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
+  .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
+  .opcion-btn:disabled { cursor: default; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: #4A6A85; background: #F4F8FC; border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback.bien { color: var(--bosque); background: #E7FBF3; }
+  .trivia-feedback.mal { color: #B94A2E; background: #FFF0EC; }
+  .etiqueta-op {
+    float: right; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+    background: rgba(0,0,0,0.07);
+  }
+  .opcion-btn.correcta .etiqueta-op { background: var(--menta); color: #fff; }
+  .opcion-btn.incorrecta .etiqueta-op { background: #E4796B; color: #fff; }
+  .respuesta-abierta {
+    width: 100%; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 0.94rem; resize: vertical;
+  }
+  .respuesta-abierta:disabled { background: #F7FAFD; color: #4A6A85; }
+  #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
+  .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  /* Tarjetas de repaso en pantalla: antes solo se veia la instruccion
+     ("recorta cada tarjeta") y las tarjetas no aparecian por ningun lado. */
+  .lista-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .tarjeta-repaso { border: 1.5px solid var(--linea); border-radius: 10px; overflow: hidden; background: #fff; }
+  .tarjeta-repaso .frente { padding: 9px 10px; font-weight: 800; font-size: 0.87rem; line-height: 1.3; }
+  .tarjeta-repaso .reverso { padding: 9px 10px; font-size: 0.85rem; line-height: 1.35; color: var(--bosque); background: var(--hielo); border-top: 1px dashed var(--aqua); }
+  .respuestas-toggle { text-align: center; }
+  .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
+  .respuestas-box.abierto { display: block; }
+  .historial-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--linea); cursor: pointer; }
+  .historial-item:first-child { border-top: none; }
+  .historial-item .titulo { font-weight: 700; }
+  .historial-item .fecha { color: #4A6A85; font-size: 0.8rem; white-space: nowrap; }
+  .etiqueta-badge { display: inline-block; background: var(--hielo); border: 1px solid var(--aqua); color: var(--bosque); font-size: 0.72rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
+  .historial-item .seleccionar { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--menta); cursor: pointer; }
+  /* Fila de un tema en "Mis temas anteriores": antes era un solo flex con
+     wrap (checkbox + título + fecha + etiquetas todos como hermanos), lo
+     que en pantallas angostas hacía que la fecha y el título se acomodaran
+     en lugares distintos según qué tan largo fuera el título de cada tema
+     (31-ago-2026). Ahora el checkbox es su propia columna y todo lo demás
+     vive en una sola columna angosta que sí controla su propio wrap. */
+  .historial-item--tema { align-items: flex-start; }
+  .historial-item--tema .seleccionar { margin-top: 3px; }
+  .historial-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .historial-item-linea1 { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; }
+  .historial-item .etiquetas-item { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .hint-combinar { color: #4A6A85; font-size: 0.85rem; margin: -6px 0 10px; }
+  .barra-combinar { display: flex; flex-direction: column; gap: 10px; background: var(--hielo); border: 2px solid var(--aqua); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-weight: 700; font-size: 0.9rem; }
+  .barra-combinar .fila-principal { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .barra-combinar .acciones { display: flex; gap: 8px; }
+  .btn-seleccionar-etiqueta { background: none; border: none; color: var(--profundo); font-weight: 800; font-size: 0.82rem; padding: 2px 0; margin: 4px 0 0; cursor: pointer; font-family: inherit; text-decoration: underline; }
+  .toggle-modo-examen { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.85rem; color: var(--profundo); cursor: pointer; }
+  .toggle-modo-examen input { width: 17px; height: 17px; accent-color: #F97066; cursor: pointer; }
+  .chip-etiqueta { background: #fff; border: 2px solid var(--linea); color: var(--profundo); font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  /* Acciones por tema del historial: "ya lo aprendí" y "borrar" (2-sep-2026) */
+  .chip-aprendido { border-color: var(--aqua); color: var(--bosque); }
+  .chip-borrar { border-color: #F3C7C2; color: #B4342A; }
+  .bloque-aprendidos { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--linea); }
+  .bloque-aprendidos > button { background: none; border: 0; padding: 0; font-family: inherit; font-weight: 700; font-size: 0.85rem; color: var(--bosque); cursor: pointer; }
+  .historial-item--aprendido { opacity: 0.72; }
+  /* Revisión de MI procedimiento, ejercicio por ejercicio */
+  .revision-mia { margin-top: 10px; }
+  .revision-mia textarea { width: 100%; min-height: 90px; }
+  .revision-caja { margin-top: 10px; background: var(--hielo); border: 2px solid var(--linea); border-radius: 12px; padding: 12px 14px; }
+  .revision-caja .veredicto { margin: 0 0 8px; font-weight: 700; color: var(--profundo); font-size: 0.92rem; }
+  .revision-caja ol { margin: 0; padding-left: 20px; }
+  .revision-caja li { font-size: 0.88rem; line-height: 1.5; margin-bottom: 6px; }
+  .revision-caja .sugerencia { margin: 8px 0 0; font-size: 0.88rem; color: var(--bosque); font-weight: 700; }
+  .chip-etiqueta.activa { background: var(--profundo); border-color: var(--profundo); color: #fff; }
+  #buscar-historial { margin-bottom: 8px; }
+  .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; cursor: pointer; }
+  /* Las plantillas traen sus propios estilos desde plantillas.js */
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+  <button id="btnSalir">Cerrar sesión</button>
+</header>
+
+<div class="barra-racha" id="barra-racha" style="display:none;"></div>
+
+<main id="contenido">
+  <div class="cargando">Cargando…</div>
+</main>
+
+<!-- Intro "qué puedes hacer aquí" — compartida con grupo.html (ver intro.js).
+     Va antes del script de la página porque este llama a window.introHTML(). -->
+<script src="figuras.js"></script>
+<script src="diagrama.js"></script>
+<script src="imprimible.js"></script>
+<script src="intro.js"></script>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const NIVELES = [
+    { value: "primaria_baja", label: "Primaria baja (6-8 años)" },
+    { value: "primaria_alta", label: "Primaria alta (9-12 años)" },
+    { value: "secundaria", label: "Secundaria (12-15 años)" },
+    { value: "preparatoria", label: "Preparatoria (15-18 años)" },
+    { value: "universidad", label: "Universidad / autodidacta (18+)" },
+  ];
+
+  const ETIQUETAS_INTELIGENCIA = {
+    linguistica: "Lingüística", logico_matematica: "Lógico-matemática", espacial: "Espacial",
+    musical: "Musical", kinestesica: "Corporal-kinestésica", interpersonal: "Interpersonal",
+    intrapersonal: "Intrapersonal", naturalista: "Naturalista",
+  };
+
+  // Mismo sistema de color por inteligencia que usa la landing, para que
+  // el perfil se lea igual en todo el producto.
+  const COLOR_INTELIGENCIA = {
+    linguistica: "#F97066", logico_matematica: "#F5A524", espacial: "#7C6FE0",
+    musical: "#EC7BC0", kinestesica: "#34D399", interpersonal: "#60A5FA",
+    intrapersonal: "#7DD3FC", naturalista: "#84CC16",
+  };
+
+  const ICONO_INTELIGENCIA = {
+    linguistica: "📖", logico_matematica: "🔢", espacial: "🎨", musical: "♪",
+    kinestesica: "🏃", interpersonal: "👥", intrapersonal: "💭", naturalista: "🌿",
+  };
+
+  const COMO_APRENDE = {
+    linguistica: "Leyendo y contando", logico_matematica: "Con lógica y pasos",
+    espacial: "Viendo e imaginando", musical: "Con ritmo y sonido",
+    kinestesica: "Moviéndose y haciendo", interpersonal: "Con otras personas",
+    intrapersonal: "A su ritmo, en calma", naturalista: "Explorando y clasificando",
+  };
+
+  let sesionActual = null;
+  let ultimoContenido = null;
+  let ultimoTemaId = null;
+  let perfilesCache = [];
+  let perfilSeleccionadoId = "";
+  let historialCache = [];
+  // "Ya aprendidos" arranca colapsado: la lista de temas debe mostrar lo que
+  // falta trabajar, no todo el archivo histórico (pedido del 2-sep-2026).
+  let mostrarAprendidos = false;
+  let etiquetaActiva = "";
+  let progresoCache = null;
+  let etiquetaActivaProgreso = "";
+  // Ids de temas del historial marcados para juntar en un repaso de examen
+  // (ver combinarTemas() más abajo). Vive fuera de renderHistorial() para
+  // no perderse cuando la persona busca o filtra por etiqueta.
+  const temasSeleccionados = new Set();
+  const MAX_TEMAS_COMBINAR = 6;
+  // Modo Examen admite más temas de golpe (ej. "todo Matemáticas del primer
+  // parcial") porque el simulacro está pensado para practicar, no para leer
+  // — el backend acepta hasta este mismo número (ver routes/temas.js).
+  const MAX_TEMAS_COMBINAR_EXAMEN = 12;
+  // Se mantiene fuera de actualizarBarraCombinar() para no perderse cada
+  // vez que se vuelve a dibujar la barra al cambiar la selección.
+  let modoExamenActivo = false;
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  /**
+   * El modelo escribe en markdown aunque se le pida texto plano — sale
+   * "**1. Género Narrativo**" con los asteriscos a la vista, que se ve roto.
+   * Esto convierte lo mínimo (negritas, cursivas, código y saltos de línea)
+   * a HTML de verdad.
+   *
+   * SIEMPRE escapa primero: las únicas etiquetas que llegan al DOM son las
+   * que se generan aquí, nunca las que pudiera traer el texto.
+   */
+  function formatearTexto(str) {
+    let t = escapeHtml(str || "");
+    t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[\s([{])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+    t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return t.replace(/\n/g, "<br>");
+  }
+
+  /**
+   * "Más estructurado cuando hay mucho texto" (pedido de la usuaria,
+   * 2-sep-2026): la IA suele devolver la actividad como UN párrafo enorme
+   * con los pasos numerados en línea ("1. Ponte de pie... 2. Repite el
+   * verso..."). En celular eso es un muro de texto imposible de seguir
+   * MIENTRAS haces la actividad. Esto lo estructura al pintarlo, sin tocar
+   * lo que ya está guardado — así también se arreglan los temas viejos del
+   * historial, no solo los que se generen de aquí en adelante.
+   *
+   * Reglas a propósito conservadoras (mejor no partir que partir mal):
+   * - Lista numerada solo si los marcadores van 1, 2, 3... consecutivos y
+   *   hay al menos dos. Así "3.5", "(3, 4, 5)" o "1/2" no la disparan.
+   * - Viñetas solo cuando el guion/•/– ABRE renglón: a media frase casi
+   *   siempre es un inciso, no una lista.
+   * - Sin marcadores, un texto muy largo se parte en párrafos de ~3 frases
+   *   para que respire; uno corto se deja exactamente igual que antes.
+   */
+  function formatearLargo(str) {
+    const bruto = String(str == null ? "" : str).trim();
+    if (!bruto) return "";
+
+    // 1) Pasos numerados: "1. ", "2) "...
+    const marcas = [];
+    const re = /(^|[\s (])(\d{1,2})[.)]\s+/g;
+    let m;
+    while ((m = re.exec(bruto)) !== null) {
+      marcas.push({ num: parseInt(m[2], 10), inicio: m.index + m[1].length, fin: re.lastIndex });
+    }
+    const secuencia = [];
+    let esperado = 1;
+    for (let i = 0; i < marcas.length; i++) {
+      if (marcas[i].num === esperado) {
+        secuencia.push(marcas[i]);
+        esperado++;
+      }
+    }
+    if (secuencia.length >= 2) {
+      const pasos = [];
+      for (let i = 0; i < secuencia.length; i++) {
+        const hasta = i + 1 < secuencia.length ? secuencia[i + 1].inicio : bruto.length;
+        const paso = bruto.slice(secuencia[i].fin, hasta).trim();
+        if (paso) pasos.push(paso);
+      }
+      if (pasos.length >= 2) {
+        const intro = bruto.slice(0, secuencia[0].inicio).trim();
+        return (
+          (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+          `<ol class="lista-pasos">${pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>`
+        );
+      }
+    }
+
+    // 2) Viñetas al inicio de renglón
+    const renglones = bruto.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const esVineta = (l) => /^[-–—•*]\s+/.test(l);
+    const primera = renglones.findIndex(esVineta);
+    if (primera !== -1 && renglones.slice(primera).filter(esVineta).length >= 2) {
+      const intro = renglones.slice(0, primera).join(" ").trim();
+      const items = [];
+      renglones.slice(primera).forEach((l) => {
+        if (esVineta(l)) items.push(l.replace(/^[-–—•*]\s+/, ""));
+        else if (items.length) items[items.length - 1] += " " + l;
+      });
+      return (
+        (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+        `<ul class="lista-ideas">${items.map((t) => `<li>${formatearTexto(t)}</li>`).join("")}</ul>`
+      );
+    }
+
+    // 3) Sin marcadores: párrafos que respiren
+    const parrafos = [];
+    bruto
+      .split(/\n{2,}/)
+      .map((b) => b.trim())
+      .filter(Boolean)
+      .forEach((bloque) => {
+        if (bloque.length <= 320) {
+          parrafos.push(bloque);
+          return;
+        }
+        const frases = bloque.match(/[^.!?…]+[.!?…]+["'”’)\]]*\s*|[^.!?…]+$/g) || [bloque];
+        let acumulado = "";
+        frases.forEach((f) => {
+          acumulado += f;
+          if (acumulado.length >= 220) {
+            parrafos.push(acumulado.trim());
+            acumulado = "";
+          }
+        });
+        const resto = acumulado.trim();
+        if (resto) {
+          // Una cola muy corta como párrafo suelto se ve peor que pegada.
+          if (resto.length < 60 && parrafos.length) parrafos[parrafos.length - 1] += " " + resto;
+          else parrafos.push(resto);
+        }
+      });
+    return parrafos.map((p) => `<p class="parrafo-largo">${formatearTexto(p)}</p>`).join("");
+  }
+
+  /* El imprimible del material de repaso (tarjetas de doblar, memorama,
+     y "imprimir todo") vive en imprimible.js — lo comparten tema.html,
+     g.html y grupo.html. Aqui solo quedan los dos atajos. */
+  function imprimirTarjetas(tipo, tarjetas) {
+    if (window.EnsenaiImprimible) window.EnsenaiImprimible.tarjetas(tipo, tarjetas);
+  }
+  function imprimirMaterialExtra(materiales, tituloTema) {
+    if (window.EnsenaiImprimible) window.EnsenaiImprimible.materialExtra(materiales, tituloTema);
+  }
+
+  // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+  // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
+  // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  // Un error de negocio real (los que lanzamos nosotros con Error(...) más
+  // abajo) sí es legible y se muestra tal cual.
+  /**
+   * Marca un campo obligatorio vacío: lo pinta, escribe el motivo justo
+   * debajo, lo desplaza a la vista y le pone el cursor dentro.
+   *
+   * Existe porque la validación pintaba el error al FINAL del formulario,
+   * a media pantalla del campo culpable: en celular se leía "escribe sobre
+   * qué tema quieres generar material" sin ver que el campo Tema estaba
+   * vacío, y la gente terminaba escribiendo el tema en Etiquetas
+   * (reporte sep-2026).
+   */
+  function marcarCampoFaltante(campo, mensaje) {
+    if (!campo) return;
+    limpiarCampoFaltante(campo);
+    campo.classList.add("campo-faltante");
+    const aviso = document.createElement("p");
+    aviso.className = "error-campo";
+    aviso.id = `error-campo-${campo.id}`;
+    aviso.textContent = `⚠️ ${mensaje}`;
+    campo.insertAdjacentElement("afterend", aviso);
+    campo.setAttribute("aria-invalid", "true");
+    campo.scrollIntoView({ behavior: "smooth", block: "center" });
+    // El foco va después del scroll: enfocar primero hace que el navegador
+    // salte de golpe y se pierda el desplazamiento suave.
+    setTimeout(() => campo.focus({ preventScroll: true }), 300);
+    // Se limpia sola en cuanto la persona empieza a escribir.
+    campo.addEventListener("input", () => limpiarCampoFaltante(campo), { once: true });
+  }
+
+  function limpiarCampoFaltante(campo) {
+    if (!campo) return;
+    campo.classList.remove("campo-faltante");
+    campo.removeAttribute("aria-invalid");
+    document.getElementById(`error-campo-${campo.id}`)?.remove();
+  }
+
+  function mensajeErrorAmigable(err) {
+    return err instanceof TypeError
+      ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
+      : err.message;
+  }
+
+  // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
+  // tarda 30-60s en despertar con la primera petición — esa primera
+  // petición puede fallar con un "Failed to fetch" genérico. Este helper
+  // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
+  // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
+  // un reintento genera el material DOS veces.
+  const RUTAS_QUE_NO_SE_REINTENTAN = [
+    "/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar",
+    // El PDF también cuesta (llama a la IA y sube a Storage) y adaptar por
+    // inteligencia genera 8 actividades con el modelo.
+    "/api/temas/pdf", "/actividades",
+  ];
+  // Agregar un tema a la liga (POST /api/grupos/<id>/temas) consume cupo del
+  // plan y crea la fila: reintentarlo a ciegas dejaba el tema DUPLICADO en el
+  // grupo. Se detecta aparte porque la ruta lleva el id del grupo en medio.
+  const esAgregarTemaALiga = (url) => /\/api\/grupos\/[^/]+\/temas(\?|$)/.test(url);
+  // Un fetch que truena casi de inmediato es "nunca salió" (servidor
+  // dormido, sin internet); uno que truena después de un rato pudo haber
+  // llegado y seguir procesándose del otro lado.
+  const MS_FALLO_INMEDIATO = 3000;
+
+  async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    const metodo = (opciones?.method || "GET").toUpperCase();
+    const esIdempotente = metodo === "GET" || metodo === "HEAD";
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r)) || esAgregarTemaALiga(url);
+    const t0 = Date.now();
+
+    try {
+      return await fetch(url, opciones);
+    } catch (err) {
+      const tardo = Date.now() - t0;
+
+      // Peticiones que escriben: reintentar a ciegas es lo que producía
+      // material duplicado y cupo gastado doble (31-ago-2026). Solo se
+      // reintenta lo que es seguro reintentar.
+      if (!esIdempotente && (esCara || tardo >= MS_FALLO_INMEDIATO)) {
+        throw new Error(
+          tardo >= MS_FALLO_INMEDIATO
+            ? "Se perdió la conexión, pero es posible que el material SÍ se haya generado del otro lado. Revisa si ya aparece en tu lista antes de volver a intentar, para no generarlo dos veces."
+            : "No pudimos conectar con el servidor. Vuelve a intentarlo."
+        );
+      }
+
+      if (cont) {
+        cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        return await fetch(url, opciones);
+      } catch (err2) {
+        throw new Error("El servidor está tardando en responder. Espera unos segundos y vuelve a intentarlo.");
+      }
+    }
+  }
+
+  async function init() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      window.location.href = "comprador.html?despues=tema";
+      return;
+    }
+    sesionActual = data.session;
+
+    document.getElementById("btnSalir").onclick = async () => {
+      await supabaseClient.auth.signOut();
+      window.location.href = "comprador.html";
+    };
+
+    await cargarTipoUsuario();
+    mostrarPerfil();
+
+    // Si quedó una generación a medias (se bloqueó el celular, se cerró la
+    // pestaña), se retoma en silencio y se avisa cuando esté lista.
+    reanudarTrabajoPendiente();
+
+    // `?bienvenida=1` lo pone comprador.html cuando alguien acaba de decir
+    // quién es. En vez de dejarlo frente a un formulario vacío, se le abre
+    // directo el quiz: es lo más "wow" del producto y explica de golpe por
+    // qué el material va a estar personalizado.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("bienvenida") === "1") {
+      mostrarIntroQuiz();
+      // Quitar el parámetro para que la intro no se repita al refrescar.
+      // En try/catch porque replaceState truena en contextos sin origen
+      // (por ejemplo al abrir el archivo directo con file://).
+      try {
+        history.replaceState({}, "", "tema.html");
+      } catch (err) {
+        /* sin consecuencias: solo significa que al refrescar se vuelve a ver */
+      }
+    }
+  }
+
+  /**
+   * Pantalla puente entre "¿quién eres?" y el quiz. No pide nada todavía:
+   * explica en una línea qué va a pasar y cuánto tarda, para que hacer el
+   * quiz se sienta como el primer paso natural y no como un trámite.
+   */
+  function mostrarIntroQuiz() {
+    const esAdulto = versionQuiz() === "adulto";
+    document.getElementById("contenido").innerHTML = `
+      <div class="tarjeta" style="text-align:center;">
+        <p style="color:var(--bosque); font-weight:700; font-size:0.88rem; margin:0 0 6px;">Empecemos por aquí 🎉</p>
+        <h1 style="margin:0 0 10px;">${esAdulto ? "¿Cómo aprendes mejor?" : "¿Cómo aprende mejor?"}</h1>
+        <p class="ayuda" style="margin:0 0 18px;">
+          Son <strong>12 preguntas rápidas</strong>, menos de dos minutos. Con eso sabemos si ${
+            esAdulto ? "te" : "le"
+          } funciona mejor ver, escuchar, moverse o razonar — y todo el material que generes después se adapta a eso.
+        </p>
+        <div class="rejilla-intro">
+          ${["📖", "🔢", "🎨", "♪", "🏃", "👥", "💭", "🌿"]
+            .map((e, i) => `<span class="chip-intro" style="background:${Object.values(COLOR_INTELIGENCIA)[i]};">${e}</span>`)
+            .join("")}
+        </div>
+        <p class="ayuda" style="font-size:0.82rem; margin:14px 0 0;">Es una guía para personalizar el material, no un diagnóstico.</p>
+        <button class="primario" id="btn-empezar-quiz">Contestar el quiz</button>
+        <button class="secundario" style="width:100%;" id="btn-saltar-quiz">Ahora no, quiero generar un tema</button>
+      </div>
+    `;
+    document.getElementById("btn-empezar-quiz").addEventListener("click", () => {
+      mostrarFormulario();
+      cargarPerfiles().then(() => mostrarQuizPerfil());
+      setTimeout(() => document.getElementById("zona-perfiles")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    });
+    document.getElementById("btn-saltar-quiz").addEventListener("click", mostrarFormulario);
+  }
+
+  /**
+   * PANTALLA DE INICIO (2-sep-2026, pedido de la usuaria: "entras directo
+   * ahí"). El perfil es lo primero que se ve: quién es, cómo aprende,
+   * cuántos temas lleva completados y su lista de temas. Generar material,
+   * que antes era el formulario que recibía a todos, ahora es un botón.
+   *
+   * Los datos se pintan desde los caches que ya llenaban las funciones de
+   * siempre (perfilesCache, historialCache, gamificacionCache): cada una
+   * llama a pintarHeroPerfil() al terminar, así la tarjeta se completa
+   * conforme van llegando en vez de esperar a la más lenta.
+   */
+  let perfilActivoId = null;
+  let gamificacionCache = null;
+  let limitePerfilesCache = 1;
+
+  /**
+   * En qué pestaña de abajo está parada la persona: "inicio", "temas" o
+   * "hojas" (4-sep-2026). Antes todo esto vivía en una sola pantalla y era
+   * un scroll larguísimo, sobre todo con la biblioteca de plantillas.
+   */
+  let vistaPerfil = "inicio";
+
+  function mostrarPerfil(vista) {
+    if (vista) vistaPerfil = vista;
+    document.getElementById("contenido").innerHTML = `
+      <div class="vista-tab" id="vista-inicio">
+      ${window.introHTML ? window.introHTML("individual") : ""}
+      <div class="tarjeta" id="tarjeta-perfil">
+        <div id="zona-perfil-hero"><div class="cargando">Cargando…</div></div>
+      </div>
+      <button class="primario" id="btn-ir-generar" style="margin-top:0;">✨ Generar un tema nuevo</button>
+      <div class="acciones-perfil" style="margin-top:10px;">
+        <button type="button" class="secundario" id="btn-ir-examen">🎯 Modo examen</button>
+        <button type="button" class="secundario" id="btn-ir-revisar">🔍 Revisar un ejercicio</button>
+      </div>
+      <div class="tarjeta" id="tarjeta-mi-progreso" style="margin-top:18px;">
+        <h2 style="margin-top:0;">📊 Cómo va</h2>
+        <div id="zona-mi-progreso"><div class="cargando">Cargando…</div></div>
+      </div>
+      </div>
+
+      <div class="vista-tab" id="vista-hojas">
+      <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
+        <h2>📄 Imprimibles <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
+        <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir, para casa o para el salón. No dependen de ningún tema.</p>
+        <div id="lista-plantillas"></div>
+      </div>
+      </div>
+
+      <div class="vista-tab" id="vista-temas">
+      <div class="tarjeta" id="tarjeta-mis-temas">
+        <h2>Mis temas</h2>
+        <p class="hint-combinar" id="hint-combinar" style="display:none;">Selecciona dos o más para armar un repaso de examen que los junte a todos.</p>
+        <div id="filtros-historial" style="display:none; margin-bottom:12px;">
+          <input type="text" id="buscar-historial" placeholder="Buscar por tema o etiqueta…" style="margin-bottom:8px;">
+          <div id="chips-etiquetas" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+          <div id="accion-etiqueta"></div>
+        </div>
+        <div id="barra-combinar" class="barra-combinar" style="display:none;"></div>
+        <div id="lista-historial"><div class="cargando">Cargando…</div></div>
+      </div>
+      </div>
+    `;
+
+    pintarVistaPerfil();
+    montarTabs();
+
+    document.getElementById("btn-ir-generar").addEventListener("click", () => mostrarFormulario());
+    document.getElementById("btn-ir-revisar").addEventListener("click", () => mostrarFormulario("revisar"));
+    document.getElementById("btn-ir-examen").addEventListener("click", () => {
+      document.getElementById("tarjeta-mis-temas")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const hint = document.getElementById("hint-combinar");
+      if (hint && historialCache.length >= 2) hint.style.display = "";
+    });
+    cargarPerfiles();
+    cargarHistorial();
+    cargarGamificacion();
+    cargarMiProgreso();
+    cargarBibliotecaPlantillas();
+  }
+
+  /** Muestra solo la sección de la pestaña activa. */
+  function pintarVistaPerfil() {
+    ["inicio", "temas", "hojas"].forEach((v) => {
+      const el = document.getElementById("vista-" + v);
+      if (el) el.style.display = v === vistaPerfil ? "" : "none";
+    });
+    window.scrollTo({ top: 0 });
+  }
+
+  /**
+   * La barra de abajo. Se monta una vez y se vuelve a marcar en cada
+   * redibujado; vive fuera de #contenido, que se reescribe a cada rato.
+   */
+  function montarTabs() {
+    if (!window.EnsenaiTabs) return;
+    window.EnsenaiTabs.montar({
+      tabs: [
+        { id: "inicio", icono: "🏠", texto: "Inicio" },
+        { id: "temas", icono: "📚", texto: "Mis temas" },
+        { id: "hojas", icono: "📄", texto: "Imprimibles" },
+      ],
+      activa: vistaPerfil,
+      onCambio: (v) => {
+        vistaPerfil = v;
+        pintarVistaPerfil();
+      },
+    });
+  }
+
+  /**
+   * La biblioteca completa dentro del perfil (4-sep-2026). La pinta
+   * plantillas.js, el mismo módulo que usa grupo.html: los papás ven lo
+   * mismo que los maestros, con su buscador y sus filtros.
+   *
+   * El catálogo completo es del plan Ilimitado. A los demás el módulo les
+   * pinta cuántas hojas hay y el botón para mejorar el plan — quién ve qué
+   * lo decide el servidor, no esta pantalla.
+   */
+  async function cargarBibliotecaPlantillas() {
+    const tarjeta = document.getElementById("tarjeta-plantillas");
+    const cont = document.getElementById("lista-plantillas");
+    if (!tarjeta || !cont || !window.EnsenaiPlantillas || !sesionActual) return;
+
+    await window.EnsenaiPlantillas.biblioteca({
+      cont,
+      API_BASE,
+      token: () => sesionActual.access_token,
+      onUpgrade: () => (window.location.href = "comprador.html?cuenta=1"),
+    });
+
+    if (cont.dataset.plHay === "1") {
+      const cuenta = document.getElementById("cuenta-plantillas");
+      if (cuenta && cont.dataset.plTotal) cuenta.textContent = `· ${cont.dataset.plTotal}`;
+      tarjeta.style.display = "block";
+      window.EnsenaiTabs?.globo("hojas", cont.dataset.plTotal || "");
+    } else {
+      // La pestaña "Hojas" existe siempre, así que no puede quedarse en
+      // blanco: si todavía no hay biblioteca, se dice con palabras.
+      tarjeta.style.display = "block";
+      tarjeta.innerHTML = `
+        <h2>📄 Imprimibles</h2>
+        <p class="ayuda" style="margin:0;">Todavía no hay imprimibles en la biblioteca. Estamos subiéndolos — vuelve en unos días.</p>`;
+    }
+  }
+
+  /**
+   * La tarjeta de arriba del perfil. Se vuelve a pintar cada vez que llega
+   * un dato nuevo, así que tiene que aguantar que los caches estén vacíos.
+   */
+  function pintarHeroPerfil() {
+    const cont = document.getElementById("zona-perfil-hero");
+    if (!cont) return;
+
+    const esAdulto = versionQuiz() === "adulto";
+
+    // Sin ningún perfil todavía: la tarjeta se convierte en la invitación al
+    // quiz, que es el primer paso real del producto.
+    if (!perfilesCache.length) {
+      cont.innerHTML = `
+        <div style="text-align:center;">
+          <h1 style="margin:0 0 8px;">${esAdulto ? "¿Cómo aprendes mejor?" : "¿Cómo aprende mejor?"}</h1>
+          <p class="ayuda" style="margin:0 0 14px;">Son 12 preguntas rápidas. Con eso, todo el material que generes se adapta a ${
+            esAdulto ? "tu" : "su"
+          } forma de aprender.</p>
+          <button class="primario" id="btn-hero-quiz" style="margin-top:0;">Contestar el quiz</button>
+        </div>`;
+      document.getElementById("btn-hero-quiz").addEventListener("click", () => mostrarQuizPerfil());
+      return;
+    }
+
+    const perfil = perfilesCache.find((p) => p.id === perfilActivoId) || perfilesCache[0];
+    perfilActivoId = perfil.id;
+
+    const g = gamificacionCache || { racha_actual: 0, medallas: [] };
+    const completados = historialCache.filter((t) => t.aprendido).length;
+    const tipos = (perfil.inteligencia_dominante || []).slice(0, 2);
+
+    // Las burbujas solo aparecen si de verdad hay entre quién elegir (o
+    // espacio en el plan para otro): con un solo hijo son ruido.
+    const puedeAgregar = perfilesCache.length < limitePerfilesCache;
+    const burbujasHtml =
+      perfilesCache.length > 1 || puedeAgregar
+        ? `<div class="burbujas-perfil">
+            ${perfilesCache
+              .map(
+                (p) => `<button type="button" class="burbuja-perfil${p.id === perfilActivoId ? " activa" : ""}" data-perfil-burbuja="${p.id}">
+                  ${htmlAvatar(p, 26)}<span>${escapeHtml(p.nombre)}</span>
+                </button>`
+              )
+              .join("")}
+            ${puedeAgregar ? `<button type="button" class="burbuja-perfil nueva" id="btn-burbuja-nueva">+ Agregar</button>` : ""}
+          </div>`
+        : "";
+
+    cont.innerHTML = `
+      ${burbujasHtml}
+      <div class="hero-perfil">
+        ${htmlAvatar(perfil, 76)}
+        <div class="datos">
+          <h1>${escapeHtml(perfil.nombre)}</h1>
+          <div class="chips-inteligencia">
+            ${tipos
+              .map(
+                (t) =>
+                  `<span class="chip-inteligencia" style="background:${COLOR_INTELIGENCIA[t] || "#B9CFE4"};">${escapeHtml(
+                    ETIQUETAS_INTELIGENCIA[t] || t
+                  )}</span>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+      ${
+        tipos.length
+          ? `<p class="ayuda" style="margin:14px 0 0; font-size:0.85rem;">${esAdulto ? "Aprendes" : "Aprende"} mejor ${escapeHtml(
+              tipos.map((t) => (COMO_APRENDE[t] || "").toLowerCase()).filter(Boolean).join(", y también ")
+            )}. Todo el material sale así.</p>`
+          : ""
+      }
+      <div class="rejilla-stats">
+        <div class="stat-perfil"><div class="num"><span class="emoji">🔥</span>${g.racha_actual || 0}</div><div class="lbl">día${g.racha_actual === 1 ? "" : "s"} de racha</div></div>
+        <div class="stat-perfil"><div class="num">${completados}</div><div class="lbl">tema${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"}</div></div>
+        <div class="stat-perfil"><div class="num">${(g.medallas || []).length}</div><div class="lbl">medalla${(g.medallas || []).length === 1 ? "" : "s"}</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px;">
+        <button type="button" class="secundario" style="margin:0;" id="btn-ver-perfiles">⚙️ Mis perfiles</button>
+        <a href="comprador.html?cuenta=1" style="font-size:0.82rem; font-weight:800; color:var(--bosque); text-decoration:none;">Mi plan y medallas →</a>
+      </div>
+    `;
+
+    cont.querySelectorAll("[data-perfil-burbuja]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        perfilActivoId = btn.dataset.perfilBurbuja;
+        pintarHeroPerfil();
+      });
+    });
+    document.getElementById("btn-burbuja-nueva")?.addEventListener("click", () => mostrarQuizPerfil());
+    document.getElementById("btn-ver-perfiles")?.addEventListener("click", () => mostrarFormulario("perfiles"));
+  }
+
+  /**
+   * Pantalla de GENERAR. Ya no es la pantalla de inicio (eso es
+   * mostrarPerfil): se llega con un botón y se regresa con otro. `anclaje`
+   * ("revisar" | "perfiles") permite entrar directo a una de las tarjetas
+   * de abajo desde el perfil, sin que la persona tenga que buscarla.
+   */
+  function mostrarFormulario(anclaje) {
+    window.EnsenaiTabs?.mostrar(false);
+    document.getElementById("contenido").innerHTML = `
+      <button type="button" class="secundario" id="btn-volver-perfil" style="margin:0 0 14px;">← Mi perfil</button>
+      <div class="tarjeta" id="tarjeta-generar">
+        <h1>✨ Genera material sobre un tema</h1>
+        <p class="ayuda">Escribe cualquier tema y lo adaptamos a tu edad y a tu forma de aprender.</p>
+        <label>Perfil a usar</label>
+        <select id="perfil-input"><option value="">Balanceado (sin perfil específico)</option></select>
+        <!-- El selector solo era fácil de pasar por alto y generar con el
+             perfil equivocado. Esta tarjeta muestra en grande para quién se
+             está generando y con qué estilo, y se actualiza al cambiarlo. -->
+        <div id="perfil-activo" class="perfil-activo"></div>
+        <label>Tema</label>
+        <input type="text" id="tema-input" placeholder="Ej. Las fracciones, La Revolución Mexicana, El sistema solar…">
+        <label>¿Algo específico que quieras que incluya? (opcional)</label>
+        <textarea id="detalles-input" placeholder="Ej. Solo la parte de fracciones equivalentes, o: es para el examen del viernes y vieron hasta la página 40."></textarea>
+        <p class="ayuda" style="margin:2px 0 0; font-size:0.8rem;">Entre más nos digas, más se parece el material a lo que están viendo en clase.</p>
+        <label>Foto del resumen o apuntes (opcional)</label>
+        <div class="zona-foto">
+          <label class="btn-foto" for="fotos-input">📷 Subir foto</label>
+          <input type="file" id="fotos-input" accept="image/*" multiple>
+          <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu resumen.</p>
+          <div class="miniaturas" id="miniaturas-fotos"></div>
+        </div>
+        <label>Nivel</label>
+        <select id="nivel-input">
+          ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
+        </select>
+        <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
+          <input type="checkbox" id="enfoque-psico-input">
+          🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
+        </label>
+        <label>Etiquetas (opcional)</label>
+        <input type="text" id="etiquetas-input" placeholder="Ej. Matemáticas, Parcial 1">
+        <p class="ayuda" style="margin:2px 0 0; font-size:0.8rem;">Sepáralas con comas — te ayudan a encontrar este tema después en tu historial.</p>
+        <button class="primario" id="btn-generar">Generar material</button>
+        <div id="resultado-generar"></div>
+      </div>
+      <div class="tarjeta" id="tarjeta-revisar">
+        <h1>🔍 Revisar un ejercicio</h1>
+        <p class="ayuda">Sube la foto de un ejercicio que ya resolviste a mano y te decimos en qué paso está el error, si lo hay.</p>
+        <label>Foto del ejercicio resuelto</label>
+        <div class="zona-foto">
+          <label class="btn-foto" for="fotos-input-revision">📷 Subir foto</label>
+          <input type="file" id="fotos-input-revision" accept="image/*" multiple>
+          <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos — por ejemplo, varias hojas del mismo ejercicio.</p>
+          <div class="miniaturas" id="miniaturas-fotos-revision"></div>
+        </div>
+        <button class="primario" id="btn-revisar-ejercicio">Revisar mi ejercicio</button>
+        <div id="resultado-revision"></div>
+      </div>
+      <div class="tarjeta" id="tarjeta-perfiles">
+        <h2 style="margin-top:0;">Perfiles de aprendizaje</h2>
+        <p class="ayuda" style="margin:0 0 10px;">${
+          versionQuiz() === "adulto"
+            ? "Tu perfil define el estilo del material. Puedes tener más de uno si estudias cosas muy distintas."
+            : "Un perfil por persona (ej. uno por cada hijo/a) — el material se adapta a su forma de aprender."
+        }</p>
+        <div id="zona-perfiles"><div class="cargando">Cargando…</div></div>
+      </div>
+    `;
+    document.getElementById("btn-volver-perfil").addEventListener("click", () => mostrarPerfil());
+    if (anclaje === "revisar" || anclaje === "perfiles") {
+      // Un instante después: la tarjeta ya está en el DOM pero el navegador
+      // todavía no acomoda el scroll si se pide en el mismo tick.
+      setTimeout(
+        () => document.getElementById(anclaje === "revisar" ? "tarjeta-revisar" : "tarjeta-perfiles")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        60
+      );
+    }
+    document.getElementById("btn-generar").addEventListener("click", generarTema);
+    // Enter en el campo "Tema" genera de una vez — es el campo obligatorio
+    // y el primero que se llena; los demás son opcionales, así que no hace
+    // falta seguir tocando "Generar material" a mano en celular.
+    document.getElementById("tema-input").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") generarTema();
+    });
+    document.getElementById("fotos-input").addEventListener("change", alElegirFotos);
+    fotosSeleccionadas = [];
+    pintarMiniaturas();
+    document.getElementById("fotos-input-revision").addEventListener("change", alElegirFotosRevision);
+    document.getElementById("btn-revisar-ejercicio").addEventListener("click", revisarEjercicio);
+    fotosRevision = [];
+    pintarMiniaturasRevision();
+    cargarPerfiles();
+    cargarGamificacion();
+  }
+
+  /**
+   * Racha + medallas + trivia diaria — el "gancho para volver" del modo
+   * individual (ver utils/gamificacion.js en el backend). Si algo falla
+   * aquí no debe estorbar el resto de la app: simplemente no se muestra
+   * nada, la persona sigue pudiendo generar temas con normalidad.
+   */
+  let triviaDiariaCargada = false;
+
+  async function cargarGamificacion() {
+    const cont = document.getElementById("barra-racha");
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-plan`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu racha.");
+      gamificacionCache = plan.gamificacion || { racha_actual: 0, racha_record: 0, medallas: [] };
+      renderGamificacion(gamificacionCache);
+      pintarHeroPerfil(); // la racha y las medallas también se ven en el perfil
+    } catch (err) {
+      // No es crítico: mejor esconder la franja que dejar un hueco roto.
+      const barra = document.getElementById("barra-racha");
+      if (barra) barra.style.display = "none";
+    }
+  }
+
+  function renderGamificacion(g) {
+    const cont = document.getElementById("barra-racha");
+    if (!cont) return;
+    cont.style.display = "";
+    cont.innerHTML = `
+      <div class="barra-racha-interna">
+      <div class="barra-racha-fila">
+        <div>
+          <p id="racha-titulo" style="margin:0; font-weight:800; font-family:'Grandstander',sans-serif; color:var(--profundo); font-size:1.05rem;"></p>
+          <p id="racha-sub" class="ayuda" style="margin:2px 0 0; font-size:0.82rem;"></p>
+        </div>
+        <button type="button" class="secundario" id="btn-abrir-trivia-diaria" style="white-space:nowrap;">🧠 Trivia diaria</button>
+      </div>
+      <div id="zona-trivia-diaria" style="display:none; margin-top:14px;"></div>
+      </div>
+    `;
+    actualizarRachaChip(g);
+    document.getElementById("btn-abrir-trivia-diaria").addEventListener("click", toggleTriviaDiaria);
+  }
+
+  // Actualiza SOLO el texto de la racha, sin volver a crear #zona-trivia-diaria
+  // — se usa después de completar la trivia diaria, cuando esa zona ya trae
+  // las respuestas revisadas y no se debe perder ese estado.
+  function actualizarRachaChip(g) {
+    const titulo = document.getElementById("racha-titulo");
+    const sub = document.getElementById("racha-sub");
+    // Los números se leen con || 0: si el backend responde sin ellos (o con
+    // una forma vieja), la franja decía "Récord: undefined días".
+    const actual = g.racha_actual || 0;
+    const record = g.racha_record || 0;
+    if (titulo) titulo.textContent = `🔥 Racha: ${actual} día${actual === 1 ? "" : "s"}`;
+    if (sub) {
+      sub.textContent =
+        actual > 0
+          ? `Récord: ${record} día${record === 1 ? "" : "s"}`
+          : "Genera un tema o haz tu trivia diaria para empezar tu racha.";
+    }
+  }
+
+  /**
+   * "Mi progreso" (31-ago-2026): a diferencia de la racha (que mide
+   * actividad), esto mide DOMINIO — qué tema ya se domina y cuál sigue
+   * flojo, usando las respuestas de trivia que se van guardando por tema
+   * (ver enviarRespuestasTrivia y GET /api/temas/mi-progreso). Igual que la
+   * racha, junta el progreso de TODOS los perfiles/hijos de la cuenta —
+   * mis_temas no guarda con cuál se generó cada tema.
+   */
+  async function cargarMiProgreso() {
+    const cont = document.getElementById("zona-mi-progreso");
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/mi-progreso`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar tu progreso.");
+      progresoCache = data;
+      etiquetaActivaProgreso = ""; // por si se recarga después de generar más temas
+      renderMiProgreso();
+    } catch (err) {
+      document.getElementById("tarjeta-mi-progreso")?.remove(); // no es crítico — mejor ocultarlo que dejar un hueco roto
+    }
+  }
+
+  /**
+   * Filtro por etiqueta dentro de "Mi progreso" (31-ago-2026): en vez de una
+   * racha separada por materia/parcial (que necesitaría una categoría
+   * confiable y las etiquetas son libres y opcionales), se reutiliza la
+   * etiqueta que la persona ya le puso a cada tema — el dato ya viene en
+   * GET /mi-progreso, así que filtrar es puro trabajo del navegador, sin
+   * pedir nada nuevo al backend. Mismo patrón visual (.chip-etiqueta) que
+   * el filtro del historial (renderChipsEtiquetas), con su propia variable
+   * (etiquetaActivaProgreso) para no mezclarse con ese filtro.
+   */
+  function renderChipsEtiquetasProgreso(temasSinFiltrar) {
+    const cont = document.getElementById("chips-etiquetas-progreso");
+    if (!cont) return;
+    const todasEtiquetas = [...new Set(temasSinFiltrar.flatMap((t) => t.etiquetas || []))].sort();
+    if (!todasEtiquetas.length) {
+      cont.innerHTML = "";
+      return;
+    }
+    cont.innerHTML =
+      `<button type="button" class="chip-etiqueta${etiquetaActivaProgreso === "" ? " activa" : ""}" data-etiqueta="">Todas</button>` +
+      todasEtiquetas
+        .map((e) => `<button type="button" class="chip-etiqueta${etiquetaActivaProgreso === e ? " activa" : ""}" data-etiqueta="${escapeHtml(e)}">${escapeHtml(e)}</button>`)
+        .join("");
+    cont.querySelectorAll(".chip-etiqueta").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        etiquetaActivaProgreso = btn.dataset.etiqueta;
+        renderMiProgreso();
+      });
+    });
+  }
+
+  function renderMiProgreso() {
+    const cont = document.getElementById("zona-mi-progreso");
+    if (!cont || !progresoCache) return;
+    const todosLosTemas = progresoCache.temas || [];
+
+    if (todosLosTemas.length === 0) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">Contesta la trivia de un tema para empezar a ver aquí en qué vas mejor y qué te conviene repasar.</p>`;
+      return;
+    }
+
+    const temas = etiquetaActivaProgreso ? todosLosTemas.filter((t) => (t.etiquetas || []).includes(etiquetaActivaProgreso)) : todosLosTemas;
+
+    // Con un filtro activo, el resumen (promedio, intentos) se recalcula
+    // SOLO sobre los temas de esa etiqueta — "cómo voy en Primer Parcial"
+    // tiene que ser el promedio de Primer Parcial, no el general.
+    const promedio_general = temas.length
+      ? Math.round(temas.reduce((sum, t) => sum + t.promedio_porcentaje, 0) / temas.length)
+      : null;
+    const total_intentos = temas.reduce((sum, t) => sum + t.intentos, 0);
+
+    const chipsHtml = `<div id="chips-etiquetas-progreso" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>`;
+
+    const resumenHtml = temas.length
+      ? `
+      <p class="ayuda" style="margin:0 0 12px; font-size:0.85rem;">
+        ${temas.length} tema${temas.length === 1 ? "" : "s"} con trivia contestada
+        ${promedio_general !== null ? ` — promedio${etiquetaActivaProgreso ? ` en "${escapeHtml(etiquetaActivaProgreso)}"` : " general"}: <strong>${promedio_general}%</strong>` : ""}
+        (${total_intentos} intento${total_intentos === 1 ? "" : "s"} en total).
+      </p>
+    `
+      : `<p class="ayuda" style="margin:0 0 12px;">Ningún tema con esa etiqueta tiene trivia contestada todavía.</p>`;
+
+    const filasHtml = temas
+      .map((t) => {
+        let tendencia = "";
+        if (t.intentos > 1) {
+          if (t.ultimo_porcentaje > t.primer_porcentaje) tendencia = " · 📈 mejorando";
+          else if (t.ultimo_porcentaje < t.primer_porcentaje) tendencia = " · 📉 bajando";
+          else tendencia = " · ➡️ sin cambio";
+        }
+        return `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px dashed var(--linea, #E3E9EF);">
+          <div style="min-width:0;">
+            <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t.tema)}</div>
+            <div class="ayuda" style="font-size:0.78rem; margin-top:2px;">${t.intentos} intento${t.intentos === 1 ? "" : "s"}${tendencia}</div>
+          </div>
+          <span style="flex-shrink:0; font-weight:800; padding:4px 10px; border-radius:999px; font-size:0.85rem; ${
+            t.necesita_repaso
+              ? "background:#FFF0EC; color:#B3431E;"
+              : "background:var(--hielo); color:var(--bosque);"
+          }">${t.promedio_porcentaje}%${t.necesita_repaso ? " · repasar" : ""}</span>
+        </div>
+      `;
+      })
+      .join("");
+
+    cont.innerHTML = chipsHtml + resumenHtml + filasHtml;
+    renderChipsEtiquetasProgreso(todosLosTemas);
+  }
+
+  async function toggleTriviaDiaria() {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    const abrir = zona.style.display === "none";
+    zona.style.display = abrir ? "block" : "none";
+    if (!abrir || triviaDiariaCargada) return;
+
+    zona.innerHTML = `<div class="cargando">Cargando tu trivia de hoy…</div>`;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/trivia-diaria`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar tu trivia diaria.");
+      renderTriviaDiaria(data);
+      triviaDiariaCargada = true;
+    } catch (err) {
+      zona.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  function renderTriviaDiaria(data) {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    if (!data.disponible) {
+      zona.innerHTML = `<p class="ayuda" style="margin:0;">${escapeHtml(
+        data.motivo || "Genera al menos un tema para desbloquear tu trivia diaria."
+      )}</p>`;
+      return;
+    }
+
+    // Mismo patrón visual que la trivia de un tema normal (.trivia-item,
+    // .opcion-btn) — ver mostrarTemaGenerado más abajo — para que se sienta
+    // igual de familiar aunque junte preguntas de varios temas a la vez.
+    const triviaHtml = data.preguntas
+      .map(
+        (p, i) => `
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
+        ${
+          p.opciones?.length
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
+        }
+        <div class="trivia-feedback" style="display:none;"></div>
+        <p class="ayuda" style="margin:6px 0 0; font-size:0.75rem;">De: ${escapeHtml(p.origen_tema || "")}</p>
+      </div>
+    `
+      )
+      .join("");
+
+    zona.innerHTML = `
+      <p class="ayuda" style="margin:0 0 10px; font-size:0.85rem;">Preguntas de tus propios temas — no gasta cupo de tu plan.</p>
+      ${triviaHtml}
+      <div id="trivia-diaria-resumen" style="display:none;"></div>
+      <button type="button" class="primario" id="btn-revisar-trivia-diaria" style="width:100%;">Revisar mis respuestas</button>
+    `;
+    zona.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    document.getElementById("btn-revisar-trivia-diaria").addEventListener("click", revisarTriviaDiaria);
+  }
+
+  async function revisarTriviaDiaria() {
+    const zona = document.getElementById("zona-trivia-diaria");
+    if (!zona) return;
+    let total = 0;
+    let correctas = 0;
+
+    zona.querySelectorAll(".trivia-item").forEach((item) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
+        });
+
+        feedback.style.display = "block";
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+      } else {
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") + `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+      }
+    });
+
+    const resumen = document.getElementById("trivia-diaria-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      const pct = correctas / total;
+      const mensaje = pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver mañana.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
+    }
+
+    const btnRevisar = document.getElementById("btn-revisar-trivia-diaria");
+    if (btnRevisar) btnRevisar.style.display = "none";
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/trivia-diaria/completar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ aciertos: correctas, total }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (res.ok && data.gamificacion) {
+        const g = data.gamificacion;
+        const medallasNuevas = g.medallas_nuevas || [];
+        zona.insertAdjacentHTML(
+          "beforeend",
+          `<div class="aviso" style="margin-top:12px;">
+            🔥 Racha: ${g.racha_actual} día${g.racha_actual === 1 ? "" : "s"}
+            ${medallasNuevas.length ? "<br>" + medallasNuevas.map((m) => `🏅 ¡Nueva medalla! ${m.icono} ${escapeHtml(m.nombre)}`).join("<br>") : ""}
+          </div>`
+        );
+        actualizarRachaChip(g);
+      }
+    } catch (err) {
+      // si falla no pasa nada — ya vio sus respuestas, solo no se actualiza la racha visualmente
+    }
+  }
+
+  async function cargarPerfiles() {
+    // En la pantalla de perfil no existe #zona-perfiles: igual hay que traer
+    // los perfiles, porque son lo que se pinta arriba (pintarHeroPerfil).
+    const cont = document.getElementById("zona-perfiles");
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/perfiles`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus perfiles.");
+
+      perfilesCache = data.perfiles || [];
+      const limite = data.limite_perfiles;
+      limitePerfilesCache = limite;
+      pintarHeroPerfil();
+      if (!cont) return; // estamos en la pantalla de perfil: no hay lista que pintar
+
+      const listaHtml = perfilesCache.length
+        ? perfilesCache
+            .map(
+              (p) => `
+        <div class="historial-item" data-perfil-id="${p.id}">
+          <span class="titulo">
+            ${htmlAvatar(p, 26)}
+            ${escapeHtml(p.nombre)}
+            <span style="font-weight:400; color:#4A6A85;">— ${escapeHtml(
+              (p.inteligencia_dominante || []).map((t) => COMO_APRENDE[t] || ETIQUETAS_INTELIGENCIA[t] || t).join(" · ")
+            )}</span>
+          </span>
+          <span style="display:flex; gap:6px;">
+            <button class="secundario" style="margin:0; padding:6px 10px;" data-rehacer="${p.id}" title="Volver a hacer el quiz">🔄 Rehacer</button>
+            <button class="secundario" style="margin:0; padding:6px 10px;" data-borrar="${p.id}">Borrar</button>
+          </span>
+        </div>
+      `
+            )
+            .join("")
+        : `<p class="ayuda" style="margin:0 0 10px;">Todavía no tienes perfiles guardados.</p>`;
+
+      cont.innerHTML = `
+        ${listaHtml}
+        <p class="ayuda" style="margin:10px 0 0; font-size:0.85rem;">${perfilesCache.length} de ${limite} perfil(es) de tu plan.</p>
+        ${
+          perfilesCache.length < limite
+            ? `<button class="secundario" style="width:100%;" id="btn-nuevo-perfil">+ Agregar perfil (hacer quiz)</button>`
+            : `<p class="ayuda" style="margin:6px 0 0; font-size:0.85rem;">Llegaste al límite de tu plan — <a href="comprador.html?cuenta=1">mejora tu plan</a> para agregar más.</p>`
+        }
+      `;
+
+      if (document.getElementById("btn-nuevo-perfil")) {
+        document.getElementById("btn-nuevo-perfil").addEventListener("click", () => mostrarQuizPerfil());
+      }
+      cont.querySelectorAll("[data-borrar]").forEach((btn) => {
+        btn.addEventListener("click", () => borrarPerfil(btn.dataset.borrar));
+      });
+      // "Rehacer" resuelve la fricción de que un perfil solo se pudiera
+      // borrar: si el niño creció, cambió su forma de aprender, o el quiz se
+      // contestó a la ligera la primera vez, antes había que borrarlo — y en
+      // el plan Gratis eso te dejaba en cero perfiles.
+      cont.querySelectorAll("[data-rehacer]").forEach((btn) => {
+        btn.addEventListener("click", () => mostrarQuizPerfil(btn.dataset.rehacer));
+      });
+
+      // llena el selector de perfil del formulario de generación
+      const select = document.getElementById("perfil-input");
+      if (select) {
+        const previo = select.value;
+        select.innerHTML =
+          `<option value="">Balanceado (sin perfil específico)</option>` +
+          perfilesCache.map((p) => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join("");
+        // Si solo hay un perfil, se preselecciona: es lo que la persona
+        // quiere el 99% de las veces y evita generar con "Balanceado" sin
+        // darse cuenta.
+        // Prioridad: lo que ya estaba elegido en el selector > el perfil que
+        // la persona tiene abierto en su pantalla de perfil > el único que
+        // existe. Así, entrar desde "Sofía" y darle a generar no termina
+        // haciendo material para Mateo.
+        select.value = perfilesCache.some((p) => p.id === previo)
+          ? previo
+          : perfilesCache.some((p) => p.id === perfilActivoId)
+          ? perfilActivoId
+          : perfilesCache.length === 1
+          ? perfilesCache[0].id
+          : previo;
+        select.onchange = pintarPerfilActivo;
+        pintarPerfilActivo();
+      }
+    } catch (err) {
+      if (cont) cont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  /**
+   * Tarjeta que deja ver de un golpe para quién se va a generar el material
+   * y con qué estilo. Antes solo estaba el `<select>`, muy fácil de pasar por
+   * alto — y quien tiene varios hijos terminaba generando con el perfil
+   * equivocado sin enterarse.
+   */
+  function pintarPerfilActivo() {
+    const cont = document.getElementById("perfil-activo");
+    if (!cont) return;
+    const id = document.getElementById("perfil-input")?.value;
+    const perfil = perfilesCache.find((p) => p.id === id);
+
+    if (!perfil) {
+      cont.className = "perfil-activo neutro";
+      cont.innerHTML = `<span class="pa-icono">⚖️</span>
+        <div><strong>Perfil balanceado</strong><span class="pa-sub">El material no se adapta a una forma de aprender en particular.</span></div>`;
+      return;
+    }
+
+    const tipos = (perfil.inteligencia_dominante || []).slice(0, 2);
+    cont.className = "perfil-activo";
+    cont.style.borderColor = COLOR_INTELIGENCIA[tipos[0]] || "var(--linea)";
+    cont.innerHTML = `
+      ${htmlAvatar(perfil, 38)}
+      <div>
+        <strong>Generando para ${escapeHtml(perfil.nombre)}</strong>
+        <span class="pa-sub">${tipos.map((t) => escapeHtml(COMO_APRENDE[t] || ETIQUETAS_INTELIGENCIA[t] || t)).join(" · ")}</span>
+      </div>`;
+  }
+
+  // ── Quiz de perfil de aprendizaje ───────────────────────────────────────
+  // Estado del quiz en curso: por cada pregunta, qué eligió como primera y
+  // (opcionalmente) como segunda opción. Se guardan TIPOS, no índices,
+  // porque el backend ahora baraja el orden de las opciones en cada
+  // pregunta para no sesgar el resultado hacia las primeras de la lista.
+  // ── Tips mientras se genera el material ─────────────────────────────────
+  // Generar tarda ~30 segundos. En vez de dejar a la persona mirando un
+  // "cargando", se aprovecha para darle algo que de verdad le sirva: un
+  // consejo corto de cómo acompañar el estudio. Los primeros son específicos
+  // del perfil que eligió (refuerzan por qué el perfil importa), y los
+  // generales vienen del marco del documento "Sistema Cognitivo Integral"
+  // (evocación activa, repaso espaciado, mentalidad de crecimiento).
+  const TIPS_POR_INTELIGENCIA = {
+    linguistica: [
+      "Pídele que te cuente el tema con sus propias palabras, sin ver los apuntes. Si lo puede explicar, lo entendió.",
+      "Inventar una historia corta con los conceptos del tema los fija mucho mejor que repetirlos.",
+    ],
+    logico_matematica: [
+      "Antes de empezar, pregúntale “¿qué crees que va a pasar aquí?”. Predecir activa el cerebro más que solo leer.",
+      "Buscar el patrón — qué se repite, qué cambia — le ordena el tema más rápido que memorizarlo por partes.",
+    ],
+    espacial: [
+      "Pídele que te DIBUJE lo que entendió, en vez de contártelo. A quien piensa en imágenes le fija mucho más el tema.",
+      "Dos colores en los apuntes: uno para las ideas principales y otro para los ejemplos. La diferencia se nota.",
+    ],
+    musical: [
+      "Ponerle tonada a lo que hay que memorizar funciona de verdad: una lista con ritmo se recuerda semanas después.",
+      "Que grabe una nota de voz explicando el tema y la escuche después. Oírse a sí mismo/a explicar ayuda mucho.",
+    ],
+    kinestesica: [
+      "Estudiar de pie o caminando no es distracción. A quien aprende con el cuerpo, quedarse quieto le cuesta el doble.",
+      "Convertir el tema en algo que se pueda actuar o tocar con las manos vale más que media hora de lectura.",
+    ],
+    interpersonal: [
+      "Que te explique el tema a ti, o hasta a un peluche. Enseñar en voz alta es de las formas más rápidas de fijar algo.",
+      "Inviertan papeles: que ella o él te tome el examen a ti. Preparar las preguntas obliga a entender el tema.",
+    ],
+    intrapersonal: [
+      "Dale unos minutos a solas antes de empezar. Necesita ordenar sus ideas antes de recibir nuevas.",
+      "Preguntarle “¿esto con qué se te parece de tu vida?” conecta el tema con algo que ya sabe.",
+    ],
+    naturalista: [
+      "Relaciona el tema con algo real que pueda observar. Clasificar y comparar le ordena la cabeza.",
+      "Sacar el estudio al patio o al parque no es perder el tiempo: el entorno le ayuda a enganchar.",
+    ],
+  };
+
+  const TIPS_GENERALES = [
+    "Repasar tres veces en días distintos fija mucho más que estudiar tres horas seguidas.",
+    "Releer los apuntes se siente productivo pero engaña. Cerrar el cuaderno y tratar de recordar es lo que funciona.",
+    "Elogia el esfuerzo, no la inteligencia: “te esforzaste mucho” construye más que “qué inteligente eres”.",
+    "Sesiones de 20 a 25 minutos con un descanso rinden más que una hora seguida.",
+    "Dormir bien después de estudiar es parte del estudio: el cerebro consolida lo aprendido mientras duerme.",
+    "Si algo no le sale, pregúntale “¿qué parte exactamente?”. Ubicar dónde se traba ahorra muchísimo tiempo.",
+    "Equivocarse y corregir fija más que acertar a la primera. Un error no es tiempo perdido.",
+  ];
+
+  let tipsIntervalo = null;
+
+  function armarListaTips() {
+    const perfil = perfilesCache.find((p) => p.id === document.getElementById("perfil-input")?.value);
+    const dominantes = perfil?.inteligencia_dominante || [];
+    const propios = dominantes.flatMap((t) => TIPS_POR_INTELIGENCIA[t] || []);
+    // Los del perfil van primero (son los que más resuenan), luego los generales.
+    return [...propios, ...TIPS_GENERALES];
+  }
+
+  /**
+   * `encabezado` acepta un string fijo (como antes) o un arreglo de etapas
+   * [{ ms, texto }] para que el título vaya cambiando según el tiempo real
+   * transcurrido (31-ago-2026, pedido explícito de la usuaria: "que no se
+   * sienta tan tardado" al generar un tema). No hace la generación más
+   * rápida — el backend sigue tardando lo mismo — pero deja de sentirse
+   * "colgado" mostrando en qué va, en vez de un mismo mensaje fijo todo
+   * el rato. Las etapas son un estimado (no vienen del backend en tiempo
+   * real), así que se pisan un poco optimistas a propósito.
+   */
+  function iniciarTips(contenedor, encabezado, accion) {
+    detenerTips();
+    const tips = armarListaTips();
+    const etapas = Array.isArray(encabezado) ? encabezado : null;
+    const inicio = Date.now();
+    let i = 0;
+    let tick = 0;
+
+    const tituloActual = () => {
+      if (!etapas) return encabezado;
+      const transcurrido = Date.now() - inicio;
+      let actual = etapas[0]?.texto || "";
+      for (const etapa of etapas) {
+        if (transcurrido >= etapa.ms) actual = etapa.texto;
+      }
+      return actual;
+    };
+
+    // Se dibuja UNA vez y después solo se actualiza el texto. Antes se
+    // reemplazaba todo el innerHTML cada 2 segundos: el botón "seguir
+    // navegando" se destruía y volvía a crearse constantemente, así que un
+    // clic que cayera justo en ese instante se perdía (31-ago-2026).
+    const nPuntos = Math.min(tips.length, 6);
+    contenedor.innerHTML = `
+      <div class="zona-espera">
+        <div class="espera-barra"><span></span></div>
+        <p class="espera-titulo"></p>
+        <div class="tip-caja">
+          <span class="tip-icono">💡</span>
+          <p class="tip-texto"></p>
+        </div>
+        <div class="tip-puntos">${Array.from({ length: nPuntos }, () => "<span></span>").join("")}</div>
+        ${accion ? `<button type="button" class="btn-seguir-navegando" id="btn-accion-espera"></button>` : ""}
+      </div>`;
+
+    const elTitulo = contenedor.querySelector(".espera-titulo");
+    const elTip = contenedor.querySelector(".tip-texto");
+    const elPuntos = [...contenedor.querySelectorAll(".tip-puntos span")];
+    const elAccion = accion ? contenedor.querySelector("#btn-accion-espera") : null;
+    if (elAccion) {
+      elAccion.textContent = accion.texto;
+      elAccion.addEventListener("click", accion.onClick); // se conecta una sola vez
+    }
+
+    const actualizar = () => {
+      if (elTitulo) elTitulo.textContent = tituloActual();
+      if (elTip) elTip.textContent = tips[i % tips.length];
+      elPuntos.forEach((p, k) => p.classList.toggle("activo", k === i % nPuntos));
+    };
+
+    actualizar();
+    // Se refresca cada 2s (para que la etapa se sienta viva) pero el tip
+    // solo cambia cada 3 refrescos (~6s), igual que antes.
+    tipsIntervalo = setInterval(() => {
+      tick++;
+      if (tick % 3 === 0) i++;
+      actualizar();
+    }, 2000);
+  }
+
+  // ── Generación en segundo plano ────────────────────────────────────────
+  // Generar un tema ya no secuestra la pantalla: el trabajo vive en el
+  // servidor (ver POST /api/temas/generar-async) y este aviso flotante
+  // avisa cuando está listo. Cerrar la página, bloquear el celular o
+  // perder la red no lo cancelan — al volver se retoma el mismo trabajo.
+  let generacionEnCurso = null;
+
+  function quitarAvisoGeneracion() {
+    document.getElementById("aviso-generacion")?.remove();
+  }
+
+  function mostrarAvisoGeneracion({ estado, texto, accionTexto, onAccion }) {
+    quitarAvisoGeneracion();
+    const div = document.createElement("div");
+    div.className = `aviso-generacion${estado === "listo" ? " listo" : estado === "falla" ? " falla" : ""}`;
+    div.id = "aviso-generacion";
+    div.innerHTML = `
+      <span class="texto">${escapeHtml(texto)}</span>
+      ${accionTexto ? `<button type="button" id="btn-aviso-generacion">${escapeHtml(accionTexto)}</button>` : ""}
+      <button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>
+    `;
+    document.body.appendChild(div);
+    if (accionTexto && onAccion) {
+      document.getElementById("btn-aviso-generacion").addEventListener("click", () => {
+        quitarAvisoGeneracion();
+        onAccion();
+      });
+    }
+    document.getElementById("btn-cerrar-aviso")?.addEventListener("click", quitarAvisoGeneracion);
+  }
+
+  function detenerTips() {
+    if (tipsIntervalo) { clearInterval(tipsIntervalo); tipsIntervalo = null; }
+  }
+
+  let respuestasQuiz = {};
+  let preguntasQuiz = [];
+  let resultadoQuiz = null;
+  let ajusteManual = null;
+
+  // Tipo de usuario elegido al registrarse (papa/estudiante/educador/adulto/otro).
+  // Decide qué versión del quiz se pide: "ninos" está redactada para que un
+  // papá describa a su hijo ("Cuando tiene tiempo libre, prefiere…"), y
+  // "adulto" está en primera persona ("Cuando tengo tiempo libre, prefiero…").
+  // Antes siempre se pedía la de niños, así que un adolescente o un adulto
+  // aprendiendo por su cuenta contestaba preguntas escritas para otra persona.
+  let tipoUsuario = null;
+
+  function versionQuiz() {
+    return tipoUsuario === "estudiante" || tipoUsuario === "adulto" ? "adulto" : "ninos";
+  }
+
+  async function cargarTipoUsuario() {
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/mi-tipo`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (res.ok) tipoUsuario = (await res.json()).tipo_usuario || null;
+    } catch (err) {
+      tipoUsuario = null; // sin tipo, se usa la versión de niños como antes
+    }
+  }
+
+  // ── Avatares de los perfiles ────────────────────────────────────────────
+  // Se guarda solo el ID (ej. "avatar-03"), nunca la imagen: los archivos
+  // viven en el frontend. Antes este selector iba a ser de animales (zorro,
+  // búho, tortuga...) pero se cambió a caritas de niños ilustradas — set
+  // comprado en Etsy (licencia "comercial pequeño, hasta 100 ventas" — NO
+  // renovada a licencia extendida todavía; hacerlo antes de que las
+  // suscripciones de pago combinadas pasen de ~90). Los archivos viven en
+  // assets/avatares/avatar-01.png … avatar-24.png. Si algún perfil ya
+  // guardado tenía un id de la época de animales (avatar-01..12), no truena:
+  // simplemente ahora ese id apunta a una carita en vez de un emoji.
+  const USAR_ILUSTRACIONES = true;
+  const AVATARES = [
+    { id: "avatar-01", file: "avatar-01.png" }, { id: "avatar-02", file: "avatar-02.png" },
+    { id: "avatar-03", file: "avatar-03.png" }, { id: "avatar-04", file: "avatar-04.png" },
+    { id: "avatar-05", file: "avatar-05.png" }, { id: "avatar-06", file: "avatar-06.png" },
+    { id: "avatar-07", file: "avatar-07.png" }, { id: "avatar-08", file: "avatar-08.png" },
+    { id: "avatar-09", file: "avatar-09.png" }, { id: "avatar-10", file: "avatar-10.png" },
+    { id: "avatar-11", file: "avatar-11.png" }, { id: "avatar-12", file: "avatar-12.png" },
+    { id: "avatar-13", file: "avatar-13.png" }, { id: "avatar-14", file: "avatar-14.png" },
+    { id: "avatar-15", file: "avatar-15.png" }, { id: "avatar-16", file: "avatar-16.png" },
+    { id: "avatar-17", file: "avatar-17.png" }, { id: "avatar-18", file: "avatar-18.png" },
+    { id: "avatar-19", file: "avatar-19.png" }, { id: "avatar-20", file: "avatar-20.png" },
+    { id: "avatar-21", file: "avatar-21.png" }, { id: "avatar-22", file: "avatar-22.png" },
+    { id: "avatar-23", file: "avatar-23.png" }, { id: "avatar-24", file: "avatar-24.png" },
+  ];
+
+  // Avatares de adultos/adolescentes autodidactas: iniciales sobre un color
+  // llamativo, sacado del mismo set de colores de inteligencias (así se ve
+  // parte del mismo sistema visual). Se calcula del nombre — no requiere
+  // guardar nada nuevo en el backend.
+  const PALETA_INICIALES = Object.values(COLOR_INTELIGENCIA);
+
+  function iniciales(nombre) {
+    const palabras = (nombre || "").trim().split(/\s+/).filter(Boolean);
+    if (palabras.length === 0) return "?";
+    if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase();
+    return (palabras[0][0] + palabras[1][0]).toUpperCase();
+  }
+
+  function colorIniciales(nombre) {
+    const str = (nombre || "").trim() || "?";
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    return PALETA_INICIALES[hash % PALETA_INICIALES.length];
+  }
+
+  function htmlAvatarIniciales(nombre, tam = 34) {
+    const estilo = `width:${tam}px; height:${tam}px; background:${colorIniciales(nombre)}; font-family:'Grandstander',sans-serif; font-weight:700; color:#fff; font-size:${Math.round(tam * 0.4)}px;`;
+    return `<span class="avatar-perfil" style="${estilo}">${escapeHtml(iniciales(nombre))}</span>`;
+  }
+
+  /** Devuelve el HTML del avatar de un perfil: iniciales para cuentas de adultos/autodidactas, ilustración de niños si ya existen (o el ícono de su inteligencia) para el resto. */
+  function htmlAvatar(perfil, tam = 34) {
+    if (versionQuiz() === "adulto") return htmlAvatarIniciales(perfil?.nombre, tam);
+
+    const av = AVATARES.find((a) => a.id === perfil?.avatar);
+    const tipo = perfil?.inteligencia_dominante?.[0];
+    const fondo = COLOR_INTELIGENCIA[tipo] || "#B9CFE4";
+    const estilo = `width:${tam}px; height:${tam}px; background:${fondo}; font-size:${Math.round(tam * 0.5)}px;`;
+
+    if (av && USAR_ILUSTRACIONES) {
+      return `<span class="avatar-perfil" style="${estilo}"><img src="assets/avatares/${av.file}" alt=""></span>`;
+    }
+    return `<span class="avatar-perfil" style="${estilo}">${ICONO_INTELIGENCIA[tipo] || "🧩"}</span>`;
+  }
+
+  let avatarElegido = null;
+
+  function pintarSelectorAvatar() {
+    const cont = document.getElementById("selector-avatar");
+    if (!cont) return;
+    cont.innerHTML = AVATARES.map(
+      (a, i) => `
+      <button type="button" class="opcion-avatar${avatarElegido === a.id ? " activa" : ""}" data-avatar="${a.id}" aria-pressed="${avatarElegido === a.id}" aria-label="Avatar ${i + 1}${avatarElegido === a.id ? " (elegido)" : ""}">
+        <img src="assets/avatares/${a.file}" alt="">
+      </button>`
+    ).join("");
+    cont.querySelectorAll("[data-avatar]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        // Volver a picar el mismo lo deselecciona.
+        avatarElegido = avatarElegido === btn.dataset.avatar ? null : btn.dataset.avatar;
+        pintarSelectorAvatar();
+      });
+    });
+  }
+
+  // Si viene `perfilIdEditando`, el quiz actualiza ese perfil en vez de
+  // crear uno nuevo (así no choca con el límite de perfiles del plan).
+  let perfilIdEditando = null;
+
+  async function mostrarQuizPerfil(idExistente) {
+    window.EnsenaiTabs?.mostrar(false);
+    // El quiz vive dentro de la tarjeta de perfiles, que solo existe en la
+    // pantalla de generar. Desde el perfil (botón "Contestar el quiz" o
+    // "+ Agregar") hay que ir allá primero, o esto tronaría con cont null.
+    if (!document.getElementById("zona-perfiles")) {
+      mostrarFormulario("perfiles");
+      await cargarPerfiles();
+      return mostrarQuizPerfil(idExistente);
+    }
+
+    perfilIdEditando = idExistente || null;
+    const existente = perfilesCache.find((p) => p.id === perfilIdEditando);
+    const cont = document.getElementById("zona-perfiles");
+    cont.innerHTML = `
+      ${
+        existente
+          ? `<div class="aviso" style="margin-bottom:14px;">Vas a rehacer el quiz de <strong>${escapeHtml(existente.nombre)}</strong>. Su perfil se actualiza — no se crea uno nuevo ni se gasta espacio de tu plan.</div>`
+          : ""
+      }
+      <label>Nombre de este perfil</label>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="text" id="nombre-perfil-input" style="flex:1;" value="${existente ? escapeHtml(existente.nombre) : ""}" placeholder="${versionQuiz() === "adulto" ? "Ej. Yo, Mi maestría, Inglés…" : "Ej. Sofía, Mateo, yo…"}">
+        ${versionQuiz() === "adulto" ? `<span id="vista-avatar-iniciales"></span>` : ""}
+      </div>
+      ${
+        versionQuiz() === "adulto"
+          ? ""
+          : `<label>Elige un avatar (opcional)</label><div class="rejilla-avatares" id="selector-avatar"></div>`
+      }
+      <div id="preguntas-perfil" style="margin-top:14px;"><div class="cargando">Cargando preguntas…</div></div>
+    `;
+
+    respuestasQuiz = {};
+    resultadoQuiz = null;
+    ajusteManual = null;
+    avatarElegido = existente?.avatar || null;
+
+    if (versionQuiz() === "adulto") {
+      // Adultos y adolescentes autodidactas: nada de caritas de niños ni
+      // set de animales — un avatar de iniciales con color llamativo,
+      // calculado del nombre. No se guarda nada nuevo: se recalcula del
+      // campo "nombre" que ya existe, así que no toca el backend.
+      const inputNombre = document.getElementById("nombre-perfil-input");
+      const vista = document.getElementById("vista-avatar-iniciales");
+      const actualizarVista = () => { if (vista) vista.innerHTML = htmlAvatarIniciales(inputNombre.value, 40); };
+      inputNombre.addEventListener("input", actualizarVista);
+      actualizarVista();
+    } else {
+      pintarSelectorAvatar();
+    }
+
+    const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/quiz?version=${versionQuiz()}`);
+    const data = await res.json();
+    preguntasQuiz = data.preguntas || [];
+
+    document.getElementById("preguntas-perfil").innerHTML = `
+      <div class="aviso" style="margin-bottom:14px;">
+        Elige la opción que <strong>más</strong> ${versionQuiz() === "adulto" ? "te describe" : "se le parece"}. Si dudas entre dos, márcalas las dos — la segunda cuenta un poco menos y nos ayuda a afinar el resultado.
+      </div>
+      ${preguntasQuiz.map((p, i) => pintarPreguntaQuiz(p, i)).join("")}
+      <div id="aviso-confiabilidad"></div>
+      <button class="primario" id="btn-guardar-perfil">Ver resultado</button>
+      <button class="secundario" style="width:100%;" id="btn-cancelar-perfil">Cancelar</button>
+    `;
+
+    conectarOpcionesQuiz();
+    document.getElementById("btn-guardar-perfil").addEventListener("click", calcularPerfilQuiz);
+    document.getElementById("btn-cancelar-perfil").addEventListener("click", cargarPerfiles);
+  }
+
+  function pintarPreguntaQuiz(p, i) {
+    return `
+      <div class="quiz-pregunta" data-pregunta="${p.id}">
+        <p class="quiz-enunciado">${i + 1}. ${escapeHtml(p.pregunta)}</p>
+        <div class="quiz-opciones">
+          ${p.opciones
+            .map(
+              (op) => `
+            <button type="button" class="quiz-opcion" data-pregunta="${p.id}" data-tipo="${escapeHtml(op.tipo)}">
+              <span class="quiz-marca"></span>${escapeHtml(op.texto)}
+            </button>`
+            )
+            .join("")}
+        </div>
+      </div>`;
+  }
+
+  function conectarOpcionesQuiz() {
+    document.querySelectorAll(".quiz-opcion").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.pregunta;
+        const tipo = btn.dataset.tipo;
+        const r = respuestasQuiz[id] || { primaria: null, secundaria: null };
+
+        if (r.primaria === tipo) {
+          // Quitar la primera: la segunda (si hay) sube a primera.
+          r.primaria = r.secundaria;
+          r.secundaria = null;
+        } else if (r.secundaria === tipo) {
+          r.secundaria = null;
+        } else if (!r.primaria) {
+          r.primaria = tipo;
+        } else {
+          r.secundaria = tipo;
+        }
+
+        respuestasQuiz[id] = r;
+        refrescarPregunta(id);
+      });
+    });
+  }
+
+  function refrescarPregunta(id) {
+    const r = respuestasQuiz[id] || {};
+    document.querySelectorAll(`.quiz-opcion[data-pregunta="${id}"]`).forEach((btn) => {
+      const tipo = btn.dataset.tipo;
+      const marca = btn.querySelector(".quiz-marca");
+      btn.classList.toggle("primaria", r.primaria === tipo);
+      btn.classList.toggle("secundaria", r.secundaria === tipo);
+      marca.textContent = r.primaria === tipo ? "1ª" : r.secundaria === tipo ? "2ª" : "";
+    });
+  }
+
+  /**
+   * Misma regla que usa el backend (`evaluarConfiabilidad`), pero aplicada
+   * antes de mandar: si claramente no se contestó pensando, no tiene caso
+   * gastar uno de los espacios de perfil del plan en un resultado que no
+   * significa nada.
+   */
+  function revisarConfiabilidad(respuestas) {
+    const primarias = respuestas.map((r) => r.primaria).filter(Boolean);
+    const distintos = new Set(primarias).size;
+    if (distintos === 1) return "siempre_lo_mismo";
+    if (distintos === 2 && primarias.length >= 10) return "muy_poca_variedad";
+    return null;
+  }
+
+  async function calcularPerfilQuiz(forzar) {
+    const nombre = document.getElementById("nombre-perfil-input").value.trim();
+    const avisoCont = document.getElementById("aviso-confiabilidad");
+    avisoCont.innerHTML = "";
+
+    if (!nombre) {
+      avisoCont.innerHTML = `<div class="error">Escribe un nombre para este perfil.</div>`;
+      return;
+    }
+
+    const respuestas = [];
+    for (const p of preguntasQuiz) {
+      const r = respuestasQuiz[p.id];
+      if (!r || !r.primaria) {
+        avisoCont.innerHTML = `<div class="error">Falta contestar la pregunta ${p.id}. Elige al menos una opción en cada una.</div>`;
+        return;
+      }
+      respuestas.push(r);
+    }
+
+    if (forzar !== true) {
+      const motivo = revisarConfiabilidad(respuestas);
+      if (motivo) {
+        avisoCont.innerHTML = `
+          <div class="error">
+            <strong>El resultado no va a ser muy útil así.</strong><br>
+            ${
+              motivo === "siempre_lo_mismo"
+                ? "Elegiste la misma opción en todas las preguntas."
+                : "Casi todas tus respuestas fueron de dos tipos nada más."
+            }
+            Vale más la pena contestarlo con calma — son 12 preguntas rápidas.
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="secundario" style="margin:0; width:auto;" id="btn-rehacer-quiz">Contestar de nuevo</button>
+              <button class="secundario" style="margin:0; width:auto;" id="btn-forzar-quiz">Usarlo de todos modos</button>
+            </div>
+          </div>`;
+        document.getElementById("btn-rehacer-quiz").addEventListener("click", mostrarQuizPerfil);
+        document.getElementById("btn-forzar-quiz").addEventListener("click", () => calcularPerfilQuiz(true));
+        avisoCont.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/aprendizaje/calcular`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ respuestas }),
+        },
+        document.getElementById("zona-perfiles"),
+        "Calculando el perfil…"
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo calcular el perfil.");
+
+      resultadoQuiz = { nombre, respuestas, data };
+      ajusteManual = null;
+      mostrarResultadoPerfil();
+    } catch (err) {
+      avisoCont.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  /**
+   * Resultado del quiz, ANTES de guardarlo. Dos cosas a propósito:
+   *
+   * 1. No se muestran los 8 porcentajes al frente. Salen de 12 respuestas,
+   *    así que un "33%" sugiere una precisión que el test no tiene; se
+   *    destacan las 2 principales, las siguientes 2 en chico, y el detalle
+   *    numérico queda detrás de un "ver detalle" para quien lo quiera.
+   * 2. Se puede ajustar. Quien contesta conoce a su hijo mucho mejor que
+   *    12 preguntas — si el resultado no le suena, lo corrige y ese es el
+   *    perfil que se guarda.
+   */
+  function mostrarResultadoPerfil() {
+    const { nombre, data } = resultadoQuiz;
+    const cont = document.getElementById("zona-perfiles");
+    const principales = ajusteManual || data.perfil_dominante || [];
+    const secundarias = (data.secundarias || []).filter((t) => !principales.includes(t));
+    const porcentajes = data.porcentajes || {};
+
+    const tarjeta = (tipo) => `
+      <div class="perfil-principal" style="border-color:${COLOR_INTELIGENCIA[tipo] || "#ccc"};">
+        <span class="perfil-icono" style="background:${COLOR_INTELIGENCIA[tipo] || "#ccc"};">${ICONO_INTELIGENCIA[tipo] || "•"}</span>
+        <div>
+          <strong>${escapeHtml(COMO_APRENDE[tipo] || "")}</strong>
+          <span class="perfil-tipo-chico">${escapeHtml(ETIQUETAS_INTELIGENCIA[tipo] || tipo)}</span>
+        </div>
+      </div>`;
+
+    const filasDetalle = Object.entries(porcentajes)
+      .sort((a, b) => b[1] - a[1])
+      .map(
+        ([tipo, pct]) => `
+      <div class="barra-perfil-fila">
+        <span class="barra-perfil-label">${escapeHtml(ETIQUETAS_INTELIGENCIA[tipo] || tipo)}</span>
+        <div class="barra-perfil-track"><div class="barra-perfil-fill${principales.includes(tipo) ? " dominante" : ""}" style="width:${pct}%"></div></div>
+        <span class="barra-perfil-pct">${pct}%</span>
+      </div>`
+      )
+      .join("");
+
+    cont.innerHTML = `
+      <h3 style="margin-top:0;">Así aprende ${escapeHtml(nombre)}</h3>
+      <div class="perfil-principales">${principales.map(tarjeta).join("")}</div>
+      ${
+        secundarias.length
+          ? `<p class="ayuda" style="margin:12px 0 6px; font-size:0.85rem;">También le funciona:</p>
+             <div style="display:flex; flex-wrap:wrap; gap:6px;">
+               ${secundarias
+                 .map(
+                   (t) =>
+                     `<span class="chip-secundaria">${ICONO_INTELIGENCIA[t] || "•"} ${escapeHtml(ETIQUETAS_INTELIGENCIA[t] || t)}</span>`
+                 )
+                 .join("")}
+             </div>`
+          : ""
+      }
+      ${ajusteManual ? `<p class="ayuda" style="margin:12px 0 0; font-size:0.82rem;">✏️ Ajustado por ti.</p>` : ""}
+
+      <details class="detalle-quiz">
+        <summary>Ver el detalle del quiz</summary>
+        <div style="margin-top:10px;">${filasDetalle}</div>
+        <p class="ayuda" style="margin:8px 0 0; font-size:0.78rem;">Sale de 12 preguntas — tómalo como una guía de por dónde entrarle, no como una medición exacta.</p>
+      </details>
+
+      <div class="aviso" style="margin-top:16px;">
+        <strong>¿Te suena?</strong> ${versionQuiz() === "adulto" ? "Tú te conoces mejor que 12 preguntas." : "Tú lo conoces mejor que 12 preguntas."} Si algo no encaja, ajústalo.
+      </div>
+      <button class="primario" id="btn-confirmar-perfil">Sí, guardar perfil</button>
+      <button class="secundario" style="width:100%;" id="btn-ajustar-perfil">Ajustar</button>
+      <button class="secundario" style="width:100%;" id="btn-cancelar-resultado">Cancelar</button>
+    `;
+
+    document.getElementById("btn-confirmar-perfil").addEventListener("click", guardarPerfilQuiz);
+    document.getElementById("btn-ajustar-perfil").addEventListener("click", mostrarAjustePerfil);
+    document.getElementById("btn-cancelar-resultado").addEventListener("click", cargarPerfiles);
+  }
+
+  function mostrarAjustePerfil() {
+    const { nombre, data } = resultadoQuiz;
+    const cont = document.getElementById("zona-perfiles");
+    let elegidas = (ajusteManual || data.perfil_dominante || []).slice(0, 2);
+
+    const pintar = () => {
+      cont.innerHTML = `
+        <h3 style="margin-top:0;">¿Cómo aprende mejor ${escapeHtml(nombre)}?</h3>
+        <p class="ayuda" style="margin:0 0 12px;">Elige hasta dos. Son las que van a guiar el estilo de sus actividades.</p>
+        <div class="rejilla-ajuste">
+          ${Object.keys(ETIQUETAS_INTELIGENCIA)
+            .map(
+              (t) => `
+            <button type="button" class="opcion-ajuste${elegidas.includes(t) ? " activa" : ""}" data-tipo="${t}"
+              style="${elegidas.includes(t) ? `border-color:${COLOR_INTELIGENCIA[t]}; background:${COLOR_INTELIGENCIA[t]}1A;` : ""}">
+              <span class="perfil-icono chico" style="background:${COLOR_INTELIGENCIA[t]};">${ICONO_INTELIGENCIA[t]}</span>
+              <strong>${escapeHtml(COMO_APRENDE[t])}</strong>
+              <span class="perfil-tipo-chico">${escapeHtml(ETIQUETAS_INTELIGENCIA[t])}</span>
+            </button>`
+            )
+            .join("")}
+        </div>
+        <div id="error-ajuste"></div>
+        <button class="primario" id="btn-aplicar-ajuste">Listo</button>
+        <button class="secundario" style="width:100%;" id="btn-cancelar-ajuste">Regresar sin ajustar</button>
+      `;
+
+      cont.querySelectorAll(".opcion-ajuste").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const t = btn.dataset.tipo;
+          if (elegidas.includes(t)) elegidas = elegidas.filter((x) => x !== t);
+          else if (elegidas.length < 2) elegidas.push(t);
+          else elegidas = [elegidas[1], t]; // reemplaza la más vieja
+          pintar();
+        });
+      });
+
+      document.getElementById("btn-aplicar-ajuste").addEventListener("click", () => {
+        if (!elegidas.length) {
+          document.getElementById("error-ajuste").innerHTML = `<div class="error">Elige al menos una.</div>`;
+          return;
+        }
+        ajusteManual = elegidas.slice();
+        mostrarResultadoPerfil();
+      });
+      document.getElementById("btn-cancelar-ajuste").addEventListener("click", mostrarResultadoPerfil);
+    };
+
+    pintar();
+  }
+
+  async function guardarPerfilQuiz() {
+    const { nombre, respuestas } = resultadoQuiz;
+    const cont = document.getElementById("zona-perfiles");
+    try {
+      const editando = Boolean(perfilIdEditando);
+      const res = await fetchConReintento(
+        editando ? `${API_BASE}/api/aprendizaje/perfiles/${perfilIdEditando}` : `${API_BASE}/api/aprendizaje/perfiles`,
+        {
+          method: editando ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ nombre, respuestas, dominante_manual: ajusteManual || undefined, avatar: avatarElegido || undefined }),
+        },
+        cont,
+        "Guardando el perfil…"
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar el perfil.");
+      perfilIdEditando = null;
+      cargarPerfiles();
+    } catch (err) {
+      cont.insertAdjacentHTML("beforeend", `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`);
+    }
+  }
+
+  async function borrarPerfil(perfilId) {
+    if (!confirm("¿Borrar este perfil?")) return;
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/aprendizaje/perfiles/${perfilId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo borrar el perfil.");
+      cargarPerfiles();
+    } catch (err) {
+      alert("Error: " + mensajeErrorAmigable(err));
+    }
+  }
+
+  function parsearEtiquetas(texto) {
+    return (texto || "")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+  }
+
+  // ── Fotos de resumen/apuntes ────────────────────────────────────────────
+  // Las fotos de celular son enormes (4-8 MB) y viajan como base64 dentro
+  // del JSON, así que las reducimos en el navegador ANTES de subirlas: el
+  // lado largo se limita a 1400px y se recomprimen como JPEG. Con eso una
+  // foto de apuntes queda en ~200-400 KB y sigue siendo perfectamente
+  // legible para el generador, sin que la subida tarde en datos móviles.
+  const MAX_FOTOS = 3;
+  const LADO_MAX = 1400;
+  let fotosSeleccionadas = [];
+
+  function comprimirImagen(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      lector.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Ese archivo no parece ser una imagen válida."));
+        img.onload = () => {
+          const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * escala);
+          canvas.height = Math.round(img.height * escala);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(file);
+    });
+  }
+
+  function pintarMiniaturas() {
+    const cont = document.getElementById("miniaturas-fotos");
+    if (!cont) return;
+    cont.innerHTML = fotosSeleccionadas
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" data-quitar-foto="${i}" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+    cont.querySelectorAll("[data-quitar-foto]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        fotosSeleccionadas.splice(Number(btn.dataset.quitarFoto), 1);
+        pintarMiniaturas();
+      });
+    });
+  }
+
+  async function alElegirFotos(ev) {
+    const resultado = document.getElementById("resultado-generar");
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = ""; // permite volver a elegir el mismo archivo
+
+    for (const archivo of archivos) {
+      if (fotosSeleccionadas.length >= MAX_FOTOS) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosSeleccionadas.push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      }
+    }
+    pintarMiniaturas();
+  }
+
+  // ── Revisar un ejercicio resuelto ────────────────────────────────────────
+  // Distinto de las fotos de arriba: aquellas son contexto para GENERAR
+  // material nuevo (apuntes, resumen); estas son de un ejercicio que la
+  // persona ya resolvió, para que le digamos en qué paso se equivocó.
+  // Mismo compresor de imágenes, límite y mecánica de miniaturas.
+  const MAX_FOTOS_REVISION = 3;
+  let fotosRevision = [];
+
+  function pintarMiniaturasRevision() {
+    const cont = document.getElementById("miniaturas-fotos-revision");
+    if (!cont) return;
+    cont.innerHTML = fotosRevision
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" data-quitar-foto-revision="${i}" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+    cont.querySelectorAll("[data-quitar-foto-revision]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        fotosRevision.splice(Number(btn.dataset.quitarFotoRevision), 1);
+        pintarMiniaturasRevision();
+      });
+    });
+  }
+
+  async function alElegirFotosRevision(ev) {
+    const resultado = document.getElementById("resultado-revision");
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = "";
+
+    for (const archivo of archivos) {
+      if (fotosRevision.length >= MAX_FOTOS_REVISION) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS_REVISION} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosRevision.push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      }
+    }
+    pintarMiniaturasRevision();
+  }
+
+  /** Manda las fotos del ejercicio ya resuelto a revisión. Necesita que el
+   * backend tenga POST /api/temas/revisar — mientras no exista, el 404 se
+   * muestra como error amigable en vez de trabarse en silencio. Respuesta
+   * esperada: { veredicto, pasos: [{ numero, correcto, comentario }] }. */
+  async function revisarEjercicio() {
+    const resultado = document.getElementById("resultado-revision");
+    resultado.innerHTML = "";
+
+    if (fotosRevision.length === 0) {
+      resultado.innerHTML = `<div class="error">Sube al menos una foto del ejercicio resuelto.</div>`;
+      return;
+    }
+
+    iniciarTips(resultado, "Revisando tu ejercicio paso por paso…");
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/revisar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ imagenes: fotosRevision }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      detenerTips();
+
+      if (res.status === 402) {
+        resultado.innerHTML = `
+          <div class="error">${escapeHtml(data.error)}</div>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "No se pudo revisar el ejercicio.");
+
+      const pasos = data.pasos || [];
+      resultado.innerHTML = `
+        <div class="aviso">✓ Ejercicio revisado.</div>
+        ${data.veredicto ? `<p style="font-weight:700;">${escapeHtml(data.veredicto)}</p>` : ""}
+        ${pasos
+          .map(
+            (p) => `
+          <div class="trivia-feedback ${p.correcto ? "bien" : "mal"}" style="margin-bottom:8px;">
+            <strong>${p.correcto ? "✓" : "✗"} Paso ${escapeHtml(String(p.numero ?? ""))}:</strong> ${escapeHtml(p.comentario || "")}
+          </div>`
+          )
+          .join("")}
+      `;
+      fotosRevision = [];
+      pintarMiniaturasRevision();
+    } catch (err) {
+      detenerTips();
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  // ── Generación por trabajo en segundo plano ────────────────────────────
+  // Antes, generar un tema era UN fetch que se quedaba abierto 40-90 s. En
+  // celular eso se rompe solo: al bloquear la pantalla o cambiarse de app,
+  // iOS/Android suspende la pestaña y mata la conexión — el material se
+  // generaba y se guardaba del otro lado, pero aquí llegaba un error y la
+  // persona creía haber perdido su tema del mes (reporte sep-2026).
+  //
+  // Ahora el POST solo ENCOLA y contesta en menos de un segundo; el
+  // resultado se recoge preguntando cada pocos segundos. Perder la red un
+  // rato ya no cancela nada: el sondeo simplemente reintenta al volver.
+  const LS_TRABAJO = "ensenai:trabajo-tema";
+  const MS_ENTRE_SONDEOS = 3000;
+  const MS_MAX_ESPERA = 8 * 60 * 1000; // muy por encima del peor caso real
+  const MS_VIDA_TRABAJO_RECORDADO = 30 * 60 * 1000;
+
+  let sondeo = null; // { trabajoId, tema, minimizada, inicio, timer, activo }
+
+  function nuevaClaveCliente() {
+    try {
+      if (crypto?.randomUUID) return crypto.randomUUID();
+    } catch (err) {
+      /* navegadores viejos o contextos sin crypto: el fallback alcanza */
+    }
+    return `c-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  // El id del trabajo se guarda en localStorage para sobrevivir a que la
+  // pestaña se descarte por completo (iOS lo hace con poca memoria): al
+  // volver a abrir, la app retoma el mismo trabajo en vez de perderlo.
+  function recordarTrabajo(trabajoId, tema) {
+    try {
+      localStorage.setItem(LS_TRABAJO, JSON.stringify({ trabajoId, tema, ts: Date.now() }));
+    } catch (err) {
+      /* modo privado o storage lleno: se pierde la reanudación, nada más */
+    }
+  }
+
+  function olvidarTrabajo() {
+    try {
+      localStorage.removeItem(LS_TRABAJO);
+    } catch (err) {
+      /* sin consecuencias */
+    }
+  }
+
+  function trabajoRecordado() {
+    try {
+      const guardado = JSON.parse(localStorage.getItem(LS_TRABAJO) || "null");
+      if (!guardado?.trabajoId) return null;
+      if (Date.now() - (guardado.ts || 0) > MS_VIDA_TRABAJO_RECORDADO) {
+        olvidarTrabajo();
+        return null;
+      }
+      return guardado;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function etapasDeEspera(conFotos) {
+    // Estimadas (no vienen del backend en tiempo real). El backend hace, en
+    // orden: generar el material completo y luego una revisión de calidad
+    // que a veces vuelve a generar desde cero (ver utils/revisorCalidad.js)
+    // — por eso la última etapa se queda fija mientras eso termina.
+    return conFotos
+      ? [
+          { ms: 0, texto: "Leyendo tus fotos…" },
+          { ms: 6000, texto: "Armando la explicación de tu tema…" },
+          { ms: 14000, texto: "Armando los ejercicios y la trivia…" },
+          { ms: 23000, texto: "Preparando el material extra (memorama, flashcards, tarjetas)…" },
+          { ms: 33000, texto: "Haciendo una última revisión de calidad…" },
+          { ms: 45000, texto: "Ya casi — puliendo los últimos detalles…" },
+        ]
+      : [
+          { ms: 0, texto: "Leyendo tu tema y armando la explicación…" },
+          { ms: 8000, texto: "Armando los ejercicios y la trivia…" },
+          { ms: 17000, texto: "Preparando el material extra (memorama, flashcards, tarjetas)…" },
+          { ms: 27000, texto: "Haciendo una última revisión de calidad…" },
+          { ms: 39000, texto: "Ya casi — puliendo los últimos detalles…" },
+        ];
+  }
+
+  function detenerSondeo() {
+    if (sondeo?.timer) clearTimeout(sondeo.timer);
+    sondeo = null;
+  }
+
+  /**
+   * Empieza (o retoma) el seguimiento de un trabajo ya encolado.
+   * `mostrarEspera` en false = se retomó en segundo plano (por ejemplo al
+   * volver a abrir la app): no se le secuestra la pantalla, solo se le
+   * avisa con el globito flotante.
+   */
+  function seguirTrabajo(trabajoId, tema, { minimizada = false, mostrarEspera = true, conFotos = false } = {}) {
+    detenerSondeo();
+    sondeo = { trabajoId, tema, minimizada, inicio: Date.now(), timer: null, activo: true };
+    generacionEnCurso = { tema, trabajoId, minimizada };
+    recordarTrabajo(trabajoId, tema);
+
+    const zona = document.getElementById("resultado-generar");
+    if (mostrarEspera && !minimizada && zona) {
+      iniciarTips(zona, etapasDeEspera(conFotos), {
+        texto: "Seguir navegando mientras se genera →",
+        onClick: () => {
+          if (!sondeo) return;
+          sondeo.minimizada = true;
+          if (generacionEnCurso) generacionEnCurso.minimizada = true;
+          detenerTips();
+          const z = document.getElementById("resultado-generar");
+          if (z) z.innerHTML = "";
+          mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${tema}"…` });
+        },
+      });
+    } else {
+      sondeo.minimizada = true;
+      generacionEnCurso.minimizada = true;
+      mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${tema}"…` });
+    }
+
+    sondearTrabajo();
+  }
+
+  async function sondearTrabajo() {
+    if (!sondeo?.activo) return;
+    const actual = sondeo;
+    try {
+      // fetch pelón a propósito: fetchConReintento está pensado para
+      // peticiones que se contestan una vez, y aquí un error de red es lo
+      // ESPERADO (pantalla bloqueada, elevador, cambio de wifi). No es un
+      // fallo: se vuelve a preguntar en el siguiente ciclo.
+      const res = await fetch(`${API_BASE}/api/temas/trabajos/${actual.trabajoId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (res.status === 404) {
+        return terminarTrabajoConFallo("No encontramos esa generación. Revisa tu historial antes de volver a intentar.");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No pudimos consultar tu generación.");
+      if (!sondeo || sondeo !== actual) return; // se canceló mientras respondía
+      if (data.estado === "listo") return terminarTrabajoConExito(data.resultado);
+      if (data.estado === "fallido") return terminarTrabajoConFallo(data.error || "No se pudo generar el material.");
+    } catch (err) {
+      /* sin red: se reintenta en el siguiente ciclo, sin molestar al usuario */
+    }
+
+    if (!sondeo || sondeo !== actual) return;
+    if (Date.now() - actual.inicio > MS_MAX_ESPERA) {
+      return terminarTrabajoConFallo(
+        "Esto está tardando más de lo normal. Revisa tu historial en un momento — puede que el material ya esté ahí."
+      );
+    }
+    actual.timer = setTimeout(sondearTrabajo, MS_ENTRE_SONDEOS);
+  }
+
+  function terminarTrabajoConExito(data) {
+    const minimizada = sondeo?.minimizada;
+    const tema = sondeo?.tema || "";
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips();
+
+    const zona = document.getElementById("resultado-generar");
+    const inline = !minimizada && !!zona;
+    if (inline) {
+      quitarAvisoGeneracion();
+      mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
+    } else {
+      // Se quedó en segundo plano: no la sacamos de donde esté, solo le
+      // avisamos. El historial se refresca para que ya aparezca ahí.
+      mostrarAvisoGeneracion({
+        estado: "listo",
+        texto: `✨ "${data.contenido?.tema || tema}" ya está listo`,
+        accionTexto: "Verlo",
+        onAccion: () => mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion),
+      });
+      if (document.getElementById("lista-historial")) cargarHistorial();
+    }
+  }
+
+  function terminarTrabajoConFallo(msg) {
+    const minimizada = sondeo?.minimizada;
+    const tema = sondeo?.tema || "";
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips();
+
+    const zona = document.getElementById("resultado-generar");
+    if (!minimizada && zona) {
+      quitarAvisoGeneracion();
+      zona.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+    } else {
+      mostrarAvisoGeneracion({ estado: "falla", texto: `"${tema}": ${msg}` });
+    }
+  }
+
+  // Volver a primer plano (desbloquear el celular, regresar a la pestaña)
+  // dispara una consulta inmediata: si el material se terminó mientras la
+  // pantalla estaba apagada, aparece de inmediato en vez de esperar el
+  // siguiente ciclo. Lo mismo al recuperar la red.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+  window.addEventListener("online", () => {
+    if (!sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+
+  /**
+   * Al abrir la app: si quedó un trabajo a medias (se bloqueó el celular,
+   * se cerró la pestaña, se recargó), se retoma en silencio. Sin esto, el
+   * material terminaba guardándose en el historial sin que nadie avisara.
+   */
+  async function reanudarTrabajoPendiente() {
+    const recordado = trabajoRecordado();
+    if (recordado) {
+      seguirTrabajo(recordado.trabajoId, recordado.tema, { mostrarEspera: false });
+      return;
+    }
+    // Red de seguridad para cuando ni el id se alcanzó a guardar: se le
+    // pregunta al servidor si dejó algo corriendo.
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/trabajos/ultimo`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (!res.ok) return;
+      const { trabajo } = await res.json();
+      if (!trabajo || !["pendiente", "generando"].includes(trabajo.estado)) return;
+      seguirTrabajo(trabajo.trabajo_id, trabajo.titulo, { mostrarEspera: false });
+    } catch (err) {
+      /* sin conexión al abrir: no pasa nada, se reintenta al recargar */
+    }
+  }
+
+  async function generarTema() {
+    // Una sola generación a la vez (si no, la segunda pisaría la pantalla
+    // de espera de la primera y se gastaría cupo doble).
+    if (generacionEnCurso) {
+      mostrarAvisoGeneracion({
+        estado: "generando",
+        texto: `⏳ Espera — "${generacionEnCurso.tema}" todavía se está generando`,
+      });
+      return;
+    }
+
+    const campoTema = document.getElementById("tema-input");
+    const tema = campoTema.value.trim();
+    const nivel = document.getElementById("nivel-input").value;
+    const perfilId = document.getElementById("perfil-input").value || null;
+    const detalles = document.getElementById("detalles-input").value.trim();
+    const etiquetas = parsearEtiquetas(document.getElementById("etiquetas-input").value);
+    const enfoque = document.getElementById("enfoque-psico-input")?.checked ? "psicoeducativo" : "escolar";
+    const resultado = document.getElementById("resultado-generar");
+    resultado.innerHTML = "";
+
+    // El mensaje solo vivía aquí abajo, a media pantalla de distancia del
+    // campo vacío: en celular la persona leía "escribe un tema", no veía
+    // cuál campo faltaba, y acababa escribiendo el tema en Etiquetas
+    // (reporte sep-2026). Ahora el error señala al campo y lo enfoca.
+    if (!tema) {
+      marcarCampoFaltante(campoTema, "Escribe sobre qué tema quieres generar material.");
+      return;
+    }
+    limpiarCampoFaltante(campoTema);
+
+    const conFotos = fotosSeleccionadas.length > 0;
+    const cuerpo = JSON.stringify({
+      tema,
+      nivel,
+      modo: "individual",
+      perfilId,
+      etiquetas,
+      detalles,
+      imagenes: fotosSeleccionadas,
+      enfoque,
+      // Idempotencia: si esta petición se reintenta (red intermitente,
+      // doble tap), el servidor reconoce el mismo intento y no encola —ni
+      // cobra— una segunda generación.
+      claveCliente: nuevaClaveCliente(),
+    });
+    fotosSeleccionadas = []; // ya viajan en el cuerpo; no arrastrarlas al siguiente
+    pintarMiniaturas(); // si no, se quedan las miniaturas de fotos ya enviadas
+
+    iniciarTips(resultado, etapasDeEspera(conFotos), null);
+    // Candado inmediato: entre el POST y la respuesta hay una ventana en
+    // la que un segundo toque pasaria la guarda de arriba. El servidor
+    // tambien lo rechaza (409), pero mejor ni llegar ahi.
+    generacionEnCurso = { tema, minimizada: false };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/generar-async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: cuerpo,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 402) {
+        generacionEnCurso = null;
+        detenerTips();
+        resultado.innerHTML = `
+          <div class="error">${escapeHtml(data.error || "Llegaste al límite de tu plan.")}</div>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
+      // 409 = ya hay una generación de este usuario corriendo (por ejemplo
+      // encolada desde otro dispositivo). Se engancha a esa en vez de
+      // pelearse con ella.
+      if (res.status === 409 && data.trabajo_id) {
+        seguirTrabajo(data.trabajo_id, tema, { conFotos });
+        return;
+      }
+      if (!res.ok || !data.trabajo_id) throw new Error(data.error || "No se pudo generar el material.");
+
+      seguirTrabajo(data.trabajo_id, tema, { conFotos });
+    } catch (err) {
+      generacionEnCurso = null;
+      detenerTips();
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  async function cargarHistorial() {
+    const cont = document.getElementById("lista-historial");
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar tu historial.");
+
+      historialCache = data.temas || [];
+      pintarHeroPerfil(); // "temas completados" sale de este cache
+      etiquetaActiva = "";
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
+
+      // Si la persona navegó a otra pantalla mientras cargaba, estos nodos
+      // ya no existen: sin esta guarda tronaba y el historial no se
+      // refrescaba al terminar una generación en segundo plano.
+      const filtros = document.getElementById("filtros-historial");
+      const hint = document.getElementById("hint-combinar");
+      if (!filtros || !hint || !document.body.contains(cont)) return;
+
+      if (historialCache.length === 0) {
+        filtros.style.display = "none";
+        hint.style.display = "none";
+        cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has generado ningún tema.</p>`;
+        return;
+      }
+      hint.style.display = historialCache.length >= 2 ? "block" : "none";
+
+      // Solo mostramos los filtros si hay al menos una etiqueta usada en
+      // todo el historial — si nadie ha etiquetado nada todavía, no tiene
+      // caso mostrar chips vacíos.
+      const hayEtiquetas = historialCache.some((t) => (t.etiquetas || []).length);
+      filtros.style.display = historialCache.length > 3 || hayEtiquetas ? "block" : "none";
+
+      document.getElementById("buscar-historial").oninput = renderHistorial;
+      renderChipsEtiquetas();
+      renderHistorial();
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu historial.</div>`;
+    }
+  }
+
+  function renderChipsEtiquetas() {
+    const cont = document.getElementById("chips-etiquetas");
+    const todasEtiquetas = [...new Set(historialCache.flatMap((t) => t.etiquetas || []))].sort();
+    if (!todasEtiquetas.length) {
+      cont.innerHTML = "";
+      document.getElementById("accion-etiqueta").innerHTML = "";
+      return;
+    }
+    cont.innerHTML =
+      `<button type="button" class="chip-etiqueta${etiquetaActiva === "" ? " activa" : ""}" data-etiqueta="">Todas</button>` +
+      todasEtiquetas
+        .map((e) => `<button type="button" class="chip-etiqueta${etiquetaActiva === e ? " activa" : ""}" data-etiqueta="${escapeHtml(e)}">${escapeHtml(e)}</button>`)
+        .join("");
+    cont.querySelectorAll(".chip-etiqueta").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        etiquetaActiva = btn.dataset.etiqueta;
+        renderChipsEtiquetas();
+        renderHistorial();
+      });
+    });
+
+    // Botón para marcar de un jalón todos los temas de la etiqueta activa
+    // (ej. "todos los de Matemáticas, Primer Parcial") en vez de marcar uno
+    // por uno — pensado sobre todo para armar un repaso o simulacro grande.
+    const accion = document.getElementById("accion-etiqueta");
+    if (!etiquetaActiva) {
+      accion.innerHTML = "";
+      return;
+    }
+    const idsDeEtiqueta = historialCache.filter((t) => (t.etiquetas || []).includes(etiquetaActiva)).map((t) => t.id);
+    if (idsDeEtiqueta.length < 2) {
+      accion.innerHTML = "";
+      return;
+    }
+    const yaTodosMarcados = idsDeEtiqueta.every((id) => temasSeleccionados.has(id));
+    accion.innerHTML = `<button type="button" class="btn-seleccionar-etiqueta" id="btn-seleccionar-etiqueta">${
+      yaTodosMarcados ? "✓ Los " + idsDeEtiqueta.length + ' de "' + escapeHtml(etiquetaActiva) + '" están seleccionados' : "Seleccionar los " + idsDeEtiqueta.length + ' de "' + escapeHtml(etiquetaActiva) + '"'
+    }</button>`;
+    if (!yaTodosMarcados) {
+      document.getElementById("btn-seleccionar-etiqueta").addEventListener("click", () => {
+        idsDeEtiqueta.forEach((id) => temasSeleccionados.add(id));
+        renderHistorial();
+        renderChipsEtiquetas();
+      });
+    }
+  }
+
+  /**
+   * "Ya lo aprendí" / "Volver a practicarlo" (2-sep-2026). No borra nada: el
+   * tema se conserva completo, solo deja de contar como pendiente — sale de
+   * "Mi progreso" y sus preguntas ya no entran en la trivia diaria (que es
+   * lo que empuja la racha). Ver PATCH /api/temas/mios/:id en el backend.
+   *
+   * Se pinta optimista y se revierte si el servidor dice que no: marcar un
+   * tema es un gesto chiquito y esperar el viaje completo se siente lento.
+   */
+  async function alternarAprendido(id, btn) {
+    const tema = historialCache.find((t) => t.id === id);
+    if (!tema) return;
+    const anterior = !!tema.aprendido;
+    tema.aprendido = !anterior;
+    mostrarAprendidos = mostrarAprendidos || anterior; // al desmarcar, que no "desaparezca"
+    renderHistorial();
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ aprendido: !anterior }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar el tema.");
+      cargarMiProgreso(); // "Mi progreso" ya no debe incluirlo (o volver a incluirlo)
+    } catch (err) {
+      tema.aprendido = anterior;
+      renderHistorial();
+      alert(err.message);
+    }
+  }
+
+  /**
+   * Borrar un tema del historial, definitivo. Se avisa con todas sus letras
+   * que NO devuelve cupo del mes, porque es la pregunta obvia y la respuesta
+   * (el contador cuenta generaciones, no temas guardados) no es adivinable.
+   */
+  async function borrarTemaDelHistorial(id, btn) {
+    const tema = historialCache.find((t) => t.id === id);
+    if (!tema) return;
+    const confirmado = confirm(
+      `¿Borrar "${tema.tema}"?\n\nSe borra para siempre, junto con la trivia que contestaste y los ejercicios que marcaste de ese tema.\n\nOjo: borrarlo NO te devuelve el tema en tu cupo del mes.`
+    );
+    if (!confirmado) return;
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Borrando…";
+    }
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo borrar el tema.");
+
+      historialCache = historialCache.filter((t) => t.id !== id);
+      temasSeleccionados.delete(id);
+      renderChipsEtiquetas();
+      renderHistorial();
+      cargarMiProgreso();
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "🗑️ Borrar";
+      }
+      alert(err.message);
+    }
+  }
+
+  function renderHistorial() {
+    const cont = document.getElementById("lista-historial");
+    const busqueda = (document.getElementById("buscar-historial").value || "").trim().toLowerCase();
+
+    const filtrados = historialCache.filter((t) => {
+      const coincideEtiqueta = !etiquetaActiva || (t.etiquetas || []).includes(etiquetaActiva);
+      const textoTema = (t.tema || "").toLowerCase();
+      const textoEtiquetas = (t.etiquetas || []).join(" ").toLowerCase();
+      const coincideBusqueda = !busqueda || textoTema.includes(busqueda) || textoEtiquetas.includes(busqueda);
+      return coincideEtiqueta && coincideBusqueda;
+    });
+
+    if (!filtrados.length) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">No hay temas que coincidan con tu búsqueda.</p>`;
+      return;
+    }
+
+    const permiteSeleccion = historialCache.length >= 2;
+
+    // Los temas marcados como aprendidos se van a su propia sección, abajo
+    // y plegada: siguen ahí para reabrirlos o reimprimirlos, pero dejan de
+    // competir con lo que sí está pendiente.
+    const pendientes = filtrados.filter((t) => !t.aprendido);
+    const aprendidos = filtrados.filter((t) => t.aprendido);
+
+    const fila = (t) => `
+      <div class="historial-item historial-item--tema${t.aprendido ? " historial-item--aprendido" : ""}" data-id="${t.id}">
+        ${permiteSeleccion ? `<input type="checkbox" class="seleccionar" data-seleccionar="${t.id}" ${temasSeleccionados.has(t.id) ? "checked" : ""} title="Seleccionar para armar un repaso">` : ""}
+        <div class="historial-item-info">
+          <div class="historial-item-linea1">
+            <span class="titulo">${t.aprendido ? "✅" : "📘"} ${escapeHtml(t.tema)}</span>
+            <span class="fecha">${new Date(t.created_at).toLocaleDateString("es-MX")}</span>
+          </div>
+          <span class="etiquetas-item">
+            ${(t.etiquetas || []).map((e) => `<span class="etiqueta-badge">${escapeHtml(e)}</span>`).join("")}
+            <button type="button" class="chip-etiqueta" style="padding:1px 9px; font-size:0.72rem;" data-editar-etiquetas="${t.id}">✏️ Etiquetas</button>
+            <button type="button" class="chip-etiqueta chip-aprendido" style="padding:1px 9px; font-size:0.72rem;" data-aprendido="${t.id}">${
+              t.aprendido ? "↩️ Volver a practicarlo" : "✅ Ya lo aprendí"
+            }</button>
+            <button type="button" class="chip-etiqueta chip-borrar" style="padding:1px 9px; font-size:0.72rem;" data-borrar="${t.id}">🗑️ Borrar</button>
+          </span>
+        </div>
+      </div>
+    `;
+
+    cont.innerHTML =
+      (pendientes.length
+        ? pendientes.map(fila).join("")
+        : `<p class="ayuda" style="margin:0;">Ya marcaste como aprendidos todos los temas que coinciden. 🎉</p>`) +
+      (aprendidos.length
+        ? `<div class="bloque-aprendidos">
+             <button type="button" id="btn-ver-aprendidos">✅ Ya aprendidos (${aprendidos.length}) ${mostrarAprendidos ? "▲" : "▼"}</button>
+             <div style="margin-top:10px; ${mostrarAprendidos ? "" : "display:none;"}">${aprendidos.map(fila).join("")}</div>
+           </div>`
+        : "");
+
+    const btnVerAprendidos = document.getElementById("btn-ver-aprendidos");
+    if (btnVerAprendidos) {
+      btnVerAprendidos.addEventListener("click", () => {
+        mostrarAprendidos = !mostrarAprendidos;
+        renderHistorial();
+      });
+    }
+    cont.querySelectorAll("[data-aprendido]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        alternarAprendido(btn.dataset.aprendido, btn);
+      });
+    });
+    cont.querySelectorAll("[data-borrar]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        borrarTemaDelHistorial(btn.dataset.borrar, btn);
+      });
+    });
+
+    cont.querySelectorAll(".historial-item .titulo, .historial-item .fecha").forEach((el) => {
+      el.addEventListener("click", () => verTemaDelHistorial(el.closest(".historial-item").dataset.id));
+    });
+    cont.querySelectorAll("[data-editar-etiquetas]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        editarEtiquetas(btn.dataset.editarEtiquetas);
+      });
+    });
+    cont.querySelectorAll("[data-seleccionar]").forEach((chk) => {
+      chk.addEventListener("click", (ev) => ev.stopPropagation());
+      chk.addEventListener("change", () => {
+        const id = chk.dataset.seleccionar;
+        if (chk.checked) temasSeleccionados.add(id);
+        else temasSeleccionados.delete(id);
+        actualizarBarraCombinar();
+        renderChipsEtiquetas(); // refresca "Seleccionar los N de X" si ya quedaron todos marcados
+      });
+    });
+    actualizarBarraCombinar();
+  }
+
+
+
+  /** Muestra u oculta la barra de "Armar repaso" según cuántos temas del
+   * historial estén marcados — ver el checkbox `data-seleccionar` arriba. */
+  function actualizarBarraCombinar() {
+    const barra = document.getElementById("barra-combinar");
+    if (!barra) return;
+    const n = temasSeleccionados.size;
+
+    if (n < 2) {
+      barra.style.display = "none";
+      barra.innerHTML = "";
+      return;
+    }
+
+    const tope = modoExamenActivo ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    const excedido = n > tope;
+    barra.style.display = "flex";
+    barra.innerHTML = `
+      <label class="toggle-modo-examen">
+        <input type="checkbox" id="chk-modo-examen" ${modoExamenActivo ? "checked" : ""}>
+        🎯 Modo Examen — puro simulador de práctica, sin explicación (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+      </label>
+      <div class="fila-principal">
+        <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamenActivo ? "un simulacro" : "un repaso"}` : ""}</span>
+        <div class="acciones">
+          <button type="button" class="secundario" id="btn-cancelar-combinar">Cancelar</button>
+          <button type="button" class="primario" id="btn-armar-repaso"${excedido ? " disabled" : ""}>${modoExamenActivo ? "🎯 Armar simulacro" : "✨ Armar repaso"}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("chk-modo-examen").addEventListener("change", (ev) => {
+      modoExamenActivo = ev.target.checked;
+      actualizarBarraCombinar();
+    });
+    document.getElementById("btn-cancelar-combinar").addEventListener("click", () => {
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
+      renderHistorial();
+      renderChipsEtiquetas();
+    });
+    if (!excedido) {
+      document.getElementById("btn-armar-repaso").addEventListener("click", combinarTemas);
+    }
+  }
+
+  /** Junta el contenido de los temas marcados en el historial en un solo
+   * material — pensado para estudiar varios temas juntos antes de un examen.
+   * Con el interruptor "Modo Examen" activo (ver actualizarBarraCombinar),
+   * el resultado se inclina hacia ejercicios y un simulador de trivia en vez
+   * de resumen, y gasta el contador aparte de simulacros del plan (no el de
+   * temas normales) — ver resolverAccesoExamen en routes/temas.js. */
+  async function combinarTemas() {
+    const ids = [...temasSeleccionados];
+    const tope = modoExamenActivo ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    if (ids.length < 2 || ids.length > tope) return;
+
+    const cont = document.getElementById("lista-historial");
+    document.getElementById("barra-combinar").style.display = "none";
+    iniciarTips(cont, modoExamenActivo ? "Armando tu simulacro de examen…" : "Juntando tus temas y armando el repaso…");
+
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/temas/combinar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ temaIds: ids, enfoque: modoExamenActivo ? "examen" : "estudio" }),
+        },
+        null,
+        null
+      );
+      const data = await res.json();
+      detenerTips();
+
+      if (res.status === 402) {
+        cont.innerHTML = `
+          <div class="error">${escapeHtml(data.error)}</div>
+          <a href="comprador.html?cuenta=1" style="display:block; text-decoration:none;"><button class="primario">Ver mi plan / mejorar plan</button></a>
+        `;
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
+
+      temasSeleccionados.clear();
+      modoExamenActivo = false;
+      mostrarTemaGenerado(data.contenido, data.tema_id, null, data.gamificacion);
+    } catch (err) {
+      detenerTips();
+      renderHistorial();
+      cont.insertAdjacentHTML("afterbegin", `<div class="error" style="margin-bottom:10px;">${escapeHtml(mensajeErrorAmigable(err))}</div>`);
+    }
+  }
+
+  async function editarEtiquetas(temaId) {
+    const actual = historialCache.find((t) => t.id === temaId);
+    const texto = prompt("Etiquetas separadas por comas (ej. Matemáticas, Parcial 1):", (actual?.etiquetas || []).join(", "));
+    if (texto === null) return; // canceló
+
+    const etiquetas = parsearEtiquetas(texto);
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${temaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ etiquetas }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron guardar las etiquetas.");
+
+      if (actual) actual.etiquetas = data.etiquetas;
+      document.getElementById("filtros-historial").style.display = "block";
+      renderChipsEtiquetas();
+      renderHistorial();
+    } catch (err) {
+      alert("Error: " + mensajeErrorAmigable(err));
+    }
+  }
+
+  async function verTemaDelHistorial(temaId) {
+    const cont = document.getElementById("contenido");
+    cont.innerHTML = `<div class="cargando">Cargando tu tema…</div>`;
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${temaId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont, "Cargando tu tema… el servidor está despertando, puede tardar hasta un minuto la primera vez.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el tema.");
+
+      mostrarTemaGenerado(data.tema.contenido, data.tema.id, data.tema.pdf_url);
+    } catch (err) {
+      document.getElementById("contenido").innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div></div>`;
+    }
+  }
+
+  function normalizarTexto(s) {
+    return (s || "").trim().toLowerCase();
+  }
+
+  /**
+   * Antes, al revisar, la opción correcta se pintaba de verde — pero si tú
+   * también la habías elegido, se veía idéntica: no había forma de saber
+   * cuál habías escogido tú. Y si fallabas, tampoco se decía con palabras
+   * cuál era la buena. Ahora cada opción se etiqueta explícitamente
+   * ("Tu respuesta" / "Correcta") y debajo de cada pregunta sale una línea
+   * que dice qué pasó, en vez de dejarlo todo al color.
+   */
+  /**
+   * Manda el detalle de cómo se contestó la trivia de un tema del historial
+   * (ver POST /api/temas/mios/:id/respuestas) — alimenta "Mi progreso"
+   * (cargarMiProgreso). No bloquea nada si falla: la persona ya vio su
+   * calificación en pantalla.
+   */
+  async function enviarRespuestasTrivia(temaId, respuestas) {
+    try {
+      await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(temaId)}/respuestas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ respuestas }),
+      });
+    } catch (err) {
+      // no bloquea la experiencia si falla
+    }
+  }
+
+  /**
+   * Checkbox ligero "✓ Ya la resolví" en la pestaña Practicar (31-ago-2026)
+   * — mismo patrón que g.html (modo grupo), pero aquí solo hay una persona,
+   * así que se sobrescribe un solo estado en vez de ir guardando un
+   * historial por cada clic (ver PUT/GET /api/temas/mios/:id/ejercicios-resueltos).
+   */
+  async function cargarEjerciciosResueltos() {
+    if (!ultimoTemaId) return;
+    // Se recuerda de QUÉ tema se pidió: si el usuario alcanza a abrir otro
+    // tema antes de que responda, esta respuesta ya no aplica y marcaría
+    // los checkboxes del tema equivocado (31-ago-2026).
+    const temaPedido = ultimoTemaId;
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(temaPedido)}/ejercicios-resueltos`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (temaPedido !== ultimoTemaId) return; // ya estamos viendo otro tema
+      (data.indices_resueltos || []).forEach((i) => {
+        const chk = document.querySelector(`.chk-ejercicio-resuelto[data-ej="${i}"]`);
+        if (chk) chk.checked = true;
+      });
+    } catch (err) {
+      // no es crítico — el checkbox simplemente arranca vacío
+    }
+  }
+
+  async function guardarEjerciciosResueltos() {
+    if (!ultimoTemaId) return;
+    const aviso = document.getElementById("progreso-aviso");
+    const totalCheckboxes = document.querySelectorAll(".chk-ejercicio-resuelto").length;
+    const indices = Array.from(document.querySelectorAll(".chk-ejercicio-resuelto:checked")).map((chk) =>
+      parseInt(chk.dataset.ej, 10)
+    );
+
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/mios/${encodeURIComponent(ultimoTemaId)}/ejercicios-resueltos`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ indices }),
+      });
+      if (!res.ok) throw new Error();
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = indices.length
+          ? `✓ Guardado — ${indices.length} de ${totalCheckboxes} marcados.`
+          : "Guardado — todavía no marcaste ninguno.";
+      }
+    } catch (err) {
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = "No se pudo guardar tu progreso — intenta de nuevo en un momento.";
+      }
+    }
+  }
+
+  function revisarTrivia() {
+    let total = 0;
+    let correctas = 0;
+    const detalle = [];
+
+    document.querySelectorAll(".trivia-item").forEach((item, indice) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const pregunta = item.dataset.pregunta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+
+          // La etiqueta es lo que quita la ambigüedad del color.
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
+        });
+
+        feedback.style.display = "block";
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: seleccionado ? seleccionado.dataset.valor : null,
+          respuesta_correcta: correcta,
+          acerto: !!acerto,
+        });
+      } else {
+        // Pregunta abierta: no se califica, pero sí se compara con la sugerida.
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") +
+          `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+
+        // abierta: no se autocalifica, así que acerto queda en null — igual
+        // que en el modo grupo (routes/grupos.js).
+        detalle.push({ indice, pregunta, respuesta: escribio || null, respuesta_correcta: correcta, acerto: null });
+      }
+    });
+
+    // Guarda el resultado en el historial del tema (ver GET /mi-progreso) —
+    // si esto falla, la persona no se entera: ya vio su calificación en
+    // pantalla, esto solo alimenta "Mi progreso" a futuro.
+    if (detalle.length && ultimoTemaId) {
+      enviarRespuestasTrivia(ultimoTemaId, detalle);
+    }
+
+    const resumen = document.getElementById("trivia-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      const pct = correctas / total;
+      const mensaje =
+        pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver a intentar.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
+    }
+
+    const btnRevisar = document.getElementById("btn-revisar-trivia");
+    if (btnRevisar) {
+      // Se reemplaza el botón por un clon para soltar el listener anterior
+      // (si no, "Intentar de nuevo" volvería a ejecutar la revisión también).
+      const nuevo = btnRevisar.cloneNode(false);
+      nuevo.textContent = "Intentar de nuevo";
+      btnRevisar.replaceWith(nuevo);
+      nuevo.addEventListener("click", () => mostrarTemaGenerado(ultimoContenido, ultimoTemaId, null));
+    }
+  }
+
+  // ── Diagramas del tema ─────────────────────────────────────────────────
+  // Antes se dibujaban como SVG de 600px de ancho: en celular el texto
+  // acababa renderizando a ~6px o el diagrama se cortaba con scroll
+  // lateral. Ahora viven en diagrama.js y salen como HTML responsivo
+  // (una columna en celular). Si por alguna razón ese archivo no cargó,
+  // no se dibuja nada — el tema se sigue viendo completo.
+  function dibujarDiagrama(diagrama) {
+    try {
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.dibujar(diagrama) : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /** Las imágenes fijas de la biblioteca que el tema traiga colgadas
+   *  (ver adjuntarIlustraciones en routes/temas.js). Los temas viejos no
+   *  traen ninguna y simplemente no se pinta nada. */
+  function dibujarIlustraciones(lista) {
+    try {
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.ilustraciones(lista) : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /**
+   * Los temas generados ANTES del rediseño tienen `resumen` como un solo
+   * string de texto corrido. Aquí se convierte a la forma nueva para que el
+   * historial viejo se siga viendo bien, sin tener que migrar la base.
+   */
+  function normalizarResumen(resumen) {
+    const vacio = { que_es: "", secciones: [], pasos: [], ideas_clave: [], ojo_aqui: "", truco: "" };
+    if (!resumen) return vacio;
+    if (typeof resumen === "string") return { ...vacio, que_es: resumen };
+    return {
+      que_es: resumen.que_es || "",
+      secciones: Array.isArray(resumen.secciones) ? resumen.secciones.filter((s) => s && (s.titulo || s.texto)) : [],
+      pasos: Array.isArray(resumen.pasos) ? resumen.pasos.filter(Boolean) : [],
+      ideas_clave: Array.isArray(resumen.ideas_clave) ? resumen.ideas_clave.filter(Boolean) : [],
+      ojo_aqui: resumen.ojo_aqui || "",
+      truco: resumen.truco || "",
+    };
+  }
+
+  /**
+   * Manda a revisar el procedimiento que la persona escribió para UN
+   * ejercicio. El enunciado y la solución NO se mandan desde aquí: el
+   * servidor los lee del tema guardado (ver POST
+   * /api/temas/mios/:id/revisar-ejercicio), así la revisión sabe contra qué
+   * comparar y nadie puede alterar el ejercicio desde el navegador.
+   */
+  async function revisarMiProcedimiento(indice, btn) {
+    const salida = document.getElementById("revision-res-" + indice);
+    const caja = document.getElementById("procedimiento-" + indice);
+    if (!salida || !caja) return;
+
+    const procedimiento = (caja.value || "").trim();
+    if (!procedimiento) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">Escribe cómo lo resolviste (aunque sea en pasos cortos) para poder revisarlo.</p></div>`;
+      return;
+    }
+    if (!ultimoTemaId) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">Este material no está guardado, así que no se puede revisar por ejercicio.</p></div>`;
+      return;
+    }
+
+    btn.disabled = true;
+    const textoOriginal = btn.textContent;
+    btn.textContent = "Revisando…";
+    salida.innerHTML = `<div class="cargando">Leyendo tu procedimiento paso por paso…</div>`;
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/temas/mios/${ultimoTemaId}/revisar-ejercicio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ indice, procedimiento }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo revisar tu procedimiento.");
+
+      const pasos = Array.isArray(data.pasos) ? data.pasos : [];
+      salida.innerHTML = `
+        <div class="revision-caja">
+          <p class="veredicto">${escapeHtml(data.veredicto || "")}</p>
+          ${
+            pasos.length
+              ? `<ol>${pasos
+                  .map((p) => `<li>${p.correcto ? "✅" : "⚠️"} ${escapeHtml(p.comentario || "")}</li>`)
+                  .join("")}</ol>`
+              : ""
+          }
+          ${data.sugerencia ? `<p class="sugerencia">👉 ${escapeHtml(data.sugerencia)}</p>` : ""}
+        </div>`;
+    } catch (err) {
+      salida.innerHTML = `<div class="revision-caja"><p class="veredicto">${escapeHtml(err.message)}</p></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  }
+
+  /**
+   * "📎 Para imprimir": las hojas de la biblioteca que embonan con ESTE tema
+   * (3-sep-2026).
+   *
+   * El servidor decide cuáles (GET /api/recursos/plantillas/para-tema, ver
+   * utils/matcherPlantillas.js). Si no embona ninguna, no se pinta nada:
+   * más vale que la sección no exista a que ofrezca material que no viene
+   * al caso. Falla en silencio a propósito — es un extra del tema, nunca
+   * puede romper la pantalla del tema en sí.
+   */
+  /**
+   * "📎 Para imprimir": las hojas que embonan con ESTE tema. La pinta
+   * plantillas.js (4-sep-2026); antes vivía duplicada aquí y en grupo.html.
+   * Estas SÍ son para todos los planes: es el material que le toca a lo
+   * que la persona está viendo.
+   */
+  function cargarPlantillasDelTema(contenido) {
+    const zona = document.getElementById("zona-plantillas-tema");
+    if (!zona || !window.EnsenaiPlantillas || !sesionActual) return;
+    window.EnsenaiPlantillas.delTema({
+      cont: zona,
+      API_BASE,
+      token: () => sesionActual.access_token,
+      contenido,
+    });
+  }
+
+  function mostrarTemaGenerado(contenido, temaId, pdfUrlGuardado, gamificacion) {
+    window.EnsenaiTabs?.mostrar(false);
+    ultimoContenido = contenido;
+    ultimoTemaId = temaId;
+    const c = contenido;
+    const cont = document.getElementById("contenido");
+
+    // Una actividad "existe" solo si trae texto de verdad. En Modo Examen el
+    // simulador deja actividad vacía a propósito (ver agents/combinarTemas.js)
+    // y antes eso pintaba un recuadro en blanco bajo el título "Actividad"
+    // (31-ago-2026).
+    const tieneContenido = (a) => !!a && (String(a.titulo || "").trim() || String(a.instrucciones || "").trim());
+    const actividadesConTexto = Array.isArray(c.actividades) ? c.actividades.filter(tieneContenido) : [];
+
+    const actividadesHtml = actividadesConTexto.length
+      ? actividadesConTexto
+          .map(
+            (a) => `
+        <div class="actividad-box">
+          <span class="inteligencia">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)}</span>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(a.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(a.instrucciones || "")}</div>
+        </div>
+      `
+          )
+          .join("")
+      : tieneContenido(c.actividad)
+      ? `
+        <div class="actividad-box">
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(c.actividad.instrucciones || "")}</div>
+        </div>
+      `
+      : "";
+
+    // Las preguntas ABIERTAS (sin opciones) antes no tenían dónde contestar:
+    // solo aparecía la respuesta sugerida al revisar. Ahora llevan su propio
+    // campo de texto, para que la persona intente responder antes de ver la
+    // sugerencia — que es donde está el valor del repaso.
+    const triviaHtml = (c.trivia || [])
+      .map(
+        (p, i) => `
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}" data-pregunta="${escapeHtml(p.pregunta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
+        ${
+          p.opciones?.length
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
+        }
+        <div class="trivia-feedback" style="display:none;"></div>
+      </div>
+    `
+      )
+      .join("");
+
+    const materialExtraHtml = (c.material_extra || [])
+      .map((m, i) => {
+        const tarjetas = Array.isArray(m.tarjetas) ? m.tarjetas.filter((t) => t && (t.frente || t.reverso)) : [];
+        return `
+      <div class="material-extra-box">
+        <div style="font-weight:700; text-transform:capitalize; margin-bottom:4px;">${escapeHtml(m.tipo || "")}</div>
+        ${
+          m.contenido
+            ? `<div style="font-size:0.92rem; line-height:1.5; white-space:pre-line; margin-bottom:${
+                tarjetas.length ? "10px" : "0"
+              };">${formatearTexto(m.contenido)}</div>`
+            : ""
+        }
+        ${
+          tarjetas.length
+            ? `<div class="lista-tarjetas">${tarjetas
+                .map(
+                  (t) => `<div class="tarjeta-repaso">
+                      <div class="frente">${escapeHtml(t.frente || "")}</div>
+                      ${t.reverso ? `<div class="reverso">${escapeHtml(t.reverso)}</div>` : ""}
+                    </div>`
+                )
+                .join("")}</div>
+               <button type="button" class="secundario btn-imprimir-tarjetas" data-material-idx="${i}" style="margin:10px 0 0;">🖨️ Imprimir ${
+                tarjetas.length === 1 ? "tarjeta" : "tarjetas"
+              } (${tarjetas.length})</button>`
+            : ""
+        }
+      </div>
+    `;
+      })
+      .join("");
+
+    const r = c.respuestas || {};
+    const respuestasHtml = `
+      ${
+        r.trivia_resuelta?.length
+          ? `<h3 style="margin-top:0;">Respuestas de la trivia</h3>` +
+            r.trivia_resuelta.map((rt) => `<p style="margin:4px 0;"><strong>${escapeHtml(rt.pregunta)}</strong> — ${escapeHtml(rt.respuesta)}</p>`).join("")
+          : ""
+      }
+      ${r.solucion_actividad ? `<h3>Solución de la actividad</h3><p style="margin:0;">${escapeHtml(r.solucion_actividad)}</p>` : ""}
+      ${
+        r.conceptos_clave?.length
+          ? `<h3>Conceptos clave</h3><ul>${r.conceptos_clave.map((k) => `<li>${escapeHtml(k)}</li>`).join("")}</ul>`
+          : ""
+      }
+      ${r.autoevaluacion ? `<h3>Autoevaluación</h3><p style="margin:0;">${escapeHtml(r.autoevaluacion)}</p>` : ""}
+    `;
+
+    const res = normalizarResumen(c.resumen);
+    const ejercicios = c.ejercicios || [];
+
+    // ── Pestaña 1: ESTUDIAR ──────────────────────────────────────────────
+    const estudiarHtml = `
+      ${res.que_es ? `<div class="bloque-est destacado"><p>${formatearTexto(res.que_es)}</p></div>` : ""}
+      ${dibujarIlustraciones(c.ilustraciones)}
+      ${dibujarDiagrama(c.diagrama)}
+      ${res.secciones
+        .map(
+          (s) => `
+        <div class="bloque-est">
+          ${s.titulo ? `<h3 class="bloque-titulo">${formatearTexto(s.titulo)}</h3>` : ""}
+          ${formatearLargo(s.texto || "")}
+        </div>`
+        )
+        .join("")}
+      ${
+        res.pasos.length
+          ? `<div class="bloque-est">
+              <h3 class="bloque-titulo">🧭 Paso a paso</h3>
+              <ol class="lista-pasos">${res.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>
+             </div>`
+          : ""
+      }
+      ${
+        res.ideas_clave.length
+          ? `<div class="bloque-est">
+              <h3 class="bloque-titulo">⭐ Lo que no se te puede olvidar</h3>
+              <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${formatearTexto(k)}</li>`).join("")}</ul>
+             </div>`
+          : ""
+      }
+      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${formatearTexto(res.ojo_aqui)}</p></div>` : ""}
+      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${formatearTexto(res.truco)}</p></div>` : ""}
+      ${
+        c.esquema_visual
+          ? `<details class="bloque-est plegable">
+              <summary>Ver el esquema completo</summary>
+              <p style="white-space:pre-line; margin-top:8px;">${formatearTexto(c.esquema_visual)}</p>
+             </details>`
+          : ""
+      }
+    `;
+
+    // ── Pestaña 2: PRACTICAR ─────────────────────────────────────────────
+    const ejerciciosHtml = ejercicios
+      .map(
+        (e, i) => `
+      <div class="ejercicio" data-ej="${i}">
+        <div class="ejercicio-cabeza">
+          <span class="ejercicio-num">${i + 1}</span>
+          <p class="ejercicio-enunciado">${formatearTexto(e.enunciado || "")}</p>
+        </div>
+        ${
+          e.pista
+            ? `<button type="button" class="btn-pista" data-ej="${i}">💡 Ver pista</button>
+               <div class="pista-caja" id="pista-${i}" style="display:none;">${formatearTexto(e.pista)}</div>`
+            : ""
+        }
+        <button type="button" class="btn-solucion" data-ej="${i}">Ver solución</button>
+        <div class="solucion-caja" id="solucion-${i}" style="display:none;">
+          ${
+            (e.pasos || []).length
+              ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>`
+              : ""
+          }
+          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
+        </div>
+        <label class="ejercicio-marcar">
+          <input type="checkbox" class="chk-ejercicio-resuelto" data-ej="${i}">
+          ✓ Ya la resolví
+        </label>
+        <!-- "Que lo puedas resolver y la IA te diga cómo lo resolviste"
+             (2-sep-2026). Solo aparece en temas guardados: la revisión
+             necesita el id del tema para leer el enunciado y la solución
+             del lado del servidor. -->
+        ${
+          temaId
+            ? `<button type="button" class="btn-revisar-mio" data-ej="${i}">✍️ Revisar cómo lo resolví</button>
+               <div class="revision-mia" id="revision-${i}" style="display:none;">
+                 <textarea id="procedimiento-${i}" placeholder="Escribe los pasos que hiciste, aunque sea cortito. Ej.: elevé 3 y 4 al cuadrado, sumé 9+16=25, saqué raíz y me dio 5."></textarea>
+                 <button type="button" class="secundario btn-enviar-revision" data-ej="${i}">Revisar mi procedimiento</button>
+                 <div id="revision-res-${i}"></div>
+               </div>`
+            : ""
+        }
+      </div>`
+      )
+      .join("");
+
+    const practicarHtml = `
+      ${
+        ejerciciosHtml
+          ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>
+             ${ejerciciosHtml}
+             <button class="secundario btn-guardar-progreso" id="btn-guardar-progreso">💾 Guardar mi progreso</button>
+             <div class="progreso-aviso" id="progreso-aviso" style="display:none;"></div>`
+          : ""
+      }
+      ${actividadesHtml ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad</h2>${actividadesHtml}` : ""}
+      ${!ejerciciosHtml && !actividadesHtml ? `<p class="ayuda">Este tema no trae ejercicios.</p>` : ""}
+    `;
+
+    // ── Pestaña 3: REPASAR ───────────────────────────────────────────────
+    const repasarHtml = `
+      ${
+        triviaHtml
+          ? `<h2 style="margin-top:0;">🧠 Trivia</h2>
+             <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
+             ${triviaHtml}
+             <div id="trivia-resumen" style="display:none;"></div>
+             <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>`
+          : ""
+      }
+      ${
+        materialExtraHtml
+          ? `<h2 style="margin-top:${triviaHtml ? "24px" : "0"};">📎 Material de repaso</h2>
+             <button type="button" class="secundario" id="btn-imprimir-repaso" style="margin:0 0 12px; width:100%;">🖨️ Imprimir todo el material de repaso</button>
+             ${materialExtraHtml}`
+          : ""
+      }
+      <div class="respuestas-toggle" style="margin-top:20px;"><button class="secundario" id="btn-respuestas">Ver respuestas</button></div>
+      <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
+    `;
+
+    // Racha/medallas nuevas de ESTA generación (ver utils/gamificacion.js) —
+    // solo viene cuando mostrarTemaGenerado se llama justo después de
+    // generar/combinar; al reabrir un tema del historial no aplica.
+    const medallasNuevas = gamificacion?.medallas_nuevas || [];
+    // La franja de racha vive fuera de #contenido, así que no se re-pinta
+    // sola al mostrar el tema: se le pasa el dato nuevo para que el número
+    // de arriba no se quede en el de antes de generar.
+    if (gamificacion) actualizarRachaChip(gamificacion);
+    const gamificacionBannerHtml = gamificacion
+      ? `<div class="aviso" style="margin-bottom:14px;">
+          🔥 Racha: ${gamificacion.racha_actual} día${gamificacion.racha_actual === 1 ? "" : "s"}
+          ${medallasNuevas.length ? "<br>" + medallasNuevas.map((m) => `🏅 ¡Nueva medalla! ${m.icono} ${escapeHtml(m.nombre)}`).join("<br>") : ""}
+        </div>`
+      : "";
+
+    const nEj = ejercicios.length;
+
+    // Modo Examen (simulador puro, 31-ago-2026, ver agents/combinarTemas.js)
+    // deja el resumen vacío A PROPÓSITO — sin esto, "Estudiar" se abriría
+    // por default mostrando un panel completamente en blanco. Si no hay
+    // nada que exponer, ni siquiera se muestra esa pestaña, y se arranca
+    // directo en Practicar (o Repasar si el simulador es solo trivia).
+    const resumenVacio =
+      !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
+      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual && !(c.ilustraciones || []).length;
+    // Un simulador puede traer SOLO ejercicios o SOLO trivia. Antes se
+    // pintaban igual las tres pestañas y el alumno abría una vacía
+    // (31-ago-2026): ahora cada pestaña aparece solo si tiene algo dentro.
+    const hayPracticar = !!(ejerciciosHtml || actividadesHtml);
+    // respuestasHtml siempre es una plantilla no vacía, así que se mira el
+    // dato real: si no hay trivia, ni material extra, ni respuestas con
+    // contenido, la pestaña Repasar no aporta nada.
+    const hayRespuestasUtiles = !!(
+      (r.trivia_resuelta || []).length ||
+      String(r.solucion_actividad || "").trim() ||
+      (r.conceptos_clave || []).length ||
+      String(r.autoevaluacion || "").trim()
+    );
+    const hayRepasar = !!(triviaHtml || materialExtraHtml || hayRespuestasUtiles);
+    const tabInicial = !resumenVacio ? "estudiar" : hayPracticar ? "practicar" : "repasar";
+
+    cont.innerHTML = `
+      <a class="volver" id="btn-volver">← Volver</a>
+      ${gamificacionBannerHtml}
+      <div class="tarjeta">
+        <h1>📘 ${escapeHtml(c.tema || "")}</h1>
+        <div class="pestanas">
+          ${
+            resumenVacio
+              ? ""
+              : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
+          }
+          ${
+            hayPracticar
+              ? `<button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>`
+              : ""
+          }
+          ${
+            hayRepasar
+              ? `<button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>`
+              : ""
+          }
+        </div>
+        <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
+        <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
+        <div class="panel" id="panel-repasar" style="${tabInicial === "repasar" ? "" : "display:none;"}">${repasarHtml}</div>
+        <button class="secundario" id="btn-pdf" style="margin-top:18px; width:100%;">${pdfUrlGuardado ? "📄 Descargar imprimible (PDF)" : "📄 Generar imprimible (PDF)"}</button>
+        <div id="zona-plantillas-tema"></div>
+      </div>
+    `;
+
+    cargarPlantillasDelTema(c);
+
+    document.querySelectorAll(".pestana").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".pestana").forEach((b) => b.classList.toggle("activa", b === btn));
+        ["estudiar", "practicar", "repasar"].forEach((p) => {
+          document.getElementById("panel-" + p).style.display = p === btn.dataset.panel ? "" : "none";
+        });
+      });
+    });
+
+    document.querySelectorAll(".btn-pista").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("pista-" + btn.dataset.ej);
+        caja.style.display = caja.style.display === "none" ? "block" : "none";
+        btn.textContent = caja.style.display === "none" ? "💡 Ver pista" : "💡 Ocultar pista";
+      });
+    });
+
+    document.querySelectorAll(".btn-revisar-mio").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("revision-" + btn.dataset.ej);
+        const abierta = caja.style.display !== "none";
+        caja.style.display = abierta ? "none" : "block";
+        btn.textContent = abierta ? "✍️ Revisar cómo lo resolví" : "✍️ Ocultar";
+        if (!abierta) document.getElementById("procedimiento-" + btn.dataset.ej)?.focus();
+      });
+    });
+
+    document.querySelectorAll(".btn-enviar-revision").forEach((btn) => {
+      btn.addEventListener("click", () => revisarMiProcedimiento(parseInt(btn.dataset.ej, 10), btn));
+    });
+
+    document.querySelectorAll(".btn-solucion").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("solucion-" + btn.dataset.ej);
+        const abierta = caja.style.display !== "none";
+        caja.style.display = abierta ? "none" : "block";
+        btn.textContent = abierta ? "Ver solución" : "Ocultar solución";
+        btn.classList.toggle("abierta", !abierta);
+      });
+    });
+
+    document.getElementById("btn-volver").addEventListener("click", () => mostrarPerfil());
+    document.getElementById("btn-respuestas").addEventListener("click", () => {
+      document.getElementById("caja-respuestas").classList.toggle("abierto");
+    });
+
+    document.querySelectorAll(".btn-imprimir-tarjetas").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const m = (c.material_extra || [])[parseInt(btn.dataset.materialIdx, 10)];
+        if (m) imprimirTarjetas(m.tipo, m.tarjetas);
+      });
+    });
+
+    const btnImprimirRepaso = document.getElementById("btn-imprimir-repaso");
+    if (btnImprimirRepaso) {
+      btnImprimirRepaso.addEventListener("click", () => imprimirMaterialExtra(c.material_extra, c.titulo || ""));
+    }
+
+    const btnGuardarProgreso = document.getElementById("btn-guardar-progreso");
+    if (btnGuardarProgreso) {
+      btnGuardarProgreso.addEventListener("click", guardarEjerciciosResueltos);
+      cargarEjerciciosResueltos();
+    }
+
+    document.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    const btnRevisarTrivia = document.getElementById("btn-revisar-trivia");
+    if (btnRevisarTrivia) btnRevisarTrivia.addEventListener("click", revisarTrivia);
+
+    let pdfUrlCache = pdfUrlGuardado || null;
+    const btnPdf = document.getElementById("btn-pdf");
+    btnPdf.addEventListener("click", async () => {
+      if (pdfUrlCache) {
+        window.open(pdfUrlCache, "_blank");
+        return;
+      }
+      const textoOriginal = btnPdf.textContent;
+      btnPdf.disabled = true;
+      btnPdf.textContent = "Preparando PDF…";
+      try {
+        const res = await fetchConReintento(`${API_BASE}/api/temas/pdf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ contenido: ultimoContenido, modo: "individual", temaId: ultimoTemaId }),
+        });
+        const data = await res.json();
+        if (!data.pdf_url) throw new Error(data.error || "No se pudo generar el PDF.");
+        pdfUrlCache = data.pdf_url;
+        window.open(pdfUrlCache, "_blank");
+        btnPdf.textContent = "📄 Descargar imprimible (PDF)";
+      } catch (err) {
+        alert("Error: " + mensajeErrorAmigable(err));
+        btnPdf.textContent = textoOriginal;
+      } finally {
+        btnPdf.disabled = false;
+      }
+    });
+  }
+
+  init();
+</script>
+<!-- Botón flotante de comentarios del piloto (ver feedback.js). Va al final
+     y en archivo aparte: así los tres paneles comparten el mismo widget y
+     puede leer API_BASE y sesionActual del script de arriba. -->
+<script src="tabs.js"></script>
+<script src="plantillas.js"></script>
+<script src="feedback.js"></script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "57b9bff54f8e4f85ae01d63bf13fa973"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

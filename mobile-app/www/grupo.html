@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- viewport-fit=cover: sin esto, env(safe-area-inset-bottom) vale 0 en
+     iPhone y la barra de pestañas queda debajo de la rayita del home. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EnseñAI — Mi grupo</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai {
+    display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14);
+    padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle;
+  }
+  #btnSalir { background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; }
+  main { max-width: 680px; margin: 0 auto; padding: 32px 20px 80px; }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.4rem; margin: 0 0 6px; }
+  h2 { font-family: 'Grandstander', sans-serif; font-size: 1.15rem; margin: 0 0 4px; }
+  h3 { font-family: 'Grandstander', sans-serif; color: var(--bosque); font-size: 1rem; margin: 16px 0 8px; }
+  p.ayuda { color: #4A6A85; margin: 0 0 16px; }
+  label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
+  input, select, textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  textarea { resize: vertical; min-height: 70px; }
+  .zona-espera { padding: 18px 4px 6px; text-align: center; }
+  .espera-barra { height: 5px; border-radius: 999px; background: var(--linea); overflow: hidden; margin-bottom: 14px; }
+  .espera-barra span {
+    display: block; height: 100%; width: 38%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--cielo), var(--menta));
+    animation: espera-desliza 1.5s ease-in-out infinite;
+  }
+  @keyframes espera-desliza { 0% { transform: translateX(-100%); } 100% { transform: translateX(265%); } }
+  .espera-titulo { color: #4A6A85; font-size: 0.92rem; margin: 0 0 14px; }
+  .tip-caja {
+    display: flex; gap: 12px; text-align: left; align-items: flex-start;
+    background: var(--hielo); border: 2px dashed var(--menta); border-radius: 14px; padding: 14px 16px;
+    animation: tip-aparece .45s ease;
+  }
+  @keyframes tip-aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tip-icono { font-size: 1.15rem; line-height: 1.4; flex-shrink: 0; }
+  .tip-texto { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--bosque); }
+  .tip-puntos { display: flex; gap: 5px; justify-content: center; margin-top: 12px; }
+  .tip-puntos span { width: 6px; height: 6px; border-radius: 50%; background: var(--linea); transition: background .3s; }
+  .tip-puntos span.activo { background: var(--menta); }
+  .btn-seguir-navegando {
+    background: none; border: none; color: #5b7d99; font-family: inherit; font-weight: 700;
+    font-size: 0.83rem; text-decoration: underline; cursor: pointer; margin-top: 14px;
+  }
+  /* Aviso flotante de "se esta generando en segundo plano" (1-sep-2026):
+     generar material de grupo tarda ~1 min y antes eso secuestraba la
+     pantalla; peor aun, si en ese rato se re-dibujaba #contenido (crear otro
+     grupo, agregar un tema), la generacion terminaba en el vacio. */
+  .aviso-generacion {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 60;
+    display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px);
+    background: #fff; border: 2px solid var(--aqua); border-radius: 999px; padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(30,58,138,0.18);
+    font-size: 0.86rem; font-weight: 700; color: var(--profundo);
+  }
+  .aviso-generacion.listo { border-color: var(--menta); }
+  .aviso-generacion.falla { border-color: #FFC4B5; color: #B94A2E; }
+  .aviso-generacion .texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aviso-generacion button {
+    flex-shrink: 0; border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.82rem;
+    background: var(--menta); color: #fff;
+  }
+  .aviso-generacion button.cerrar { background: none; color: #5b7d99; padding: 7px 4px; font-size: 1rem; }
+
+  .zona-foto { border: 2px dashed var(--linea); border-radius: 12px; padding: 14px; text-align: center; }
+  .zona-foto input[type="file"] { display: none; }
+  .zona-foto .btn-foto {
+    display: inline-block; background: var(--hielo); border: 2px solid var(--menta); color: var(--bosque);
+    padding: 9px 18px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  }
+  .miniaturas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+  .miniatura { position: relative; width: 74px; height: 74px; border-radius: 10px; overflow: hidden; border: 2px solid var(--linea); }
+  .miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .miniatura button {
+    position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.62); color: #fff; border: none; font-size: 0.72rem; line-height: 1; cursor: pointer; padding: 0;
+  }
+  button.primario {
+    background: var(--profundo); color: #fff; border: none; padding: 14px 20px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 14px;
+    box-shadow: 0 4px 0 var(--profundo-oscuro); width: 100%;
+  }
+  button.secundario { background: none; border: 2px solid var(--linea); color: var(--profundo); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+  button.chico { padding: 8px 14px; font-size: 0.85rem; margin-top: 0; width: auto; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
+  /* Campo obligatorio vacio: el aviso va PEGADO al campo. El error suelto
+     al pie del formulario no se relacionaba con nada en celular — ver
+     marcarCampoFaltante(). */
+  .campo-faltante { border-color: #E86A4B !important; background: #FFF6F3 !important; }
+  .error-campo { color: #B94A2E; font-size: 0.85rem; font-weight: 700; margin: 4px 0 2px; }
+  .aviso { background: var(--hielo); border: 2px dashed var(--menta); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; color: var(--bosque); margin-bottom: 16px; }
+  .cargando { text-align: center; padding: 40px 20px; color: #4A6A85; }
+  .grupo-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .grupo-item .nombre { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; }
+  .metricas { display: flex; gap: 16px; margin: 10px 0; flex-wrap: wrap; }
+  .metrica { background: var(--hielo); border-radius: 10px; padding: 8px 14px; text-align: center; }
+  .metrica .num { font-family: 'Grandstander', sans-serif; font-weight: 700; color: var(--profundo); font-size: 1.2rem; }
+  .metrica .label { font-size: 0.72rem; color: #4A6A85; text-transform: uppercase; letter-spacing: 0.02em; }
+  /* Panel del maestro en dos niveles (2-sep-2026) */
+  .tarjeta-grupo .cabeza-grupo { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .tarjeta-grupo .metricas-chicas { font-size: 0.78rem; color: #4A6A85; font-weight: 700; white-space: nowrap; }
+  .viendo-ahora { background: var(--hielo); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .viendo-ahora.vacio { background: none; border: 2px dashed var(--linea); }
+  .viendo-ahora .etiqueta-mini { margin: 0; font-size: 0.7rem; color: #4A6A85; font-weight: 800; letter-spacing: 0.03em; }
+  .viendo-ahora .titulo-vigente { margin: 4px 0 0; font-weight: 800; font-size: 0.92rem; }
+  .chip-bajos { background: #FFF0EC; border: 1px solid #FFC4B5; color: #B94A2E; font-family: inherit; font-weight: 800; font-size: 0.76rem; border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+  .fila-bajo { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px dashed var(--linea); font-size: 0.82rem; }
+  .fila-alumno { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--linea); }
+  .fila-alumno:first-child { border-top: 0; }
+  .fila-alumno .quien { min-width: 0; }
+  .fila-alumno .nombre-alumno { font-weight: 800; font-size: 0.9rem; }
+  .chip-racha { flex-shrink: 0; background: var(--hielo); color: var(--bosque); border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 0.85rem; }
+  .chip-racha.apagada { background: #F2F5F8; color: #7B93A8; }
+  .acciones-grupo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .acciones-grupo button { width: 100%; margin-top: 0; }
+  .liga-box { display: flex; gap: 8px; align-items: center; background: var(--hielo); border-radius: 10px; padding: 8px 12px; margin: 10px 0; }
+  .liga-box input { border: none; background: none; padding: 4px; font-size: 0.9rem; flex: 1; color: var(--bosque); font-weight: 700; }
+  .tema-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px dashed var(--linea); gap: 10px; }
+  .tema-item:first-child { border-top: none; }
+  .tema-item .titulo { font-weight: 700; flex: 1; }
+  .tema-item .seleccionar { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--menta); cursor: pointer; }
+  .hint-combinar { color: #4A6A85; font-size: 0.85rem; margin: -6px 0 10px; }
+  .barra-combinar { display: flex; flex-direction: column; gap: 10px; background: var(--hielo); border: 2px solid var(--aqua); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-weight: 700; font-size: 0.9rem; }
+  .barra-combinar .fila-principal { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .barra-combinar .acciones { display: flex; gap: 8px; }
+  .toggle-modo-examen { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.85rem; color: var(--profundo); cursor: pointer; }
+  .toggle-modo-examen input { width: 17px; height: 17px; accent-color: #F97066; cursor: pointer; }
+  .estado {
+    font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .estado.pagado, .estado.gratis_prueba, .estado.cubierto_suscripcion { background: var(--hielo); color: var(--bosque); }
+  .estado.pendiente { background: #FFF3E0; color: #B36B00; }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+  .toggle-row input { width: auto; }
+  .divisor { border: none; border-top: 1px dashed var(--linea); margin: 18px 0; }
+  .editor-trivia { background: var(--hielo); border-radius: 14px; padding: 14px; margin: 12px 0; }
+  .pregunta-editable { background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .pregunta-editable:last-of-type { margin-bottom: 0; }
+  .pregunta-editable .fila-top { display: flex; gap: 8px; align-items: flex-start; }
+  .pregunta-editable textarea { flex: 1; min-height: 44px; font-size: 0.92rem; }
+  .fila-opcion { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .fila-opcion input[type="radio"] { width: auto; flex-shrink: 0; }
+  .fila-opcion input[type="text"] { padding: 8px 10px; font-size: 0.9rem; }
+  .fila-opcion.correcta input[type="text"] { border-color: var(--menta); }
+  /* ── Editor completo del material (2-sep-2026) ─────────────────────────
+     Antes el maestro solo veia (y editaba) la trivia: el resumen, el
+     diagrama, la actividad, los ejercicios y el material de repaso se
+     compartian a ciegas. Ahora se ve y se edita todo antes de mandarlo. */
+  .bloque-editor { background: var(--hielo); border-radius: 14px; padding: 4px 14px 14px; margin: 12px 0; }
+  .bloque-editor > summary {
+    cursor: pointer; list-style: none; padding: 12px 0 10px; font-weight: 800; font-size: 0.92rem;
+    color: var(--profundo); display: flex; align-items: center; gap: 8px;
+  }
+  .bloque-editor > summary::-webkit-details-marker { display: none; }
+  .bloque-editor > summary::after { content: "▾"; margin-left: auto; color: #7FA3C0; font-size: 0.85rem; }
+  .bloque-editor[open] > summary::after { content: "▴"; }
+  .bloque-editor .campo { background: #fff; border: 2px solid var(--linea); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .bloque-editor .campo:last-child { margin-bottom: 0; }
+  .bloque-editor label.et { display: block; font-size: 0.75rem; font-weight: 800; color: #4A6A85; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .bloque-editor textarea { width: 100%; min-height: 62px; font-size: 0.92rem; font-family: inherit; }
+  .bloque-editor input[type="text"] { width: 100%; padding: 8px 10px; font-size: 0.9rem; font-family: inherit; }
+  .bloque-editor .fila-borrable { display: flex; gap: 8px; align-items: flex-start; }
+  .bloque-editor .fila-borrable > *:first-child { flex: 1; min-width: 0; }
+  .bloque-editor .btn-mini { flex: 0 0 auto; margin: 0; padding: 6px 10px; font-size: 0.8rem; }
+  .bloque-editor .agregar { width: 100%; margin-top: 8px; }
+  .bloque-editor .vista-diagrama { background: #fff; border-radius: 12px; padding: 2px 12px 12px; }
+  .bloque-editor .nota { font-size: 0.8rem; color: #4A6A85; margin: 0 0 8px; }
+  .par-tarjeta { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: start; margin-bottom: 8px; }
+  /* Las plantillas traen sus propios estilos desde plantillas.js */
+  @media (max-width: 560px) { .par-tarjeta { grid-template-columns: 1fr auto; } }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+  <button id="btnSalir">Cerrar sesión</button>
+</header>
+
+<main id="contenido">
+  <div class="cargando">Cargando…</div>
+</main>
+
+<!-- Intro "qué puedes hacer aquí" — compartida con tema.html (ver intro.js).
+     Va antes del script de la página porque este llama a window.introHTML(). -->
+<script src="figuras.js"></script>
+<script src="diagrama.js"></script>
+<script src="intro.js"></script>
+
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const NIVELES = [
+    { value: "primaria_baja", label: "Primaria baja (6-8 años)" },
+    { value: "primaria_alta", label: "Primaria alta (9-12 años)" },
+    { value: "secundaria", label: "Secundaria (12-15 años)" },
+    { value: "preparatoria", label: "Preparatoria (15-18 años)" },
+    { value: "universidad", label: "Universidad / autodidacta (18+)" },
+  ];
+
+  let sesionActual = null;
+  // Contenido recién generado por grupo, editable antes de compartirlo con
+  // la liga (el profesional puede ajustar la trivia). Se mutan aquí en vez
+  // de en `data.contenido` directamente para poder re-renderizar el editor
+  // sin perder el resto del material (resumen, actividades, etc.).
+  const contenidoEnEdicion = {};
+
+  // Ids de temas ya activos en la liga marcados para juntar en un repaso de
+  // examen (ver combinarTemasGrupo() más abajo), por grupo — un profesional
+  // puede tener varios grupos abiertos en la misma pantalla.
+  const temasSeleccionadosPorGrupo = {};
+  const MAX_TEMAS_COMBINAR = 6;
+  // Modo Examen (misma idea que en tema.html): puro simulador de práctica
+  // (sin resumen, diagrama ni actividad — solo ejercicios y/o trivia, lo
+  // que aplique según el tema) — pensado para armar una guía de examen que
+  // el profesional comparte con su grupo. Admite más temas de golpe porque
+  // no hay que releerlo, solo practicarlo.
+  const MAX_TEMAS_COMBINAR_EXAMEN = 12;
+  const modoExamenActivoPorGrupo = {};
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+  // CORS) lanza un TypeError genérico ("Failed to fetch" en Chrome, "Load
+  // failed" en Safari) — no tiene sentido mostrárselo tal cual al usuario.
+  /**
+   * Marca un campo obligatorio vacio: lo pinta, escribe el motivo justo
+   * debajo, lo desplaza a la vista y le pone el cursor dentro.
+   *
+   * Existe porque la validacion pintaba el error al FINAL del formulario,
+   * a media pantalla del campo culpable: en celular se leia "escribe sobre
+   * que tema quieres generar material" sin ver que el campo Tema estaba
+   * vacio, y la gente terminaba escribiendo el tema en Etiquetas
+   * (reporte sep-2026).
+   */
+  function marcarCampoFaltante(campo, mensaje) {
+    if (!campo) return;
+    limpiarCampoFaltante(campo);
+    campo.classList.add("campo-faltante");
+    const aviso = document.createElement("p");
+    aviso.className = "error-campo";
+    aviso.id = `error-campo-${campo.id}`;
+    aviso.textContent = `⚠️ ${mensaje}`;
+    campo.insertAdjacentElement("afterend", aviso);
+    campo.setAttribute("aria-invalid", "true");
+    campo.scrollIntoView({ behavior: "smooth", block: "center" });
+    // El foco va despues del scroll: enfocar primero hace que el navegador
+    // salte de golpe y se pierda el desplazamiento suave.
+    setTimeout(() => campo.focus({ preventScroll: true }), 300);
+    campo.addEventListener("input", () => limpiarCampoFaltante(campo), { once: true });
+  }
+
+  function limpiarCampoFaltante(campo) {
+    if (!campo) return;
+    campo.classList.remove("campo-faltante");
+    campo.removeAttribute("aria-invalid");
+    document.getElementById(`error-campo-${campo.id}`)?.remove();
+  }
+
+  function mensajeErrorAmigable(err) {
+    return err instanceof TypeError
+      ? "No pudimos conectar con el servidor. Revisa tu internet e intenta de nuevo."
+      : err.message;
+  }
+
+  // El backend (Render, plan gratuito) se "duerme" tras un rato sin uso y
+  // tarda 30-60s en despertar con la primera petición — esa primera
+  // petición puede fallar con un "Failed to fetch" genérico. Este helper
+  // avisa con un mensaje amigable y reintenta una vez antes de rendirse.
+  // Rutas que CREAN algo caro (gastan cupo del plan y minutos de modelo).
+  // Nunca se reintentan solas: si el primer intento ya llegó al servidor,
+  // un reintento genera el material DOS veces.
+  const RUTAS_QUE_NO_SE_REINTENTAN = [
+    "/api/temas/generar", "/api/temas/combinar", "/api/temas/revisar",
+    // El PDF también cuesta (llama a la IA y sube a Storage) y adaptar por
+    // inteligencia genera 8 actividades con el modelo.
+    "/api/temas/pdf", "/actividades",
+  ];
+  // Agregar un tema a la liga (POST /api/grupos/<id>/temas) consume cupo del
+  // plan y crea la fila: reintentarlo a ciegas dejaba el tema DUPLICADO en el
+  // grupo. Se detecta aparte porque la ruta lleva el id del grupo en medio.
+  const esAgregarTemaALiga = (url) => /\/api\/grupos\/[^/]+\/temas(\?|$)/.test(url);
+  // Un fetch que truena casi de inmediato es "nunca salió" (servidor
+  // dormido, sin internet); uno que truena después de un rato pudo haber
+  // llegado y seguir procesándose del otro lado.
+  const MS_FALLO_INMEDIATO = 3000;
+
+  async function fetchConReintento(url, opciones, cont, mensajeEspera) {
+    const metodo = (opciones?.method || "GET").toUpperCase();
+    const esIdempotente = metodo === "GET" || metodo === "HEAD";
+    const esCara = RUTAS_QUE_NO_SE_REINTENTAN.some((r) => url.includes(r)) || esAgregarTemaALiga(url);
+    const t0 = Date.now();
+
+    try {
+      return await fetch(url, opciones);
+    } catch (err) {
+      const tardo = Date.now() - t0;
+
+      // Peticiones que escriben: reintentar a ciegas es lo que producía
+      // material duplicado y cupo gastado doble (31-ago-2026). Solo se
+      // reintenta lo que es seguro reintentar.
+      if (!esIdempotente && (esCara || tardo >= MS_FALLO_INMEDIATO)) {
+        throw new Error(
+          tardo >= MS_FALLO_INMEDIATO
+            ? "Se perdió la conexión, pero es posible que el material SÍ se haya generado del otro lado. Revisa si ya aparece en tu lista antes de volver a intentar, para no generarlo dos veces."
+            : "No pudimos conectar con el servidor. Vuelve a intentarlo."
+        );
+      }
+
+      if (cont) {
+        cont.innerHTML = `<div class="cargando">${mensajeEspera || "Despertando el servidor… puede tardar hasta un minuto la primera vez, ya casi."}</div>`;
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        return await fetch(url, opciones);
+      } catch (err2) {
+        throw new Error("El servidor está tardando en responder. Espera unos segundos y vuelve a intentarlo.");
+      }
+    }
+  }
+
+  async function init() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      window.location.href = "comprador.html?despues=grupo";
+      return;
+    }
+    sesionActual = data.session;
+
+    document.getElementById("btnSalir").onclick = async () => {
+      await supabaseClient.auth.signOut();
+      window.location.href = "comprador.html";
+    };
+
+    const qp = new URLSearchParams(window.location.search);
+    let avisoInicial = null;
+    if (qp.get("tema_grupo") === "activado") {
+      avisoInicial = "✓ ¡Pago recibido! Tu tema ya está activo en la liga de tu grupo.";
+    } else if (qp.get("suscripcion") === "exitosa") {
+      avisoInicial = "✓ ¡Suscripción de grupo activada! Los temas que agregues quedan cubiertos automáticamente.";
+    }
+
+    cargarGrupos(avisoInicial);
+  }
+
+  async function cargarGrupos(avisoInicial) {
+    const cont = document.getElementById("contenido");
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/mios`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus grupos.");
+
+      renderGrupos(data.grupos || [], avisoInicial);
+    } catch (err) {
+      cont.innerHTML = `<div class="tarjeta"><div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div></div>`;
+    }
+  }
+
+  /**
+   * El panel del maestro pasó de UNA pantallota a dos niveles (2-sep-2026,
+   * pedido de la usuaria: "que no se vea como una pantalla con muchísima
+   * info"). Antes cada grupo traía, siempre abierto, sus métricas, su liga,
+   * el formulario completo de generar y su lista de temas: con tres grupos
+   * era imposible encontrar nada.
+   *
+   *   renderListaGrupos  → una tarjeta corta por grupo: qué está viendo,
+   *                        cuántos van, su liga y dos botones.
+   *   renderGrupoDetalle → el grupo abierto, con todo el detalle de antes.
+   *
+   * Cuál se pinta lo decide grupoAbiertoId, que se conserva entre
+   * re-dibujos: cargarGrupos() se llama desde muchos lados (crear grupo,
+   * agregar tema, pagar) y el maestro no debe salir del grupo que está
+   * viendo por eso.
+   */
+  let gruposCache = [];
+  let grupoAbiertoId = null;
+  const resumenTemaCache = {};
+
+  function renderGrupos(grupos, avisoInicial) {
+    gruposCache = grupos;
+    const abierto = grupoAbiertoId ? grupos.find((g) => g.id === grupoAbiertoId) : null;
+    if (grupoAbiertoId && !abierto) grupoAbiertoId = null; // se borró o cambió de cuenta
+    if (abierto) renderGrupoDetalle(abierto, avisoInicial);
+    else renderListaGrupos(grupos, avisoInicial);
+  }
+
+  function abrirGrupo(id, anclaje) {
+    grupoAbiertoId = id;
+    const g = gruposCache.find((x) => x.id === id);
+    if (!g) return cargarGrupos();
+    renderGrupoDetalle(g);
+    if (anclaje === "generar") {
+      setTimeout(() => document.getElementById(`zona-generar-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    }
+  }
+
+  function volverALista() {
+    grupoAbiertoId = null;
+    renderListaGrupos(gruposCache);
+  }
+
+  /** El tema activo más reciente de un grupo — es el que el maestro tiene
+   * "en el aire" y lo único que necesita ver desde la lista. */
+  function temaVigente(g) {
+    const activos = (g.temas || []).filter((t) => t.pago_status !== "pendiente");
+    return activos.length ? activos[activos.length - 1] : null;
+  }
+
+  function renderListaGrupos(grupos, avisoInicial) {
+    const cont = document.getElementById("contenido");
+    const ligaBase = `${window.location.origin}/g.html`;
+
+    cont.innerHTML = `
+      ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
+
+      <div class="vista-tab" id="vista-grupos">
+      ${window.introHTML ? window.introHTML("maestro") : ""}
+
+      ${grupos.length === 0 ? `<div class="tarjeta"><div class="aviso">Todavía no tienes ningún grupo — crea el primero abajo.</div></div>` : ""}
+
+      ${grupos
+        .map((g) => {
+          const vigente = temaVigente(g);
+          return `
+        <div class="tarjeta tarjeta-grupo" data-grupo-id="${g.id}">
+          <div class="cabeza-grupo">
+            <div class="nombre">🏫 ${escapeHtml(g.nombre)}</div>
+            <div class="metricas-chicas">${g.temas_totales} tema${g.temas_totales === 1 ? "" : "s"} · ${g.accesos_registrados} acceso${
+              g.accesos_registrados === 1 ? "" : "s"
+            }</div>
+          </div>
+
+          ${
+            vigente
+              ? `<div class="viendo-ahora">
+                   <p class="etiqueta-mini">VIENDO AHORA</p>
+                   <p class="titulo-vigente">${escapeHtml(vigente.titulo)}</p>
+                   <div id="resumen-${g.id}" class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Revisando cómo van…</div>
+                 </div>`
+              : `<div class="viendo-ahora vacio">
+                   <p class="ayuda" style="margin:0; font-size:0.85rem;">Este grupo todavía no tiene ningún tema activo.</p>
+                 </div>`
+          }
+
+          <div class="liga-box">
+            <input readonly value="${ligaBase}?slug=${encodeURIComponent(g.slug)}" id="liga-${g.id}">
+            <button class="secundario chico" onclick="copiarLiga('${g.id}')">Copiar</button>
+          </div>
+
+          <div class="acciones-grupo">
+            <button class="primario chico" data-agregar-tema="${g.id}">✨ Agregar tema</button>
+            <button class="secundario chico" data-abrir-grupo="${g.id}">Ver el grupo</button>
+          </div>
+        </div>
+      `;
+        })
+        .join("")}
+
+      <div class="tarjeta">
+        <h2>${grupos.length === 0 ? "Crea tu primer grupo" : "Crear otro grupo"}</h2>
+        <label>Nombre del grupo</label>
+        <input type="text" id="nombre-grupo-nuevo" placeholder="Ej. 3ro B - Matemáticas, Pacientes miércoles…">
+        <div class="toggle-row">
+          <input type="checkbox" id="mostrar-nombres-nuevo" checked>
+          <label style="margin:0;">Pedir nombre a quien entre a la liga</label>
+        </div>
+        <p class="ayuda" style="margin:6px 0 0; font-size:0.82rem;">Desactívalo si prefieres que entren de forma anónima (recomendado para psicólogos con pacientes).</p>
+        <button class="primario" onclick="crearGrupo()">Crear grupo</button>
+        <div id="resultado-crear-grupo"></div>
+      </div>
+
+      </div>
+
+      <div class="vista-tab" id="vista-hojas">
+        <div class="tarjeta" id="tarjeta-plantillas" style="display:none;">
+          <h2>📄 Imprimibles <span id="cuenta-plantillas" class="ayuda" style="font-size:0.9rem; font-weight:700;"></span></h2>
+          <p class="ayuda" style="margin:0 0 12px;">Hojas listas para imprimir, para casa o para el salón. No dependen de ningún tema.</p>
+          <div id="lista-plantillas"></div>
+        </div>
+      </div>
+
+      <div class="vista-tab" id="vista-plan">
+        <div class="tarjeta">
+          <h2>Mi plan de grupo</h2>
+          <div id="zona-suscripcion-grupo"><div class="cargando">Cargando…</div></div>
+        </div>
+      </div>
+    `;
+
+    pintarVistaGrupo();
+    montarTabsGrupo();
+
+    cont.querySelectorAll("[data-abrir-grupo]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.abrirGrupo)));
+    cont.querySelectorAll("[data-agregar-tema]").forEach((b) => b.addEventListener("click", () => abrirGrupo(b.dataset.agregarTema, "generar")));
+
+    cargarPlantillas();
+    cargarSuscripcionGrupo();
+    grupos.forEach((g) => pintarResumenVigente(g));
+    // Aunque aquí no haya formulario donde pintarla, una generación a medias
+    // se retoma igual: el aviso flotante es el que avisa cuando esté lista.
+    reanudarTrabajoPendiente();
+  }
+
+  /**
+   * Plantillas de la biblioteca (2-sep-2026, junto con admin.html): archivos
+   * que la usuaria sube a mano y el maestro descarga tal cual — formatos,
+   * fichas, planeaciones. No pasan por la IA ni dependen de un tema.
+   *
+   * La tarjeta arranca escondida y solo se muestra si hay algo que ofrecer:
+   * mientras la biblioteca esté vacía (o no se haya corrido schema_v38), el
+   * maestro no ve un recuadro vacío.
+   */
+  /**
+   * Pestañas de abajo del panel del maestro (4-sep-2026): Grupos, Hojas y
+   * Plan. Antes todo esto era una sola pantalla larguísima — el plan, los
+   * grupos, el formulario de crear y la biblioteca entera, una tras otra.
+   */
+  let vistaGrupo = "grupos";
+
+  function pintarVistaGrupo() {
+    ["grupos", "hojas", "plan"].forEach((v) => {
+      const el = document.getElementById("vista-" + v);
+      if (el) el.style.display = v === vistaGrupo ? "" : "none";
+    });
+    window.scrollTo({ top: 0 });
+  }
+
+  function montarTabsGrupo() {
+    if (!window.EnsenaiTabs) return;
+    window.EnsenaiTabs.montar({
+      tabs: [
+        { id: "grupos", icono: "🏫", texto: "Mis grupos" },
+        { id: "hojas", icono: "📄", texto: "Imprimibles" },
+        { id: "plan", icono: "⚙️", texto: "Mi plan" },
+      ],
+      activa: vistaGrupo,
+      onCambio: (v) => {
+        vistaGrupo = v;
+        pintarVistaGrupo();
+      },
+    });
+  }
+
+  /**
+   * Biblioteca de plantillas: la pinta plantillas.js, compartido con
+   * tema.html (4-sep-2026). Aquí solo queda el enganche — dónde se pinta,
+   * con qué sesión, y a dónde mandar a quien quiera mejorar su plan.
+   *
+   * El catálogo completo es del plan Ilimitado; a los demás el módulo les
+   * pinta la invitación con el conteo real de hojas (quién ve qué lo
+   * decide el servidor, ver routes/recursos.js).
+   */
+  async function cargarPlantillas() {
+    const tarjeta = document.getElementById("tarjeta-plantillas");
+    const cont = document.getElementById("lista-plantillas");
+    if (!tarjeta || !cont || !window.EnsenaiPlantillas || !sesionActual) return;
+
+    await window.EnsenaiPlantillas.biblioteca({
+      cont,
+      API_BASE,
+      token: () => sesionActual.access_token,
+      onUpgrade: () => {
+        vistaGrupo = "plan";
+        pintarVistaGrupo();
+        window.EnsenaiTabs?.marcar("plan");
+      },
+    });
+
+    // El módulo marca el contenedor cuando sí pintó algo; si no, la tarjeta
+    // se queda escondida en vez de dejar un recuadro vacío.
+    if (cont.dataset.plHay === "1") {
+      const cuenta = document.getElementById("cuenta-plantillas");
+      if (cuenta && cont.dataset.plTotal) cuenta.textContent = `· ${cont.dataset.plTotal}`;
+      tarjeta.style.display = "block";
+      window.EnsenaiTabs?.globo("hojas", cont.dataset.plTotal || "");
+    } else {
+      // La pestaña "Hojas" siempre existe: no puede quedarse en blanco.
+      tarjeta.style.display = "block";
+      tarjeta.innerHTML = `
+        <h2>📄 Imprimibles</h2>
+        <p class="ayuda" style="margin:0;">Todavía no hay imprimibles en la biblioteca. Estamos subiéndolos — vuelve en unos días.</p>`;
+    }
+  }
+
+  /**
+   * "19 de 28 contestaron · promedio 74% · 3 abajo del 50%". Los nombres NO
+   * se muestran de entrada (decisión de la usuaria: "al seleccionar se
+   * muestra la lista desplegable"): el conteo es un botón que despliega
+   * quiénes son. Una sola petición por grupo, y solo del tema vigente.
+   */
+  async function pintarResumenVigente(g) {
+    const cont = document.getElementById(`resumen-${g.id}`);
+    const vigente = temaVigente(g);
+    if (!cont || !vigente) return;
+
+    try {
+      const resumen = await resumenDeTema(g.id, vigente.id);
+      if (!document.body.contains(cont)) return; // cambió de pantalla mientras cargaba
+
+      if (!resumen.contestaron) {
+        cont.textContent = "Todavía nadie contesta la trivia de este tema.";
+        return;
+      }
+      cont.innerHTML = `
+        ${resumen.contestaron} contestaron${resumen.promedio !== null ? ` · promedio ${resumen.promedio}%` : ""}
+        ${
+          resumen.bajos.length
+            ? ` · <button type="button" class="chip-bajos" data-ver-bajos="${vigente.id}">${resumen.bajos.length} abajo del 50% ▾</button>`
+            : ""
+        }
+        <div id="bajos-${vigente.id}" style="display:none; margin-top:8px;"></div>`;
+
+      cont.querySelector("[data-ver-bajos]")?.addEventListener("click", () => alternarBajos(g.id, vigente.id));
+    } catch (err) {
+      cont.textContent = "No se pudo leer cómo van (revisa tu conexión).";
+    }
+  }
+
+  /** Trae y resume las respuestas de un tema. Se cachea por tema: el maestro
+   * entra y sale de sus grupos todo el tiempo. */
+  async function resumenDeTema(grupoId, temaId) {
+    if (resumenTemaCache[temaId]) return resumenTemaCache[temaId];
+
+    const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
+      headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudieron leer las respuestas.");
+
+    const respuestas = data.respuestas || [];
+    const conPuntaje = respuestas.filter((r) => r.total_cerradas > 0);
+    const porcentaje = (r) => Math.round((r.aciertos / r.total_cerradas) * 100);
+    const resumen = {
+      contestaron: respuestas.length,
+      promedio: conPuntaje.length ? Math.round(conPuntaje.reduce((s, r) => s + porcentaje(r), 0) / conPuntaje.length) : null,
+      bajos: conPuntaje
+        .filter((r) => porcentaje(r) < 50)
+        .map((r, i) => ({ nombre: r.nombre || `Anónimo ${i + 1}`, porcentaje: porcentaje(r) })),
+    };
+    resumenTemaCache[temaId] = resumen;
+    return resumen;
+  }
+
+  function alternarBajos(grupoId, temaId) {
+    const caja = document.getElementById(`bajos-${temaId}`);
+    if (!caja) return;
+    const abierta = caja.style.display === "block";
+    caja.style.display = abierta ? "none" : "block";
+    const btn = document.querySelector(`[data-ver-bajos="${temaId}"]`);
+    const resumen = resumenTemaCache[temaId];
+    if (btn && resumen) btn.textContent = `${resumen.bajos.length} abajo del 50% ${abierta ? "▾" : "▴"}`;
+    if (abierta || !resumen) return;
+
+    caja.innerHTML = resumen.bajos
+      .map(
+        (a) => `<div class="fila-bajo"><span>${escapeHtml(a.nombre)}</span><strong>${a.porcentaje}%</strong></div>`
+      )
+      .join("");
+  }
+
+  function renderGrupoDetalle(g, avisoInicial) {
+    window.EnsenaiTabs?.mostrar(false);
+    const cont = document.getElementById("contenido");
+    const ligaBase = `${window.location.origin}/g.html`;
+
+    cont.innerHTML = `
+      ${avisoInicial ? `<div class="aviso">${escapeHtml(avisoInicial)}</div>` : ""}
+      <button type="button" class="secundario" id="btn-volver-grupos" style="margin:0 0 14px;">← Mis grupos</button>
+
+      <div class="tarjeta grupo-item" data-grupo-id="${g.id}">
+        <div class="nombre">🏫 ${escapeHtml(g.nombre)}</div>
+        <div class="metricas">
+          <div class="metrica"><div class="num">${g.temas_totales}</div><div class="label">Temas</div></div>
+          <div class="metrica"><div class="num">${g.temas_activos}</div><div class="label">Activos</div></div>
+          <div class="metrica"><div class="num">${g.accesos_registrados}</div><div class="label">Accesos</div></div>
+        </div>
+        <div class="liga-box">
+          <input readonly value="${ligaBase}?slug=${encodeURIComponent(g.slug)}" id="liga-${g.id}">
+          <button class="secundario chico" onclick="copiarLiga('${g.id}')">Copiar</button>
+        </div>
+        ${
+          temaVigente(g)
+            ? `<div class="viendo-ahora">
+                 <p class="etiqueta-mini">VIENDO AHORA</p>
+                 <p class="titulo-vigente">${escapeHtml(temaVigente(g).titulo)}</p>
+                 <div id="resumen-${g.id}" class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Revisando cómo van…</div>
+               </div>`
+            : ""
+        }
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Agregar un tema nuevo</h3>
+        <div id="zona-generar-${g.id}">
+          <label>Tema</label>
+          <input type="text" id="tema-input-${g.id}" placeholder="Ej. El sistema solar, La Revolución Mexicana…" onkeydown="if (event.key === 'Enter') generarTema('${g.id}', ${g.temas_totales === 0})">
+          <label>¿Algo específico que quieras que incluya? (opcional)</label>
+          <textarea id="detalles-input-${g.id}" placeholder="Ej. Solo lo que vimos en clase esta semana, o: enfócate en los ejemplos prácticos."></textarea>
+          <label>Foto del temario, resumen o apuntes (opcional)</label>
+          <div class="zona-foto">
+            <label class="btn-foto" for="fotos-input-${g.id}">📷 Subir foto</label>
+            <input type="file" id="fotos-input-${g.id}" accept="image/*" multiple onchange="alElegirFotos('${g.id}', event)">
+            <p class="ayuda" style="margin:8px 0 0; font-size:0.8rem;">Hasta 3 fotos. Las leemos para orientar el material a lo que trae tu material de clase.</p>
+            <div class="miniaturas" id="miniaturas-fotos-${g.id}"></div>
+          </div>
+          <label>Nivel del grupo</label>
+          <select id="nivel-input-${g.id}">
+            ${NIVELES.map((n) => `<option value="${n.value}">${n.label}</option>`).join("")}
+          </select>
+          <label class="toggle-modo-examen" style="margin: 4px 0 10px;">
+            <input type="checkbox" id="enfoque-psico-input-${g.id}">
+            🧠 Enfoque psicoeducativo (para terapia/consulta, no material escolar)
+          </label>
+          <button class="primario" onclick="generarTema('${g.id}', ${g.temas_totales === 0})">✨ Generar material</button>
+          <div id="resultado-generar-${g.id}"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Cómo van tus alumnos</h3>
+        <p class="ayuda" style="margin:0 0 10px; font-size:0.82rem;">Cada vez que alguien contesta una trivia o marca ejercicios, ese día cuenta para su racha.</p>
+        <div id="alumnos-${g.id}"><div class="cargando">Cargando…</div></div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">Temas en tu liga</h3>
+        <p class="hint-combinar" id="hint-combinar-${g.id}" style="display:none;">Selecciona dos o más para armar un repaso que los junte a todos antes de un examen.</p>
+        <div id="barra-combinar-${g.id}" class="barra-combinar" style="display:none;"></div>
+        <div id="lista-temas-${g.id}"><div class="cargando">Cargando…</div></div>
+      </div>
+    `;
+
+    document.getElementById("btn-volver-grupos").addEventListener("click", volverALista);
+
+    cargarTemas(g.id);
+    cargarAlumnos(g.id);
+    pintarResumenVigente(g);
+    // Re-dibujar #contenido borra la pantalla de espera y el panel de
+    // material ya generado; aqui se devuelven a su lugar.
+    restaurarEstadoDeGrupos();
+    // Y si quedo una generacion a medias (se bloqueo el celular, se cerro
+    // la pestana), se retoma en silencio y se avisa cuando este lista.
+    reanudarTrabajoPendiente();
+  }
+
+  /**
+   * "Que los alumnos la sigan y el maestro pueda revisarla" (2-sep-2026).
+   * Lista de quién está siguiendo el material del grupo, ordenada por racha.
+   * En grupos anónimos no hay nombres — se numeran, que es justo lo que
+   * necesita quien atiende pacientes: ver constancia, no identificar.
+   */
+  async function cargarAlumnos(grupoId) {
+    const cont = document.getElementById(`alumnos-${grupoId}`);
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/alumnos`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el avance de tu grupo.");
+
+      const alumnos = data.alumnos || [];
+      if (!alumnos.length) {
+        cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía nadie contesta una trivia ni marca ejercicios. En cuanto lo hagan, aquí verás quién le está siguiendo.</p>`;
+        return;
+      }
+
+      const hoy = new Date().toISOString().slice(0, 10);
+      const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const cuando = (d) => (d === hoy ? "hoy" : d === ayer ? "ayer" : d ? new Date(`${d}T12:00:00Z`).toLocaleDateString("es-MX") : "—");
+
+      let anonimos = 0;
+      cont.innerHTML = alumnos
+        .map((a) => {
+          const quien = a.nombre ? escapeHtml(a.nombre) : `Anónimo ${++anonimos}`;
+          // Una racha viva (movida hoy o ayer) se ve en color; una que ya se
+          // rompió se deja apagada, para que el maestro distinga de un
+          // vistazo quién sigue enganchado y quién se quedó atrás.
+          const viva = a.ultimo_dia === hoy || a.ultimo_dia === ayer;
+          return `
+            <div class="fila-alumno">
+              <div class="quien">
+                <div class="nombre-alumno">${quien}</div>
+                <div class="ayuda" style="font-size:0.76rem;">${a.dias_activos} día${a.dias_activos === 1 ? "" : "s"} en total · última vez ${cuando(a.ultimo_dia)}</div>
+              </div>
+              <span class="chip-racha${viva ? "" : " apagada"}">🔥 ${a.racha_actual}</span>
+            </div>`;
+        })
+        .join("");
+    } catch (err) {
+      cont.innerHTML = `<p class="ayuda" style="margin:0;">No se pudo cargar el avance de tu grupo ahorita.</p>`;
+    }
+  }
+
+  const NOMBRES_NIVEL_GRUPO = { gratis: "Gratis", aprendemos: "Esencial", ilimitado: "Ilimitado" };
+
+  async function cargarSuscripcionGrupo() {
+    const cont = document.getElementById("zona-suscripcion-grupo");
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/grupos/mi-plan`,
+        { headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        cont,
+        "Cargando tu plan…"
+      );
+      const plan = await res.json();
+      if (!res.ok) throw new Error(plan.error || "No se pudo cargar tu plan.");
+
+      const usoTexto =
+        plan.limite_temas_mes === null
+          ? `${plan.temas_usados_este_mes} temas-grupo cubiertos este mes — sin límite`
+          : `${plan.temas_usados_este_mes} de ${plan.limite_temas_mes} temas-grupo cubiertos este mes`;
+
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:0 0 4px;"><strong>Plan ${NOMBRES_NIVEL_GRUPO[plan.nivel] || plan.nivel}</strong>${plan.precio_mxn ? ` — $${Number(plan.precio_mxn).toFixed(2)} MXN` : ""}</p>
+        <p class="ayuda" style="margin:0 0 4px; font-size:0.85rem;">${escapeHtml(usoTexto)}</p>
+        <p class="ayuda" style="margin:0; font-size:0.85rem;">${plan.grupos_actuales} de ${plan.limite_grupos} grupo(s) creados.</p>
+        <div id="zona-botones-plan-grupo"></div>
+      `;
+      pintarBotonesPlanGrupo(plan);
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudo cargar tu plan.</div>`;
+    }
+  }
+
+  /**
+   * Botones de plan con selector mensual/anual (3-sep-2026, schema_v39).
+   * Igual que en comprador.html: los montos reales viven en
+   * platform_settings y los cobra el backend; esto es solo la etiqueta.
+   */
+  const PRECIOS_GRUPO = {
+    aprendemos: { mensual: 89, anual: 890 },
+    ilimitado: { mensual: 129, anual: 1290 },
+  };
+  let periodoElegidoGrupo = "mensual";
+
+  function pintarBotonesPlanGrupo(plan) {
+    const zona = document.getElementById("zona-botones-plan-grupo");
+    if (!zona) return;
+    if (plan.nivel === "ilimitado") {
+      zona.innerHTML = "";
+      return;
+    }
+
+    const anual = periodoElegidoGrupo === "anual";
+    const etiqueta = (nivel) =>
+      anual
+        ? `$${PRECIOS_GRUPO[nivel].anual.toLocaleString("es-MX")}/año`
+        : `$${PRECIOS_GRUPO[nivel].mensual}/mes`;
+
+    let html = `
+      <div style="display:flex; gap:6px; margin-top:12px;">
+        <button type="button" class="${anual ? "secundario" : "primario"} chico" data-periodo="mensual" style="flex:1; width:auto;">Mensual</button>
+        <button type="button" class="${anual ? "primario" : "secundario"} chico" data-periodo="anual" style="flex:1; width:auto;">Anual · 2 meses gratis</button>
+      </div>
+      <button class="primario" style="margin-top:10px;" id="btn-ilimitado-grupo">Pasar a Ilimitado — ${etiqueta("ilimitado")}</button>`;
+    if (plan.nivel === "gratis") {
+      html += `<button class="secundario" style="width:100%; margin-top:6px;" id="btn-aprendemos-grupo">Pasar a Esencial — ${etiqueta("aprendemos")} (20 temas-grupo, 3 grupos)</button>`;
+    }
+    html += `<p class="ayuda" style="margin:6px 0 0; font-size:0.8rem;">🎉 Precio de fundador: se te queda mientras no canceles, aunque suba después.</p>`;
+    zona.innerHTML = html;
+
+    zona.querySelectorAll("[data-periodo]").forEach((b) =>
+      b.addEventListener("click", () => {
+        periodoElegidoGrupo = b.dataset.periodo;
+        pintarBotonesPlanGrupo(plan);
+      })
+    );
+    const btnIli = document.getElementById("btn-ilimitado-grupo");
+    if (btnIli) btnIli.addEventListener("click", () => suscribirGrupo("ilimitado", periodoElegidoGrupo));
+    const btnEse = document.getElementById("btn-aprendemos-grupo");
+    if (btnEse) btnEse.addEventListener("click", () => suscribirGrupo("aprendemos", periodoElegidoGrupo));
+  }
+
+  async function suscribirGrupo(nivel, periodo = "mensual") {
+    const cont = document.getElementById("zona-suscripcion-grupo");
+    cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/purchases/checkout-suscripcion`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+          body: JSON.stringify({ tipo: "grupo", nivel, periodo }),
+        },
+        cont,
+        "Preparando tu pago… (si el servidor estaba dormido, puede tardar unos segundos)"
+      );
+      const data = await res.json();
+      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      cont.innerHTML = `
+        <div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>
+        <button class="secundario" style="width:100%;" onclick="suscribirGrupo('${nivel}', '${periodo}')">Reintentar</button>
+      `;
+    }
+  }
+
+  function copiarLiga(grupoId) {
+    const input = document.getElementById(`liga-${grupoId}`);
+    input.select();
+    navigator.clipboard?.writeText(input.value);
+  }
+
+  async function crearGrupo() {
+    const nombre = document.getElementById("nombre-grupo-nuevo").value.trim();
+    const mostrarNombres = document.getElementById("mostrar-nombres-nuevo").checked;
+    const resultado = document.getElementById("resultado-crear-grupo");
+    resultado.innerHTML = "";
+
+    if (!nombre) {
+      resultado.innerHTML = `<div class="error">Escribe un nombre para tu grupo.</div>`;
+      return;
+    }
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ nombre, mostrarNombres }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo crear el grupo.");
+
+      grupoAbiertoId = null; // el grupo nuevo se ve en la lista, con los demás
+      cargarGrupos();
+    } catch (err) {
+      resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  // ── Fotos de temario/apuntes ────────────────────────────────────────────
+  // Mismo mecanismo que en tema.html: las fotos de celular pesan varios MB
+  // y viajan como base64 dentro del JSON, así que se reducen a 1400px de
+  // lado y se recomprimen como JPEG antes de subirlas. Aquí se guardan por
+  // grupo, porque en esta pantalla puede haber varias ligas abiertas a la vez.
+  // Nombres legibles de las inteligencias, para "Adaptar por inteligencia"
+  // (grupo.html no las necesitaba antes: las 8 solo se veían en g.html).
+  const ETIQUETAS_INTELIGENCIA = {
+    linguistica: "Lingüística", logico_matematica: "Lógico-matemática", espacial: "Espacial",
+    musical: "Musical", kinestesica: "Corporal-kinestésica", interpersonal: "Interpersonal",
+    intrapersonal: "Intrapersonal", naturalista: "Naturalista",
+  };
+
+  const MAX_FOTOS = 3;
+  const LADO_MAX = 1400;
+  const fotosPorGrupo = {};
+
+  // ── Tips mientras se genera ─────────────────────────────────────────────
+  // En modo grupo la generación tarda (es el material más completo que
+  // produce el sistema). Estos consejos están escritos para quien da clase o
+  // acompaña, no para un papá — y varios explican POR QUÉ el material viene
+  // como viene, que es la duda más común de un profesional que lo estrena.
+  const TIPS_GRUPO = [
+    "En un salón hay perfiles mezclados. Por eso la actividad viene diseñada para que le entre todo el grupo: se puede resolver hablando, escribiendo, dibujando o moviéndose.",
+    "Si quieres una versión distinta para cada tipo de inteligencia, el botón \"Adaptar por inteligencia\" te genera las 8 sobre este mismo tema.",
+    "Dar actividades distintas no es hacer diferencias: es darle a cada quien una puerta de entrada al mismo tema.",
+    "Antes de compartir el material puedes editar la trivia — corregir, quitar o agregar preguntas propias.",
+    "Repasar el mismo tema tres veces en días distintos fija mucho más que una sesión larga.",
+    "Pedirles que expliquen el tema entre ellos es de las formas más rápidas de detectar quién no lo entendió.",
+    "Releer apuntes se siente productivo pero engaña. Cerrar el cuaderno e intentar recordar es lo que funciona.",
+    "El imprimible en PDF trae hoja de respuestas por separado, para que puedas repartir solo la parte del alumno.",
+  ];
+
+  const tipsIntervalos = {};
+  // Espera viva por grupo. Se guarda aqui (y no solo en el DOM) porque
+  // renderGrupos() reconstruye TODO #contenido: si la pantalla de espera
+  // viviera solo en una referencia a un nodo, al re-dibujar quedaria
+  // huerfana y la generacion terminaria en el vacio — cupo gastado y
+  // material perdido. Ver restaurarEstadoDeGrupos().
+  const esperasActivas = {};
+
+  /**
+   * Pinta la pantalla de espera dentro de #resultado-generar-<grupoId>.
+   * Dos decisiones que importan:
+   *  - el contenedor se resuelve por id en cada tick, nunca por una
+   *    referencia capturada, para que sobreviva a un re-dibujo;
+   *  - se pinta UNA vez y despues solo se actualiza textContent — repintar
+   *    el innerHTML cada 6s se comia los clics en "Seguir navegando"
+   *    (el mismo problema que ya se corrigio en tema.html).
+   */
+  function iniciarTips(grupoId, encabezado, accion) {
+    detenerTips(grupoId);
+    let i = 0;
+
+    const pintarBase = () => {
+      const cont = document.getElementById(`resultado-generar-${grupoId}`);
+      if (!cont) return null;
+      cont.innerHTML = `
+        <div class="zona-espera">
+          <div class="espera-barra"><span></span></div>
+          <p class="espera-titulo"></p>
+          <div class="tip-caja">
+            <span class="tip-icono">💡</span>
+            <p class="tip-texto"></p>
+          </div>
+          <div class="tip-puntos">${TIPS_GRUPO.slice(0, 6).map(() => `<span></span>`).join("")}</div>
+          ${accion ? `<button type="button" class="btn-seguir-navegando">${escapeHtml(accion.texto)}</button>` : ""}
+        </div>`;
+      const zona = cont.querySelector(".zona-espera");
+      if (accion) zona.querySelector(".btn-seguir-navegando").addEventListener("click", accion.onClick);
+      return zona;
+    };
+
+    const actualizar = () => {
+      if (esperasActivas[grupoId] && esperasActivas[grupoId].minimizada) return;
+      const cont = document.getElementById(`resultado-generar-${grupoId}`);
+      if (!cont) return;
+      const zona = cont.querySelector(".zona-espera") || pintarBase();
+      if (!zona) return;
+      zona.querySelector(".espera-titulo").textContent = encabezado;
+      zona.querySelector(".tip-texto").textContent = TIPS_GRUPO[i % TIPS_GRUPO.length];
+      [...zona.querySelectorAll(".tip-puntos span")].forEach((s, k) => s.classList.toggle("activo", k === i % 6));
+    };
+
+    esperasActivas[grupoId] = { minimizada: false, actualizar };
+    actualizar();
+    tipsIntervalos[grupoId] = setInterval(() => { i++; actualizar(); }, 6000);
+  }
+
+  function detenerTips(grupoId) {
+    if (tipsIntervalos[grupoId]) { clearInterval(tipsIntervalos[grupoId]); delete tipsIntervalos[grupoId]; }
+    delete esperasActivas[grupoId];
+  }
+
+  // ── Generacion en segundo plano ────────────────────────────────
+  // Generar material de grupo tarda ~1 min. Antes, si en ese rato la maestra
+  // creaba otro grupo o agregaba un tema (ambos llaman a cargarGrupos →
+  // renderGrupos), se re-dibujaba todo #contenido y la generacion terminaba
+  // escribiendo en un nodo ya desconectado: el cupo se gastaba y el material
+  // no aparecia por ningun lado. Ahora hay una sola generacion a la vez, la
+  // espera se restaura tras cualquier re-dibujo, y este aviso flotante avisa
+  // cuando el material esta listo.
+  let generacionEnCurso = null;
+
+  function quitarAvisoGeneracion() {
+    document.getElementById("aviso-generacion")?.remove();
+  }
+
+  function mostrarAvisoGeneracion({ estado, texto, accionTexto, onAccion }) {
+    quitarAvisoGeneracion();
+    const div = document.createElement("div");
+    div.className = `aviso-generacion${estado === "listo" ? " listo" : estado === "falla" ? " falla" : ""}`;
+    div.id = "aviso-generacion";
+    div.innerHTML = `
+      <span class="texto">${escapeHtml(texto)}</span>
+      ${accionTexto ? `<button type="button" id="btn-aviso-generacion">${escapeHtml(accionTexto)}</button>` : ""}
+      <button type="button" class="cerrar" id="btn-cerrar-aviso" title="Cerrar">✕</button>
+    `;
+    document.body.appendChild(div);
+    if (accionTexto && onAccion) {
+      document.getElementById("btn-aviso-generacion").addEventListener("click", () => {
+        quitarAvisoGeneracion();
+        onAccion();
+      });
+    }
+    document.getElementById("btn-cerrar-aviso")?.addEventListener("click", quitarAvisoGeneracion);
+  }
+
+  // Si aun asi cierra la pestana, el backend termina; pero el material se
+  // queda sin agregar a la liga, asi que conviene avisar antes.
+  window.addEventListener("beforeunload", (ev) => {
+    if (!generacionEnCurso) return;
+    ev.preventDefault();
+    ev.returnValue = "";
+  });
+
+  /** Deja la generacion corriendo y libera la pantalla. */
+  function minimizarGeneracion() {
+    if (!generacionEnCurso) return;
+    const { grupoId, titulo } = generacionEnCurso;
+    generacionEnCurso.minimizada = true;
+    if (esperasActivas[grupoId]) esperasActivas[grupoId].minimizada = true;
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (zona) zona.innerHTML = "";
+    mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${titulo}"…` });
+  }
+
+  /** true si hay que abortar porque ya hay una generacion corriendo. */
+  function hayGeneracionEnCurso() {
+    if (!generacionEnCurso) return false;
+    mostrarAvisoGeneracion({
+      estado: "generando",
+      texto: `⏳ Espera — "${generacionEnCurso.titulo}" todavia se esta generando`,
+    });
+    return true;
+  }
+
+  function comprimirImagen(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      lector.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Ese archivo no parece ser una imagen válida."));
+        img.onload = () => {
+          const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * escala);
+          canvas.height = Math.round(img.height * escala);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(file);
+    });
+  }
+
+  function pintarMiniaturas(grupoId) {
+    const cont = document.getElementById(`miniaturas-fotos-${grupoId}`);
+    if (!cont) return;
+    const fotos = fotosPorGrupo[grupoId] || [];
+    cont.innerHTML = fotos
+      .map(
+        (src, i) => `
+        <div class="miniatura">
+          <img src="${src}" alt="Foto ${i + 1}">
+          <button type="button" onclick="quitarFoto('${grupoId}', ${i})" title="Quitar">✕</button>
+        </div>`
+      )
+      .join("");
+  }
+
+  function quitarFoto(grupoId, indice) {
+    (fotosPorGrupo[grupoId] || []).splice(indice, 1);
+    pintarMiniaturas(grupoId);
+  }
+
+  async function alElegirFotos(grupoId, ev) {
+    const resultado = document.getElementById(`resultado-generar-${grupoId}`);
+    const archivos = [...ev.target.files].filter((f) => f.type.startsWith("image/"));
+    ev.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!fotosPorGrupo[grupoId]) fotosPorGrupo[grupoId] = [];
+
+    for (const archivo of archivos) {
+      if (fotosPorGrupo[grupoId].length >= MAX_FOTOS) {
+        if (resultado) resultado.innerHTML = `<div class="error">Puedes subir hasta ${MAX_FOTOS} fotos.</div>`;
+        break;
+      }
+      try {
+        fotosPorGrupo[grupoId].push(await comprimirImagen(archivo));
+      } catch (err) {
+        if (resultado) resultado.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+      }
+    }
+    pintarMiniaturas(grupoId);
+  }
+
+  // ── Trabajo de generacion en segundo plano ─────────────────────────────
+  // Antes esto era UN fetch abierto ~1 minuto. En celular, bloquear la
+  // pantalla o cambiarse de app suspende la pestana y mata esa conexion:
+  // el material se generaba del otro lado pero aqui llegaba un error
+  // (reporte sep-2026). Ahora el POST solo encola y el resultado se recoge
+  // preguntando cada pocos segundos, asi que perder la red no cancela nada.
+  const LS_TRABAJO_GRUPO = "ensenai:trabajo-grupo";
+  const MS_ENTRE_SONDEOS = 3000;
+  const MS_MAX_ESPERA = 8 * 60 * 1000;
+  const MS_VIDA_TRABAJO_RECORDADO = 30 * 60 * 1000;
+
+  let sondeo = null; // { trabajoId, grupoId, titulo, ctx, inicio, timer, activo }
+
+  function nuevaClaveCliente() {
+    try {
+      if (crypto?.randomUUID) return crypto.randomUUID();
+    } catch (err) {
+      /* navegadores viejos: el fallback alcanza */
+    }
+    return `c-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function recordarTrabajo(datos) {
+    try {
+      localStorage.setItem(LS_TRABAJO_GRUPO, JSON.stringify({ ...datos, ts: Date.now() }));
+    } catch (err) {
+      /* modo privado o storage lleno: solo se pierde la reanudacion */
+    }
+  }
+
+  function olvidarTrabajo() {
+    try {
+      localStorage.removeItem(LS_TRABAJO_GRUPO);
+    } catch (err) {
+      /* sin consecuencias */
+    }
+  }
+
+  function trabajoRecordado() {
+    try {
+      const g = JSON.parse(localStorage.getItem(LS_TRABAJO_GRUPO) || "null");
+      if (!g?.trabajoId) return null;
+      if (Date.now() - (g.ts || 0) > MS_VIDA_TRABAJO_RECORDADO) {
+        olvidarTrabajo();
+        return null;
+      }
+      return g;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function detenerSondeo() {
+    if (sondeo?.timer) clearTimeout(sondeo.timer);
+    sondeo = null;
+  }
+
+  /**
+   * Empieza (o retoma) el seguimiento de un trabajo ya encolado.
+   * `mostrarEspera` en false = se retomo al volver a abrir la app: no se le
+   * secuestra la pantalla, solo se le avisa con el globito flotante.
+   */
+  function seguirTrabajo(trabajoId, grupoId, titulo, ctx, { mostrarEspera = true, conFotos = false } = {}) {
+    detenerSondeo();
+    sondeo = { trabajoId, grupoId, titulo, ctx, inicio: Date.now(), timer: null, activo: true };
+    generacionEnCurso = { grupoId, titulo, trabajoId, minimizada: !mostrarEspera };
+    recordarTrabajo({ trabajoId, grupoId, titulo, ctx });
+
+    if (mostrarEspera) {
+      iniciarTips(
+        grupoId,
+        conFotos ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…",
+        { texto: "Seguir navegando mientras se genera →", onClick: minimizarGeneracion }
+      );
+    } else {
+      mostrarAvisoGeneracion({ estado: "generando", texto: `⏳ Generando "${titulo}"…` });
+    }
+
+    sondearTrabajo();
+  }
+
+  async function sondearTrabajo() {
+    if (!sondeo?.activo) return;
+    const actual = sondeo;
+    try {
+      // fetch pelon a proposito: aqui un error de red es lo ESPERADO
+      // (pantalla bloqueada, elevador, cambio de wifi) y no es un fallo —
+      // se vuelve a preguntar en el siguiente ciclo.
+      const res = await fetch(`${API_BASE}/api/temas/trabajos/${actual.trabajoId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      });
+      if (res.status === 404) {
+        return terminarTrabajoConFallo("No encontramos esa generacion. Vuelve a intentarlo.");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No pudimos consultar tu generacion.");
+      if (!sondeo || sondeo !== actual) return; // se cancelo mientras respondia
+      if (data.estado === "listo") return terminarTrabajoConExito(data.resultado);
+      if (data.estado === "fallido") return terminarTrabajoConFallo(data.error || "No se pudo generar el material.");
+    } catch (err) {
+      /* sin red: se reintenta en el siguiente ciclo, sin molestar */
+    }
+
+    if (!sondeo || sondeo !== actual) return;
+    if (Date.now() - actual.inicio > MS_MAX_ESPERA) {
+      return terminarTrabajoConFallo("Esto esta tardando mas de lo normal. Vuelve a intentarlo en un momento.");
+    }
+    actual.timer = setTimeout(sondearTrabajo, MS_ENTRE_SONDEOS);
+  }
+
+  function terminarTrabajoConExito(data) {
+    const { grupoId, titulo, ctx } = sondeo;
+    const minimizada = !!generacionEnCurso?.minimizada;
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips(grupoId);
+
+    // Se anexan al contenido porque la tabla grupo_temas no guarda nivel ni
+    // enfoque, y luego hacen falta: "Adaptar por inteligencia" escribía las
+    // 8 actividades a 6-8 años y la guía de examen salía siempre a primaria
+    // alta, sin importar el nivel real del grupo (31-ago-2026).
+    contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: ctx.nivel, enfoque: ctx.enfoque };
+    // El PDF cacheado es del tema ANTERIOR de este grupo: si no se invalida,
+    // "Agregar a mi liga" publica el imprimible equivocado.
+    delete pdfCache[grupoId];
+    delete pdfCacheSinRespuestas[grupoId];
+    metaGenerado[grupoId] = {
+      encabezado: "Material generado",
+      titulo: data.contenido?.tema || titulo,
+      esPrimerTemaGratis: ctx.esPrimerTemaGratis,
+    };
+    avisarMaterialListo(grupoId, minimizada);
+  }
+
+  function terminarTrabajoConFallo(msg) {
+    const { grupoId, titulo } = sondeo;
+    const minimizada = !!generacionEnCurso?.minimizada;
+    detenerSondeo();
+    olvidarTrabajo();
+    generacionEnCurso = null;
+    detenerTips(grupoId);
+    avisarFalloGeneracion(grupoId, minimizada, titulo, msg);
+  }
+
+  // Volver a primer plano (desbloquear el celular, regresar a la pestana)
+  // dispara una consulta inmediata, en vez de esperar el siguiente ciclo.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+  window.addEventListener("online", () => {
+    if (!sondeo?.activo) return;
+    clearTimeout(sondeo.timer);
+    sondearTrabajo();
+  });
+
+  /** Al abrir la pagina: si quedo un trabajo a medias, se retoma en silencio. */
+  function reanudarTrabajoPendiente() {
+    if (sondeo) return;
+    const g = trabajoRecordado();
+    if (!g) return;
+    seguirTrabajo(g.trabajoId, g.grupoId, g.titulo, g.ctx || {}, { mostrarEspera: false });
+  }
+
+  async function generarTema(grupoId, esPrimerTemaGratis) {
+    // Una sola generacion a la vez: con dos corriendo, la segunda pisaria la
+    // pantalla de espera de la primera y se gastaria cupo doble.
+    if (hayGeneracionEnCurso()) return;
+
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!zona) return;
+    const campoTema = document.getElementById(`tema-input-${grupoId}`);
+    const tema = campoTema.value.trim();
+    const nivel = document.getElementById(`nivel-input-${grupoId}`).value;
+    const detalles = document.getElementById(`detalles-input-${grupoId}`).value.trim();
+    const imagenes = fotosPorGrupo[grupoId] || [];
+    const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
+    zona.innerHTML = "";
+
+    // El mensaje solo vivia al pie del formulario, a media pantalla del
+    // campo vacio: en celular no se veia cual campo faltaba y la gente
+    // acababa escribiendo el tema en Etiquetas (reporte sep-2026).
+    if (!tema) {
+      marcarCampoFaltante(campoTema, "Escribe sobre qué tema quieres generar material.");
+      return;
+    }
+    limpiarCampoFaltante(campoTema);
+
+    // El material anterior de este grupo (si no se agrego a la liga) ya no
+    // aplica: si no se olvida, restaurarEstadoDeGrupos lo resucitaria encima
+    // de la pantalla de espera.
+    olvidarGenerado(grupoId);
+
+    iniciarTips(
+      grupoId,
+      imagenes.length ? "Leyendo tus fotos y preparando el material…" : "Preparando el material del grupo…",
+      { texto: "Seguir navegando mientras se genera →", onClick: minimizarGeneracion }
+    );
+    // Candado inmediato: entre el POST y la respuesta hay una ventana en
+    // la que un segundo toque pasaria hayGeneracionEnCurso(). El servidor
+    // tambien lo rechaza (409), pero mejor ni llegar ahi.
+    generacionEnCurso = { grupoId, titulo: tema, minimizada: false };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/temas/generar-async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({
+          tema,
+          nivel,
+          modo: "grupo",
+          detalles,
+          imagenes,
+          enfoque,
+          // Idempotencia: un reintento de la misma peticion no encola —ni
+          // cobra— una segunda generacion.
+          claveCliente: nuevaClaveCliente(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      // 409 = ya hay una generacion de esta cuenta corriendo (por ejemplo
+      // desde otro dispositivo): se engancha a esa en vez de pelearse.
+      if (res.status === 409 && data.trabajo_id) {
+        seguirTrabajo(data.trabajo_id, grupoId, tema, { nivel, enfoque, esPrimerTemaGratis }, { conFotos: imagenes.length > 0 });
+        return;
+      }
+      if (!res.ok || !data.trabajo_id) throw new Error(data.error || "No se pudo generar el material.");
+
+      fotosPorGrupo[grupoId] = []; // ya viajan en el cuerpo
+      pintarMiniaturas(grupoId);
+      seguirTrabajo(data.trabajo_id, grupoId, tema, { nivel, enfoque, esPrimerTemaGratis }, { conFotos: imagenes.length > 0 });
+    } catch (err) {
+      generacionEnCurso = null;
+      detenerTips(grupoId);
+      avisarFalloGeneracion(grupoId, false, tema, mensajeErrorAmigable(err));
+    }
+  }
+
+  /** Cierre comun de generarTema y combinarTemasGrupo: si la persona sigue
+   *  viendo la zona del grupo, el panel se pinta ahi; si se fue a otro lado
+   *  (o se re-dibujo la pagina), no se la saca de donde este — solo se le
+   *  avisa con el globito flotante, y el material queda guardado. */
+  function avisarMaterialListo(grupoId, minimizada) {
+    const hayZona = !!document.getElementById(`resultado-generar-${grupoId}`);
+    if (!minimizada && hayZona) {
+      quitarAvisoGeneracion();
+      pintarResultadoGenerado(grupoId);
+      return;
+    }
+    mostrarAvisoGeneracion({
+      estado: "listo",
+      texto: `✨ "${metaGenerado[grupoId].titulo}" ya está listo`,
+      accionTexto: "Verlo",
+      onAccion: () => {
+        pintarResultadoGenerado(grupoId);
+        document.getElementById(`resultado-generar-${grupoId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+    });
+  }
+
+  function avisarFalloGeneracion(grupoId, minimizada, titulo, msg) {
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!minimizada && zona) {
+      quitarAvisoGeneracion();
+      zona.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+      return;
+    }
+    mostrarAvisoGeneracion({ estado: "falla", texto: `"${titulo}": ${msg}` });
+  }
+
+  /**
+   * Dibuja las preguntas de trivia de `contenidoEnEdicion[grupoId]` como un
+   * formulario editable: texto de la pregunta, opciones (si las tiene) con
+   * un radio para marcar cuál es la correcta, o un campo de respuesta
+   * sugerida si es de tipo abierta/caso. La maestra/profesional puede
+   * ajustar el texto, corregir la respuesta correcta, borrar preguntas que
+   * no le sirvan, o agregar preguntas propias antes de compartir el tema
+   * con su grupo — no requiere volver a generar con IA.
+   */
+  function renderEditorTrivia(grupoId) {
+    const cont = document.getElementById(`editor-trivia-${grupoId}`);
+    if (!cont) return;
+    const trivia = contenidoEnEdicion[grupoId].trivia || [];
+
+    cont.innerHTML =
+      `<p class="ayuda" style="margin:0 0 8px; font-size:0.85rem;">✏️ Trivia (editable)</p>` +
+      trivia
+        .map(
+          (p, i) => `
+      <div class="pregunta-editable">
+        <div class="fila-top">
+          <textarea id="pregunta-texto-${grupoId}-${i}" placeholder="Texto de la pregunta">${escapeHtml(p.pregunta || "")}</textarea>
+          <button type="button" class="secundario chico" id="btn-borrar-pregunta-${grupoId}-${i}" title="Borrar esta pregunta">🗑️</button>
+        </div>
+        ${
+          p.opciones && p.opciones.length
+            ? p.opciones
+                .map(
+                  (op, j) => `
+          <div class="fila-opcion${op === p.respuesta_correcta ? " correcta" : ""}">
+            <input type="radio" name="correcta-${grupoId}-${i}" id="correcta-${grupoId}-${i}-${j}" ${op === p.respuesta_correcta ? "checked" : ""} title="Marcar como correcta">
+            <input type="text" id="opcion-${grupoId}-${i}-${j}" value="${escapeHtml(op)}" placeholder="Opción ${j + 1}">
+          </div>
+        `
+                )
+                .join("")
+            : `
+          <label style="margin:8px 0 4px; font-size:0.82rem;">Respuesta sugerida</label>
+          <input type="text" id="respuesta-abierta-${grupoId}-${i}" value="${escapeHtml(p.respuesta_correcta || "")}" placeholder="Respuesta sugerida">
+        `
+        }
+      </div>
+    `
+        )
+        .join("") +
+      `<button type="button" class="secundario" style="width:100%; margin-top:4px;" id="btn-agregar-pregunta-${grupoId}">+ Agregar pregunta</button>`;
+
+    trivia.forEach((p, i) => {
+      document.getElementById(`pregunta-texto-${grupoId}-${i}`).addEventListener("input", (ev) => {
+        contenidoEnEdicion[grupoId].trivia[i].pregunta = ev.target.value;
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId]; // el PDF ya descargado quedaría desactualizado
+      });
+      document.getElementById(`btn-borrar-pregunta-${grupoId}-${i}`).addEventListener("click", () => {
+        contenidoEnEdicion[grupoId].trivia.splice(i, 1);
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+        renderEditorTrivia(grupoId);
+      });
+      if (p.opciones && p.opciones.length) {
+        p.opciones.forEach((op, j) => {
+          document.getElementById(`opcion-${grupoId}-${i}-${j}`).addEventListener("input", (ev) => {
+            const t = contenidoEnEdicion[grupoId].trivia[i];
+            const eraCorrecta = t.opciones[j] === t.respuesta_correcta;
+            t.opciones[j] = ev.target.value;
+            if (eraCorrecta) t.respuesta_correcta = ev.target.value; // sigue siendo la marcada como correcta
+            delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+          });
+          document.getElementById(`correcta-${grupoId}-${i}-${j}`).addEventListener("change", () => {
+            contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = contenidoEnEdicion[grupoId].trivia[i].opciones[j];
+            delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+          });
+        });
+      } else {
+        document.getElementById(`respuesta-abierta-${grupoId}-${i}`).addEventListener("input", (ev) => {
+          contenidoEnEdicion[grupoId].trivia[i].respuesta_correcta = ev.target.value;
+          delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+        });
+      }
+    });
+
+    document.getElementById(`btn-agregar-pregunta-${grupoId}`).addEventListener("click", () => {
+      contenidoEnEdicion[grupoId].trivia.push({
+        pregunta: "",
+        tipo: "opcion",
+        opciones: ["", "", "", ""],
+        respuesta_correcta: "",
+      });
+      delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+      renderEditorTrivia(grupoId);
+    });
+  }
+
+  // Cachea la URL del PDF ya generado por grupo, para no volver a generarlo
+  // (llamada a IA de por medio) si el profesional ya lo descargó antes de
+  // agregar el tema a su liga. Se invalida (ver renderEditorTrivia) cada
+  // vez que se edita la trivia, para no compartir un PDF desactualizado.
+  // Son dos cachés separados porque "con respuestas" y "sin respuestas" son
+  // dos PDFs distintos (URLs distintas) — ver incluirRespuestas más abajo.
+  const pdfCache = {};
+  const pdfCacheSinRespuestas = {};
+
+  async function generarPdfEnServidor(contenido, incluirRespuestas = true) {
+    const res = await fetchConReintento(`${API_BASE}/api/temas/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+      body: JSON.stringify({ contenido, modo: "grupo", incluirRespuestas }),
+    });
+    const data = await res.json();
+    if (!data.pdf_url) throw new Error(data.error || "No se pudo generar el PDF.");
+    return data.pdf_url;
+  }
+
+  // `incluirRespuestas=false` arma el imprimible "en blanco" pensado para
+  // repartir directo al grupo (mismo contenido, sin la hoja de respuestas
+  // final) — el profesional sigue teniendo la versión con respuestas para
+  // su propio uso con el otro botón.
+  async function descargarPdf(grupoId, contenido, btn, incluirRespuestas = true) {
+    const cache = incluirRespuestas ? pdfCache : pdfCacheSinRespuestas;
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Preparando PDF…";
+    try {
+      const pdfUrl = cache[grupoId] || (await generarPdfEnServidor(contenido, incluirRespuestas));
+      cache[grupoId] = pdfUrl;
+      window.open(pdfUrl, "_blank");
+    } catch (err) {
+      alert("Error: " + mensajeErrorAmigable(err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  }
+
+  /** La zona de resultado de un grupo SIEMPRE se resuelve por id en el
+   *  momento de usarla: renderGrupos() reconstruye #contenido entero, asi
+   *  que una referencia guardada de antes puede estar ya desconectada del
+   *  documento (escribirle no rompe nada, pero no se ve). */
+  const zonaGenerar = (grupoId) => document.getElementById(`resultado-generar-${grupoId}`);
+
+  // Todo lo que hace falta para volver a pintar el panel de "material
+  // generado" despues de un re-dibujo, sin volver a llamar a la IA. El
+  // contenido en si vive en contenidoEnEdicion[grupoId]; aqui solo va lo
+  // que el panel necesita para armarse (titulo, encabezado, si es gratis).
+  const metaGenerado = {};
+
+  /* ── Editor completo del material del grupo (2-sep-2026) ────────────────
+     Reporte de la usuaria: "en el portal de maestros no se ve la explicación
+     del tema para que el maestro la revise", "que los maestros puedan
+     visualizar la información completa que se va a compartir — actividad,
+     resumen, actividades de repaso — y todo es editable", "en el caso de los
+     maestros no se muestra la información, únicamente se ven los títulos".
+
+     Hasta ahora el panel de "material generado" solo mostraba la trivia. Todo
+     lo demás (la explicación, el diagrama, la actividad, los ejercicios y el
+     material de repaso) se compartía con el grupo sin que el maestro lo
+     hubiera visto siquiera.
+
+     Cómo funciona el editor: cada campo lleva `data-ruta` con la ruta dentro
+     del contenido (por ejemplo "resumen.secciones.0.texto"). Un solo listener
+     delegado escribe en contenidoEnEdicion[grupoId] y NO vuelve a pintar —
+     así no se pierde el cursor mientras se escribe. Solo los botones de
+     agregar/quitar vuelven a dibujar la sección. */
+
+  function leerRuta(obj, ruta) {
+    return ruta.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  }
+
+  function escribirRuta(obj, ruta, valor) {
+    const partes = ruta.split(".");
+    const ultima = partes.pop();
+    let ref = obj;
+    for (const k of partes) {
+      if (ref[k] == null) ref[k] = /^\d+$/.test(k) ? [] : {};
+      ref = ref[k];
+    }
+    ref[ultima] = valor;
+  }
+
+  function borrarRuta(obj, ruta) {
+    const partes = ruta.split(".");
+    const ultima = partes.pop();
+    const ref = partes.reduce((o, k) => (o == null ? undefined : o[k]), obj);
+    if (!ref) return;
+    if (Array.isArray(ref)) ref.splice(parseInt(ultima, 10), 1);
+    else delete ref[ultima];
+  }
+
+  /** Los temas de antes del rediseño traen `resumen` como un solo string. */
+  function normalizarResumenGrupo(resumen) {
+    const vacio = { que_es: "", secciones: [], pasos: [], ideas_clave: [], ojo_aqui: "", truco: "" };
+    if (!resumen) return { ...vacio };
+    if (typeof resumen === "string") return { ...vacio, que_es: resumen };
+    return {
+      que_es: resumen.que_es || "",
+      secciones: Array.isArray(resumen.secciones) ? resumen.secciones : [],
+      pasos: Array.isArray(resumen.pasos) ? resumen.pasos : [],
+      ideas_clave: Array.isArray(resumen.ideas_clave) ? resumen.ideas_clave : [],
+      ojo_aqui: resumen.ojo_aqui || "",
+      truco: resumen.truco || "",
+    };
+  }
+
+  /** Deja el contenido en la forma que espera el editor, sin perder nada. */
+  function prepararContenidoEditable(c) {
+    c.resumen = normalizarResumenGrupo(c.resumen);
+    if (!Array.isArray(c.ejercicios)) c.ejercicios = [];
+    if (!Array.isArray(c.trivia)) c.trivia = [];
+    if (!Array.isArray(c.material_extra)) c.material_extra = [];
+    if (!Array.isArray(c.ilustraciones)) c.ilustraciones = [];
+    c.material_extra.forEach((m) => {
+      if (!Array.isArray(m.tarjetas)) m.tarjetas = [];
+    });
+    // Modo grupo trabaja con `actividades` (una genérica + las 8 de Gardner
+    // si se pidieron). Un material combinado viejo puede traer `actividad`.
+    if (!Array.isArray(c.actividades)) {
+      c.actividades =
+        c.actividad && (c.actividad.titulo || c.actividad.instrucciones)
+          ? [{ inteligencia: "todas", titulo: c.actividad.titulo || "", instrucciones: c.actividad.instrucciones || "" }]
+          : [];
+    }
+    return c;
+  }
+
+  function areaEditable(ruta, valor, etiqueta, filas) {
+    return `
+      <label class="et">${escapeHtml(etiqueta)}</label>
+      <textarea data-ruta="${ruta}" rows="${filas || 3}">${escapeHtml(valor || "")}</textarea>`;
+  }
+
+  function textoEditable(ruta, valor, etiqueta) {
+    return `
+      <label class="et">${escapeHtml(etiqueta)}</label>
+      <input type="text" data-ruta="${ruta}" value="${escapeHtml(valor || "")}">`;
+  }
+
+  function botonQuitar(ruta, titulo) {
+    return `<button type="button" class="secundario chico btn-mini" data-accion="quitar" data-ruta="${ruta}" title="${escapeHtml(
+      titulo
+    )}">🗑️</button>`;
+  }
+
+  function botonAgregar(que, etiqueta) {
+    return `<button type="button" class="secundario agregar" data-accion="agregar" data-que="${que}">${escapeHtml(
+      etiqueta
+    )}</button>`;
+  }
+
+  function seccionExplicacion(c) {
+    const r = c.resumen;
+    return `
+      <details class="bloque-editor" open>
+        <summary>📖 Explicación del tema</summary>
+        <p class="nota">Esto es lo que tu grupo va a leer en la pestaña "Estudiar". Puedes cambiar cualquier texto.</p>
+        <div class="campo">${areaEditable("resumen.que_es", r.que_es, "De qué se trata", 3)}</div>
+        ${r.secciones
+          .map(
+            (sec, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${textoEditable(`resumen.secciones.${i}.titulo`, sec.titulo, `Sección ${i + 1} — título`)}</div>
+              ${botonQuitar(`resumen.secciones.${i}`, "Quitar esta sección")}
+            </div>
+            ${areaEditable(`resumen.secciones.${i}.texto`, sec.texto, "Texto", 4)}
+          </div>`
+          )
+          .join("")}
+        ${botonAgregar("seccion", "+ Agregar sección")}
+        ${
+          r.pasos.length
+            ? `<div class="campo"><label class="et">🧭 Paso a paso</label>
+                ${r.pasos
+                  .map(
+                    (paso, i) => `<div class="fila-borrable" style="margin-bottom:6px;">
+                      <input type="text" data-ruta="resumen.pasos.${i}" value="${escapeHtml(paso)}">
+                      ${botonQuitar(`resumen.pasos.${i}`, "Quitar este paso")}
+                    </div>`
+                  )
+                  .join("")}
+               </div>`
+            : ""
+        }
+        ${botonAgregar("paso", "+ Agregar paso")}
+        ${
+          r.ideas_clave.length
+            ? `<div class="campo"><label class="et">⭐ Lo que no se les puede olvidar</label>
+                ${r.ideas_clave
+                  .map(
+                    (idea, i) => `<div class="fila-borrable" style="margin-bottom:6px;">
+                      <input type="text" data-ruta="resumen.ideas_clave.${i}" value="${escapeHtml(idea)}">
+                      ${botonQuitar(`resumen.ideas_clave.${i}`, "Quitar esta idea")}
+                    </div>`
+                  )
+                  .join("")}
+               </div>`
+            : ""
+        }
+        ${botonAgregar("idea", "+ Agregar idea clave")}
+        <div class="campo">${areaEditable("resumen.ojo_aqui", r.ojo_aqui, "⚠️ Ojo aquí", 2)}</div>
+        <div class="campo">${areaEditable("resumen.truco", r.truco, "🎯 Truco para recordarlo", 2)}</div>
+      </details>`;
+  }
+
+  function seccionIlustraciones(c) {
+    const lista = Array.isArray(c.ilustraciones) ? c.ilustraciones : [];
+    if (!lista.length) return "";
+    const html = window.EnsenaiDiagrama ? window.EnsenaiDiagrama.ilustraciones(lista) : "";
+    if (!html) return "";
+    return `
+      <details class="bloque-editor">
+        <summary>🖼️ Ilustraciones (${lista.length})</summary>
+        <p class="nota">Salieron solas de la biblioteca porque el tema las pedía. Quita las que no te sirvan.</p>
+        <div class="vista-diagrama">${html}</div>
+        ${lista
+          .map(
+            (i, idx) => `<div class="fila-borrable" style="margin-top:8px;">
+              <div style="font-size:0.88rem; font-weight:700; align-self:center;">${escapeHtml(i.nombre || "Sin nombre")}</div>
+              ${botonQuitar(`ilustraciones.${idx}`, "Quitar esta ilustración")}
+            </div>`
+          )
+          .join("")}
+      </details>`;
+  }
+
+  function seccionDiagrama(c) {
+    const html = window.EnsenaiDiagrama ? window.EnsenaiDiagrama.dibujar(c.diagrama) : "";
+    if (!html) return "";
+    return `
+      <details class="bloque-editor">
+        <summary>🗺️ Diagrama</summary>
+        <p class="nota">Así lo va a ver tu grupo. El diagrama se arma solo a partir del tema; si no te sirve, quítalo.</p>
+        <div class="vista-diagrama">${html}</div>
+        <button type="button" class="secundario agregar" data-accion="quitar-diagrama">🗑️ Quitar el diagrama</button>
+      </details>`;
+  }
+
+  function seccionActividades(c) {
+    const acts = c.actividades;
+    return `
+      <details class="bloque-editor">
+        <summary>✏️ Actividad${acts.length === 1 ? "" : "es"} (${acts.length})</summary>
+        <p class="nota">La actividad que van a hacer en clase o en consulta. Es la parte que más se cambia — ajústala a tu grupo.</p>
+        ${
+          acts.length
+            ? acts
+                .map(
+                  (a, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>
+                <label class="et">${
+                  a.inteligencia && a.inteligencia !== "todas"
+                    ? escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)
+                    : "Para todo el grupo"
+                }</label>
+                <input type="text" data-ruta="actividades.${i}.titulo" value="${escapeHtml(
+                    a.titulo || ""
+                  )}" placeholder="Título de la actividad">
+              </div>
+              ${botonQuitar(`actividades.${i}`, "Quitar esta actividad")}
+            </div>
+            ${areaEditable(`actividades.${i}.instrucciones`, a.instrucciones, "Instrucciones", 5)}
+          </div>`
+                )
+                .join("")
+            : `<p class="nota" style="margin:0;">Este material no trae actividad.</p>`
+        }
+        ${botonAgregar("actividad", "+ Agregar actividad")}
+      </details>`;
+  }
+
+  function seccionEjercicios(c) {
+    const ej = c.ejercicios;
+    return `
+      <details class="bloque-editor">
+        <summary>🧮 Ejercicios (${ej.length})</summary>
+        <p class="nota">Los que tu grupo resuelve en la pestaña "Practicar". La pista y la respuesta también son editables.</p>
+        ${ej
+          .map(
+            (e, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${areaEditable(`ejercicios.${i}.enunciado`, e.enunciado, `Ejercicio ${i + 1}`, 2)}</div>
+              ${botonQuitar(`ejercicios.${i}`, "Quitar este ejercicio")}
+            </div>
+            ${textoEditable(`ejercicios.${i}.pista`, e.pista, "Pista")}
+            ${textoEditable(`ejercicios.${i}.respuesta`, e.respuesta, "Respuesta")}
+          </div>`
+          )
+          .join("")}
+        ${botonAgregar("ejercicio", "+ Agregar ejercicio")}
+      </details>`;
+  }
+
+  function seccionMaterialExtra(c) {
+    const mats = c.material_extra;
+    return `
+      <details class="bloque-editor">
+        <summary>📎 Material de repaso (${mats.length})</summary>
+        <p class="nota">Tarjetas para recortar y doblar (pregunta de un lado, respuesta del otro) y otros apoyos de repaso.</p>
+        ${
+          mats.length
+            ? mats
+                .map(
+                  (m, i) => `
+          <div class="campo">
+            <div class="fila-borrable">
+              <div>${textoEditable(`material_extra.${i}.tipo`, m.tipo, `Recurso ${i + 1} — tipo`)}</div>
+              ${botonQuitar(`material_extra.${i}`, "Quitar este recurso")}
+            </div>
+            ${areaEditable(`material_extra.${i}.contenido`, m.contenido, "Cómo se usa", 2)}
+            ${
+              m.tarjetas.length
+                ? `<label class="et" style="margin-top:10px;">Tarjetas (frente / reverso)</label>` +
+                  m.tarjetas
+                    .map(
+                      (t, j) => `
+                <div class="par-tarjeta">
+                  <input type="text" data-ruta="material_extra.${i}.tarjetas.${j}.frente" value="${escapeHtml(
+                        t.frente || ""
+                      )}" placeholder="Frente">
+                  <input type="text" data-ruta="material_extra.${i}.tarjetas.${j}.reverso" value="${escapeHtml(
+                        t.reverso || ""
+                      )}" placeholder="Reverso">
+                  ${botonQuitar(`material_extra.${i}.tarjetas.${j}`, "Quitar esta tarjeta")}
+                </div>`
+                    )
+                    .join("")
+                : ""
+            }
+            <button type="button" class="secundario agregar" data-accion="agregar" data-que="tarjeta" data-idx="${i}">+ Agregar tarjeta</button>
+            ${
+              m.tarjetas.length
+                ? `<button type="button" class="secundario agregar" data-accion="imprimir-tarjetas" data-idx="${i}">🖨️ Imprimir estas tarjetas</button>`
+                : ""
+            }
+          </div>`
+                )
+                .join("")
+            : `<p class="nota" style="margin:0;">Este material no trae recursos de repaso.</p>`
+        }
+        ${
+          mats.length
+            ? `<button type="button" class="secundario agregar" data-accion="imprimir-repaso">🖨️ Imprimir todo el material de repaso</button>`
+            : ""
+        }
+      </details>`;
+  }
+
+  /**
+   * Pinta el editor completo dentro de #editor-material-<grupoId>.
+   * La trivia conserva su propio editor (renderEditorTrivia) porque necesita
+   * los radios de "cuál es la correcta".
+   */
+  function renderEditorMaterial(grupoId) {
+    const cont = document.getElementById(`editor-material-${grupoId}`);
+    if (!cont) return;
+    const c = prepararContenidoEditable(contenidoEnEdicion[grupoId] || {});
+
+    cont.innerHTML =
+      seccionExplicacion(c) +
+      seccionIlustraciones(c) +
+      seccionDiagrama(c) +
+      seccionActividades(c) +
+      seccionEjercicios(c) +
+      `<details class="bloque-editor"><summary>🧠 Trivia (${(c.trivia || []).length})</summary>
+         <div id="editor-trivia-${grupoId}" class="editor-trivia" style="padding:0; background:transparent;"></div>
+       </details>` +
+      seccionMaterialExtra(c);
+
+    renderEditorTrivia(grupoId);
+    conectarEditorMaterial(grupoId, cont);
+  }
+
+  /** Quita del material lo que quedó vacío al editarlo, para que al grupo no
+   *  le lleguen secciones, ejercicios o tarjetas en blanco. */
+  function limpiarContenidoEditado(c) {
+    if (!c) return c;
+    const conTexto = (s) => String(s || "").trim();
+    if (c.resumen && typeof c.resumen === "object") {
+      if (Array.isArray(c.resumen.secciones)) {
+        c.resumen.secciones = c.resumen.secciones.filter((s) => conTexto(s.titulo) || conTexto(s.texto));
+      }
+      if (Array.isArray(c.resumen.pasos)) c.resumen.pasos = c.resumen.pasos.filter(conTexto);
+      if (Array.isArray(c.resumen.ideas_clave)) c.resumen.ideas_clave = c.resumen.ideas_clave.filter(conTexto);
+    }
+    if (Array.isArray(c.actividades)) {
+      c.actividades = c.actividades.filter((a) => conTexto(a.titulo) || conTexto(a.instrucciones));
+    }
+    if (Array.isArray(c.ejercicios)) {
+      c.ejercicios = c.ejercicios.filter((e) => conTexto(e.enunciado));
+    }
+    if (Array.isArray(c.material_extra)) {
+      c.material_extra.forEach((m) => {
+        if (Array.isArray(m.tarjetas)) {
+          m.tarjetas = m.tarjetas.filter((t) => conTexto(t.frente) || conTexto(t.reverso));
+        }
+      });
+      c.material_extra = c.material_extra.filter(
+        (m) => conTexto(m.contenido) || (Array.isArray(m.tarjetas) && m.tarjetas.length)
+      );
+    }
+    return c;
+  }
+
+  /** Un solo juego de listeners delegados para todo el editor. */
+  function conectarEditorMaterial(grupoId, cont) {
+    if (cont.dataset.conectado === "1") return;
+    cont.dataset.conectado = "1";
+
+    const invalidarPdf = () => {
+      delete pdfCache[grupoId];
+      delete pdfCacheSinRespuestas[grupoId];
+    };
+
+    cont.addEventListener("input", (ev) => {
+      const ruta = ev.target.dataset && ev.target.dataset.ruta;
+      if (!ruta) return;
+      escribirRuta(contenidoEnEdicion[grupoId], ruta, ev.target.value);
+      invalidarPdf();
+    });
+
+    cont.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-accion]");
+      if (!btn || !cont.contains(btn)) return;
+      const c = contenidoEnEdicion[grupoId];
+      const accion = btn.dataset.accion;
+
+      if (accion === "quitar") {
+        borrarRuta(c, btn.dataset.ruta);
+      } else if (accion === "quitar-diagrama") {
+        c.diagrama = { tipo: "ninguno" };
+      } else if (accion === "agregar") {
+        const que = btn.dataset.que;
+        if (que === "seccion") c.resumen.secciones.push({ titulo: "", texto: "" });
+        else if (que === "paso") c.resumen.pasos.push("");
+        else if (que === "idea") c.resumen.ideas_clave.push("");
+        else if (que === "actividad") c.actividades.push({ inteligencia: "todas", titulo: "", instrucciones: "" });
+        else if (que === "ejercicio") c.ejercicios.push({ enunciado: "", pista: "", pasos: [], respuesta: "" });
+        else if (que === "tarjeta") {
+          const m = c.material_extra[parseInt(btn.dataset.idx, 10)];
+          if (m) {
+            if (!Array.isArray(m.tarjetas)) m.tarjetas = [];
+            m.tarjetas.push({ frente: "", reverso: "" });
+          }
+        }
+      } else if (accion === "imprimir-tarjetas") {
+        const m = c.material_extra[parseInt(btn.dataset.idx, 10)];
+        if (m && window.EnsenaiImprimible) window.EnsenaiImprimible.tarjetas(m.tipo, m.tarjetas);
+        return; // imprimir no cambia el material: no hay que repintar
+      } else if (accion === "imprimir-repaso") {
+        if (window.EnsenaiImprimible) window.EnsenaiImprimible.materialExtra(c.material_extra, c.tema || "");
+        return;
+      } else {
+        return;
+      }
+
+      invalidarPdf();
+      // Se vuelve a pintar conservando qué secciones estaban abiertas.
+      const abiertas = [...cont.querySelectorAll("details")].map((d) => d.open);
+      cont.dataset.conectado = "";
+      renderEditorMaterial(grupoId);
+      const nuevas = cont.querySelectorAll("details");
+      abiertas.forEach((abierta, i) => {
+        if (nuevas[i]) nuevas[i].open = abierta;
+      });
+    });
+  }
+
+  function pintarResultadoGenerado(grupoId) {
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    const meta = metaGenerado[grupoId];
+    const contenido = contenidoEnEdicion[grupoId];
+    if (!zona || !meta || !contenido) return;
+
+    zona.innerHTML = `
+      <div class="aviso">✓ ${escapeHtml(meta.encabezado)}: <strong>${escapeHtml(
+      meta.titulo
+    )}</strong>. Revisa y edita todo lo que quieras antes de compartirlo con tu grupo — así es como lo van a ver.</div>
+      <div id="editor-material-${grupoId}"></div>
+      <button class="primario" id="btn-agregar-${grupoId}">➕ Agregar a mi liga${meta.esPrimerTemaGratis ? " (gratis)" : ""}</button>
+      <button class="secundario" style="margin-top:10px; width:100%;" id="btn-pdf-${grupoId}">📄 Descargar imprimible (PDF, con respuestas)</button>
+      <button class="secundario" style="margin-top:6px; width:100%;" id="btn-pdf-grupo-${grupoId}">🧑‍🏫 Imprimible para el grupo (sin respuestas)</button>
+    `;
+    renderEditorMaterial(grupoId);
+    document.getElementById(`btn-agregar-${grupoId}`).addEventListener("click", () =>
+      agregarTemaAGrupo(grupoId, meta.titulo, contenidoEnEdicion[grupoId], meta.esPrimerTemaGratis)
+    );
+    document.getElementById(`btn-pdf-${grupoId}`).addEventListener("click", (ev) =>
+      descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, true)
+    );
+    document.getElementById(`btn-pdf-grupo-${grupoId}`).addEventListener("click", (ev) =>
+      descargarPdf(grupoId, contenidoEnEdicion[grupoId], ev.target, false)
+    );
+  }
+
+  /** El material de este grupo ya se uso (o se descarto): se olvida entero,
+   *  incluidos los PDFs cacheados, para que un re-dibujo no lo resucite. */
+  function olvidarGenerado(grupoId) {
+    delete contenidoEnEdicion[grupoId];
+    delete metaGenerado[grupoId];
+    delete pdfCache[grupoId];
+    delete pdfCacheSinRespuestas[grupoId];
+  }
+
+  /** Tras re-dibujar #contenido, devuelve a su lugar lo que estaba en vuelo:
+   *  la pantalla de espera de una generacion en curso, o el panel de un
+   *  material ya generado que todavia no se agrega a la liga. */
+  function restaurarEstadoDeGrupos() {
+    Object.keys(esperasActivas).forEach((gid) => esperasActivas[gid].actualizar());
+    Object.keys(metaGenerado).forEach((gid) => {
+      if (esperasActivas[gid]) return; // se esta regenerando: manda la espera
+      pintarResultadoGenerado(gid);
+    });
+  }
+
+  async function agregarTemaAGrupo(grupoId, titulo, contenido, esPrimerTemaGratis) {
+    // Si al editar la trivia se agregó una pregunta y se dejó vacía (sin
+    // texto), la quitamos antes de compartirla — evita que le llegue a los
+    // alumnos/pacientes una tarjeta de pregunta en blanco por descuido. Si
+    // se quitó algo, invalidamos el PDF en caché para que se regenere sin
+    // esa pregunta (si no, el PDF ya descargado la incluiría igual).
+    if (Array.isArray(contenido.trivia)) {
+      const totalAntes = contenido.trivia.length;
+      contenido.trivia = contenido.trivia.filter((p) => (p.pregunta || "").trim());
+      if (contenido.trivia.length !== totalAntes) delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+    }
+    // Mismo criterio para el resto del material ahora que TODO es editable
+    // (2-sep-2026): lo que quedó en blanco al editar no se le comparte al
+    // grupo como una tarjeta o un ejercicio vacío.
+    limpiarContenidoEditado(contenido);
+
+    const zonaInicial = zonaGenerar(grupoId);
+    if (zonaInicial) zonaInicial.innerHTML = `<div class="cargando">Agregando a tu liga…</div>`;
+
+    try {
+      // Si el profesional ya generó el PDF (o si falla, seguimos sin él —
+      // no debe bloquear que el tema se agregue a la liga).
+      let pdfUrl = pdfCache[grupoId] || null;
+      if (!pdfUrl) {
+        try {
+          pdfUrl = await generarPdfEnServidor(contenido);
+          pdfCache[grupoId] = pdfUrl;
+        } catch (err) {
+          pdfUrl = null;
+        }
+      }
+
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ titulo, contenido, esPrimerTemaGratis, pdfUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo agregar el tema.");
+
+      const tema = data.tema;
+      olvidarGenerado(grupoId);
+      delete fotosPorGrupo[grupoId]; // el tema ya quedó en la liga; no arrastrar las fotos al siguiente
+
+      // El desenlace se pinta DESPUES del re-dibujo, no antes: cargarGrupos()
+      // reconstruye #contenido y se llevaba por delante el boton de "Pagar y
+      // activar este tema" un instante despues de haberlo pintado.
+      await cargarGrupos();
+
+      const zonaFinal = zonaGenerar(grupoId);
+      if (tema.pago_status === "pendiente") {
+        if (zonaFinal) {
+          zonaFinal.innerHTML = `
+            <div class="aviso">Tema agregado — falta activarlo con un pago para que tu grupo lo vea.</div>
+            <button class="primario" id="btn-pagar-${tema.id}">💳 Pagar y activar este tema</button>
+          `;
+          document.getElementById(`btn-pagar-${tema.id}`).addEventListener("click", () => pagarTema(tema.id));
+        } else {
+          mostrarAvisoGeneracion({ estado: "generando", texto: `"${titulo}" quedó agregado — falta activarlo con un pago` });
+        }
+      } else if (zonaFinal) {
+        zonaFinal.innerHTML = `<div class="aviso">✓ ¡Listo! Ya está activo en tu liga.</div>`;
+      } else {
+        mostrarAvisoGeneracion({ estado: "listo", texto: `✓ "${titulo}" ya está activo en tu liga` });
+      }
+    } catch (err) {
+      const zonaError = zonaGenerar(grupoId);
+      const msg = mensajeErrorAmigable(err);
+      if (zonaError) zonaError.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+      else mostrarAvisoGeneracion({ estado: "falla", texto: `"${titulo}": ${msg}` });
+    }
+  }
+
+  async function pagarTema(temaId) {
+    try {
+      const res = await fetchConReintento(
+        `${API_BASE}/api/grupos/temas/${temaId}/checkout`,
+        { method: "POST", headers: { Authorization: `Bearer ${sesionActual.access_token}` } },
+        null,
+        null
+      );
+      const data = await res.json();
+      if (!data.checkout_url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      alert(err.message.includes("tardando") ? err.message + " Dale clic de nuevo a 'Pagar y activar'." : "Error: " + mensajeErrorAmigable(err));
+    }
+  }
+
+  const ETIQUETAS_ESTADO = {
+    pendiente: "Pendiente de pago",
+    pagado: "Activo (pagado)",
+    cubierto_suscripcion: "Activo (suscripción)",
+    gratis_prueba: "Activo (gratis)",
+  };
+
+  async function cargarTemas(grupoId) {
+    const cont = document.getElementById(`lista-temas-${grupoId}`);
+    if (!cont) return;
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/mios`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, cont);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los temas.");
+      const grupo = (data.grupos || []).find((g) => g.id === grupoId);
+      const temas = grupo?.temas || [];
+
+      // Solo se puede juntar temas que ya están activos en la liga — uno
+      // pendiente de pago puede no llegar a activarse nunca.
+      const elegibles = temas.filter((t) => t.pago_status !== "pendiente");
+      temasSeleccionadosPorGrupo[grupoId] = new Set();
+      modoExamenActivoPorGrupo[grupoId] = false;
+      const hint = document.getElementById(`hint-combinar-${grupoId}`);
+      if (hint) hint.style.display = elegibles.length >= 2 ? "block" : "none";
+
+      if (temas.length === 0) {
+        cont.innerHTML = `<p class="ayuda" style="margin:0;">Todavía no has agregado ningún tema.</p>`;
+        actualizarBarraCombinarGrupo(grupoId);
+        return;
+      }
+
+      const permiteSeleccion = elegibles.length >= 2;
+
+      cont.innerHTML = temas
+        .map(
+          (t) => `
+        <div class="tema-item">
+          ${permiteSeleccion && t.pago_status !== "pendiente" ? `<input type="checkbox" class="seleccionar" data-seleccionar-grupo="${grupoId}" data-seleccionar="${t.id}" title="Seleccionar para armar un repaso">` : ""}
+          <span class="titulo">${escapeHtml(t.titulo)}</span>
+          <span class="estado ${t.pago_status}">${escapeHtml(ETIQUETAS_ESTADO[t.pago_status] || t.pago_status)}</span>
+          ${
+            t.pago_status === "pendiente"
+              ? `<button class="secundario chico" id="btn-pagar-lista-${t.id}">Pagar</button>`
+              : `<button class="secundario chico" id="btn-material-${t.id}">📖 Ver material</button>
+                 <button class="secundario chico" id="btn-respuestas-${t.id}">Cómo contestaron</button>
+                 <button class="secundario chico" id="btn-ejercicios-${t.id}">Ver ejercicios</button>
+                 <button class="secundario chico" id="btn-adaptar-${t.id}">🧠 Adaptar por inteligencia</button>`
+          }
+        </div>
+        ${t.pago_status !== "pendiente" ? `<div id="material-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+        ${t.pago_status !== "pendiente" ? `<div id="respuestas-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+        ${t.pago_status !== "pendiente" ? `<div id="ejercicios-marcados-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+        ${t.pago_status !== "pendiente" ? `<div id="adaptar-${t.id}" style="display:none; margin:0 0 14px;"></div>` : ""}
+      `
+        )
+        .join("");
+
+      temas
+        .filter((t) => t.pago_status === "pendiente")
+        .forEach((t) => {
+          document.getElementById(`btn-pagar-lista-${t.id}`).addEventListener("click", () => pagarTema(t.id));
+        });
+
+      temas
+        .filter((t) => t.pago_status !== "pendiente")
+        .forEach((t) => {
+          const btnMat = document.getElementById(`btn-material-${t.id}`);
+          if (btnMat) btnMat.addEventListener("click", () => toggleMaterialTema(grupoId, t.id));
+          const btn = document.getElementById(`btn-respuestas-${t.id}`);
+          if (btn) btn.addEventListener("click", () => toggleRespuestas(grupoId, t.id));
+          const btnEj = document.getElementById(`btn-ejercicios-${t.id}`);
+          if (btnEj) btnEj.addEventListener("click", () => toggleEjerciciosMarcados(grupoId, t.id));
+          const btnAd = document.getElementById(`btn-adaptar-${t.id}`);
+          if (btnAd) btnAd.addEventListener("click", () => adaptarPorInteligencia(grupoId, t.id));
+        });
+
+      cont.querySelectorAll("[data-seleccionar]").forEach((chk) => {
+        chk.addEventListener("change", () => {
+          const id = chk.dataset.seleccionar;
+          if (chk.checked) temasSeleccionadosPorGrupo[grupoId].add(id);
+          else temasSeleccionadosPorGrupo[grupoId].delete(id);
+          actualizarBarraCombinarGrupo(grupoId);
+        });
+      });
+      actualizarBarraCombinarGrupo(grupoId);
+    } catch (err) {
+      cont.innerHTML = `<div class="error">No se pudieron cargar los temas.</div>`;
+    }
+  }
+
+  /** Muestra u oculta la barra de "Armar repaso" de un grupo según cuántos
+   * de sus temas activos estén marcados — ver el checkbox `data-seleccionar`
+   * en cargarTemas() arriba. */
+  function actualizarBarraCombinarGrupo(grupoId) {
+    const barra = document.getElementById(`barra-combinar-${grupoId}`);
+    if (!barra) return;
+    const seleccionados = temasSeleccionadosPorGrupo[grupoId] || new Set();
+    const n = seleccionados.size;
+
+    if (n < 2) {
+      barra.style.display = "none";
+      barra.innerHTML = "";
+      return;
+    }
+
+    const modoExamen = !!modoExamenActivoPorGrupo[grupoId];
+    const tope = modoExamen ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    const excedido = n > tope;
+    barra.style.display = "flex";
+    barra.innerHTML = `
+      <label class="toggle-modo-examen">
+        <input type="checkbox" id="chk-modo-examen-${grupoId}" ${modoExamen ? "checked" : ""}>
+        🎯 Guía de examen — puro simulador de práctica, sin explicación, pensada para compartir con tu grupo (hasta ${MAX_TEMAS_COMBINAR_EXAMEN} temas)
+      </label>
+      <div class="fila-principal">
+        <span>${n} temas seleccionados${excedido ? ` — máximo ${tope} para ${modoExamen ? "una guía de examen" : "un repaso"}` : ""}</span>
+        <div class="acciones">
+          <button type="button" class="secundario chico" id="btn-cancelar-combinar-${grupoId}">Cancelar</button>
+          <button type="button" class="primario chico" id="btn-armar-repaso-${grupoId}"${excedido ? " disabled" : ""}>${modoExamen ? "🎯 Armar guía de examen" : "✨ Armar repaso"}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById(`chk-modo-examen-${grupoId}`).addEventListener("change", (ev) => {
+      modoExamenActivoPorGrupo[grupoId] = ev.target.checked;
+      actualizarBarraCombinarGrupo(grupoId);
+    });
+    document.getElementById(`btn-cancelar-combinar-${grupoId}`).addEventListener("click", () => cargarTemas(grupoId));
+    if (!excedido) {
+      document.getElementById(`btn-armar-repaso-${grupoId}`).addEventListener("click", () => combinarTemasGrupo(grupoId));
+    }
+  }
+
+  /** Junta el contenido de los temas activos marcados en la liga en un solo
+   * material (resumen + trivia combinada), y lo deja en el mismo editor con
+   * el que se revisa cualquier tema recién generado — desde ahí el
+   * profesional lo agrega a su liga como a cualquier otro. Con "Guía de
+   * examen" activo (ver actualizarBarraCombinarGrupo), el resultado se
+   * inclina hacia ejercicios y un simulador de trivia, pensado para
+   * compartirse como guía de repaso antes de un examen. */
+  async function combinarTemasGrupo(grupoId) {
+    if (hayGeneracionEnCurso()) return;
+
+    const ids = [...(temasSeleccionadosPorGrupo[grupoId] || [])];
+    const modoExamen = !!modoExamenActivoPorGrupo[grupoId];
+    const tope = modoExamen ? MAX_TEMAS_COMBINAR_EXAMEN : MAX_TEMAS_COMBINAR;
+    if (ids.length < 2 || ids.length > tope) return;
+
+    const zona = document.getElementById(`resultado-generar-${grupoId}`);
+    if (!zona) return;
+    zona.innerHTML = "";
+    const barra = document.getElementById(`barra-combinar-${grupoId}`);
+    if (barra) barra.style.display = "none";
+    olvidarGenerado(grupoId);
+
+    const tituloProvisional = modoExamen ? `Guía de examen (${ids.length} temas)` : `Repaso de ${ids.length} temas`;
+    iniciarTips(
+      grupoId,
+      modoExamen ? "Armando la guía de examen…" : "Juntando los temas y armando el repaso…",
+      { texto: "Seguir navegando mientras se arma →", onClick: minimizarGeneracion }
+    );
+
+    const promesa = fetchConReintento(
+      `${API_BASE}/api/temas/combinar`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ temaIds: ids, modo: "grupo", enfoque: modoExamen ? "examen" : "estudio" }),
+      },
+      null,
+      null
+    ).then(async (res) => ({ res, data: await res.json() }));
+
+    generacionEnCurso = { grupoId, titulo: tituloProvisional, promesa, minimizada: false };
+
+    let minimizada = false;
+    const cerrar = () => {
+      if (generacionEnCurso) minimizada = generacionEnCurso.minimizada;
+      generacionEnCurso = null;
+      detenerTips(grupoId);
+    };
+
+    promesa
+      .then(({ res, data }) => {
+        cerrar();
+        if (!res.ok) throw new Error(data.error || "No se pudo armar el repaso.");
+
+        contenidoEnEdicion[grupoId] = { ...data.contenido, nivel: data.contenido?.nivel || null, enfoque: modoExamen ? "examen" : "estudio" };
+        delete pdfCache[grupoId];
+        delete pdfCacheSinRespuestas[grupoId];
+        modoExamenActivoPorGrupo[grupoId] = false;
+        metaGenerado[grupoId] = {
+          encabezado: modoExamen ? "Guía de examen armada" : "Repaso armado",
+          titulo: data.contenido?.tema || tituloProvisional,
+          esPrimerTemaGratis: false,
+        };
+        avisarMaterialListo(grupoId, minimizada);
+      })
+      .catch((err) => {
+        cerrar();
+        avisarFalloGeneracion(grupoId, minimizada, tituloProvisional, mensajeErrorAmigable(err));
+        cargarTemas(grupoId); // devuelve la lista de temas a su estado normal
+      });
+  }
+
+  /**
+   * Muestra/oculta, por tema, quién contestó la trivia y qué contestó en
+   * cada pregunta — para que el profesional vea en qué está fallando el
+   * grupo, no solo un promedio. En grupos anónimos (mostrar_nombres=false)
+   * el backend nunca guarda nombre, así que aquí simplemente sale como
+   * "Alumno N (anónimo)".
+   */
+  /**
+   * "Ver material" de un tema que YA está en la liga (2-sep-2026).
+   *
+   * GET /api/grupos/mios no manda el contenido de los temas (pesaría
+   * muchísimo), así que en la lista solo se veían los títulos: el maestro no
+   * tenía forma de releer lo que le compartió a su grupo, ni de corregir una
+   * redacción o una respuesta sin volver a generar el tema. Aquí se pide ese
+   * tema completo y se abre en el MISMO editor con el que se revisa un
+   * material recién generado; "Guardar cambios" lo actualiza en la liga
+   * (PATCH), sin gastar cupo.
+   */
+  async function toggleMaterialTema(grupoId, temaId) {
+    const panel = document.getElementById(`material-${temaId}`);
+    const btn = document.getElementById(`btn-material-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      panel.innerHTML = "";
+      delete contenidoEnEdicion[`tema-${temaId}`];
+      if (btn) btn.textContent = "📖 Ver material";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando el material…</div>`;
+    if (btn) btn.textContent = "Ocultar material";
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, panel);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el material.");
+
+      const clave = `tema-${temaId}`;
+      contenidoEnEdicion[clave] = data.tema.contenido || {};
+
+      panel.innerHTML = `
+        <p class="ayuda" style="margin:0 0 8px;">Así lo ve tu grupo. Puedes corregir lo que quieras y guardarlo — no gasta temas de tu plan.</p>
+        <div id="editor-material-${clave}"></div>
+        <button type="button" class="primario" id="btn-guardar-tema-${temaId}" style="margin-top:10px;">💾 Guardar cambios</button>
+        <div id="aviso-guardar-${temaId}"></div>
+      `;
+      renderEditorMaterial(clave);
+
+      document.getElementById(`btn-guardar-tema-${temaId}`).addEventListener("click", (ev) =>
+        guardarTemaEditado(grupoId, temaId, ev.target)
+      );
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  async function guardarTemaEditado(grupoId, temaId, btn) {
+    const clave = `tema-${temaId}`;
+    const aviso = document.getElementById(`aviso-guardar-${temaId}`);
+    const contenido = limpiarContenidoEditado(contenidoEnEdicion[clave]);
+    if (!contenido) return;
+    if (Array.isArray(contenido.trivia)) {
+      contenido.trivia = contenido.trivia.filter((p) => (p.pregunta || "").trim());
+    }
+
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    if (aviso) aviso.innerHTML = "";
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ contenido }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron guardar los cambios.");
+      if (aviso) {
+        aviso.innerHTML = `<div class="aviso" style="margin-top:10px;">✓ Guardado. Tu grupo ya ve la versión nueva. Si habías descargado el imprimible, vuelve a generarlo para que coincida.</div>`;
+      }
+      renderEditorMaterial(clave); // refleja lo que se limpió al guardar
+    } catch (err) {
+      if (aviso) aviso.innerHTML = `<div class="error" style="margin-top:10px;">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  }
+
+  async function toggleRespuestas(grupoId, temaId) {
+    const panel = document.getElementById(`respuestas-${temaId}`);
+    const btn = document.getElementById(`btn-respuestas-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "Cómo contestaron";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando respuestas…</div>`;
+    if (btn) btn.textContent = "Ocultar respuestas";
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/respuestas`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, panel);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar las respuestas.");
+
+      const respuestas = data.respuestas || [];
+      if (respuestas.length === 0) {
+        panel.innerHTML = `<p class="ayuda" style="margin:8px 0 0;">Todavía nadie ha contestado la trivia de este tema.</p>`;
+        return;
+      }
+
+      panel.innerHTML = respuestas
+        .map((r, i) => {
+          const quien = r.nombre ? escapeHtml(r.nombre) : `Alumno ${i + 1} (anónimo)`;
+          const marca = r.created_at
+            ? new Date(r.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+            : "";
+          const puntaje = r.total_cerradas > 0 ? ` — ${r.aciertos}/${r.total_cerradas} correctas` : "";
+
+          const detallePreguntas = (r.respuestas || [])
+            .map((p) => {
+              const icono = p.acerto === true ? "✅" : p.acerto === false ? "❌" : "✏️";
+              const nota =
+                p.acerto === false
+                  ? ` · Correcta: ${escapeHtml(p.respuesta_correcta || "")}`
+                  : "";
+              return `<div style="margin:6px 0 0; font-size:0.88rem;">
+                <div><strong>${icono} ${escapeHtml(p.pregunta)}</strong></div>
+                <div class="ayuda" style="margin:2px 0 0;">Contestó: ${escapeHtml(p.respuesta || "(sin contestar)")}${nota}</div>
+              </div>`;
+            })
+            .join("");
+
+          return `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+            <div><strong>${quien}</strong>${puntaje} <span class="ayuda">· ${marca}</span></div>
+            ${detallePreguntas}
+          </div>`;
+        })
+        .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  /**
+   * Muestra/oculta, por tema, quién marcó qué ejercicios como resueltos en
+   * la pestaña "Practicar" de g.html — la señal ligera (sin fotos) que
+   * probamos antes de invertir en guardar imágenes (ver POST/GET
+   * .../ejercicios-marcados en routes/grupos.js). Mismo patrón que
+   * toggleRespuestas() de arriba, incluido el manejo de nombres en grupos
+   * anónimos.
+   */
+  /**
+   * "Adaptar por inteligencia" (31-ago-2026): pide las 8 actividades de la
+   * tabla de Gardner para un tema que ya existe. El tema se genera con UNA
+   * actividad pensada para todo el grupo (más rápido, menos material que
+   * revisar); esto es para quien sí quiere repartir una distinta a cada
+   * quien. El backend las guarda dentro del tema, así que solo se generan
+   * una vez — una segunda llamada las regresa sin volver a gastar generación.
+   */
+  async function adaptarPorInteligencia(grupoId, temaId) {
+    const panel = document.getElementById(`adaptar-${temaId}`);
+    const btn = document.getElementById(`btn-adaptar-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "🧠 Adaptar por inteligencia";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Armando una actividad por cada inteligencia… (unos segundos)</div>`;
+    if (btn) { btn.textContent = "Ocultar actividades"; btn.disabled = true; }
+
+    const nivel = document.getElementById(`nivel-input-${grupoId}`)?.value || "primaria_alta";
+    const enfoque = document.getElementById(`enfoque-psico-input-${grupoId}`)?.checked ? "psicoeducativo" : "escolar";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grupos/temas/${temaId}/actividades`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sesionActual.access_token}` },
+        body: JSON.stringify({ nivel, enfoque }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudieron generar las actividades.");
+
+      const porInteligencia = (data.actividades || []).filter((a) => a && a.inteligencia !== "todas");
+      panel.innerHTML =
+        `<p class="ayuda" style="margin:8px 0 4px;">Ya quedaron guardadas en el tema — tus alumnos las ven en su liga. No tienes que usar las 8: elige las que te sirvan.</p>` +
+        porInteligencia
+          .map(
+            (a) => `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+              <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--bosque);">${escapeHtml(
+                ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia
+              )}</div>
+              <div style="font-weight:700; margin:2px 0 4px;">${escapeHtml(a.titulo || "")}</div>
+              <div style="font-size:0.9rem; line-height:1.5;">${escapeHtml(a.instrucciones || "")}</div>
+            </div>`
+          )
+          .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function toggleEjerciciosMarcados(grupoId, temaId) {
+    const panel = document.getElementById(`ejercicios-marcados-${temaId}`);
+    const btn = document.getElementById(`btn-ejercicios-${temaId}`);
+    if (!panel) return;
+
+    if (panel.style.display === "block") {
+      panel.style.display = "none";
+      if (btn) btn.textContent = "Ver ejercicios";
+      return;
+    }
+    panel.style.display = "block";
+    panel.innerHTML = `<div class="cargando">Cargando…</div>`;
+    if (btn) btn.textContent = "Ocultar ejercicios";
+
+    try {
+      const res = await fetchConReintento(`${API_BASE}/api/grupos/${grupoId}/temas/${temaId}/ejercicios-marcados`, {
+        headers: { Authorization: `Bearer ${sesionActual.access_token}` },
+      }, panel);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el progreso.");
+
+      const marcados = data.marcados || [];
+      if (marcados.length === 0) {
+        panel.innerHTML = `<p class="ayuda" style="margin:8px 0 0;">Todavía nadie ha marcado ejercicios resueltos en este tema.</p>`;
+        return;
+      }
+
+      panel.innerHTML = marcados
+        .map((m, i) => {
+          const quien = m.nombre ? escapeHtml(m.nombre) : `Alumno ${i + 1} (anónimo)`;
+          const marca = m.created_at
+            ? new Date(m.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+            : "";
+          const indices = (m.indices_resueltos || []).slice().sort((a, b) => a - b);
+          const n = indices.length;
+          // Cuáles resolvió, no solo cuántos: si todo el grupo se salta el
+          // mismo ejercicio, eso es justo lo que el maestro necesita ver.
+          const cuales = n
+            ? `<div class="ayuda" style="margin:3px 0 0;">Ejercicios: ${indices.map((i) => i + 1).join(", ")}</div>`
+            : "";
+          return `<div style="border:2px solid var(--linea, #E3E9EF); border-radius:12px; padding:10px 12px; margin-top:8px;">
+            <div><strong>${quien}</strong> — ${n}/${m.total_ejercicios} ejercicios marcados <span class="ayuda">· ${marca}</span></div>
+            ${cuales}
+          </div>`;
+        })
+        .join("");
+    } catch (err) {
+      panel.innerHTML = `<div class="error">${escapeHtml(mensajeErrorAmigable(err))}</div>`;
+    }
+  }
+
+  init();
+</script>
+<!-- Botón flotante de comentarios del piloto (ver feedback.js). Va al final
+     y en archivo aparte: así los tres paneles comparten el mismo widget y
+     puede leer API_BASE y sesionActual del script de arriba. -->
+<script src="tabs.js"></script>
+<script src="plantillas.js"></script>
+<script src="feedback.js"></script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "57b9bff54f8e4f85ae01d63bf13fa973"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

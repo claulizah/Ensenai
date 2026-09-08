@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnseñAI — Liga de grupo</title>
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --profundo: #1E3A8A; --profundo-oscuro: #16296B; --cielo: #60A5FA;
+    --menta: #34D399; --aqua: #7DD3FC; --bosque: #065F46;
+    --hielo: #F0FDF4; --tinta: #1E3A8A; --linea: #DCEEFC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(96,165,250,0.35) 0, transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(125,211,252,0.32) 0, transparent 32%),
+      var(--hielo);
+    color: var(--tinta); min-height: 100vh;
+  }
+  header { background: var(--profundo); color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 10px; }
+  header a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  header .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; }
+  header .marca .ai {
+    display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14);
+    padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 80px; }
+  .tarjeta { background: #fff; border: 2px solid var(--linea); border-radius: 18px; padding: 22px; margin-bottom: 18px; box-shadow: 0 3px 0 var(--linea); }
+  h1 { font-family: 'Grandstander', sans-serif; font-size: 1.5rem; margin: 0 0 6px; }
+  h2 { font-family: 'Grandstander', sans-serif; font-size: 1.15rem; margin: 0 0 8px; color: var(--profundo); }
+  h3 { font-family: 'Grandstander', sans-serif; color: var(--bosque); font-size: 0.98rem; margin: 16px 0 8px; }
+  p.ayuda { color: #4A6A85; margin: 0; }
+  label { display: block; font-weight: 700; font-size: 0.9rem; margin: 14px 0 6px; }
+  input { width: 100%; padding: 12px 14px; border: 2px solid var(--linea); border-radius: 12px; font-family: inherit; font-size: 1rem; }
+  button.primario {
+    width: 100%; background: var(--profundo); color: #fff; border: none; padding: 14px; border-radius: 999px;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 16px;
+    box-shadow: 0 4px 0 var(--profundo-oscuro);
+  }
+  button.secundario { background: none; border: 2px solid var(--linea); color: var(--profundo); padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px; }
+  .error { background: #FFF0EC; border: 2px solid #FFC4B5; color: #B94A2E; padding: 12px 14px; border-radius: 12px; margin-top: 12px; font-size: 0.9rem; }
+  .cargando { text-align: center; padding: 60px 20px; color: #4A6A85; }
+  .tema-card { border: 2px solid var(--linea); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; cursor: pointer; }
+  .tema-card .titulo { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.05rem; color: var(--profundo); }
+  .tema-card .resumen-corto { color: #4A6A85; font-size: 0.9rem; margin-top: 4px; }
+  .actividad-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  .actividad-box .inteligencia { display: inline-block; background: var(--menta); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; }
+  .trivia-item { border: 2px solid var(--linea); border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fff; }
+  .trivia-item:last-child { margin-bottom: 0; }
+  .trivia-pregunta { display: flex; align-items: flex-start; gap: 10px; font-weight: 700; margin-bottom: 12px; line-height: 1.4; }
+  .trivia-num {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-size: 0.78rem; font-family: 'Grandstander', sans-serif; display: flex; align-items: center; justify-content: center;
+  }
+  .opciones { display: grid; gap: 8px; }
+  .opcion-btn {
+    text-align: left; background: #fff; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 14px;
+    font-family: inherit; font-size: 0.94rem; color: var(--tinta); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .opcion-btn:hover:not(:disabled) { border-color: var(--cielo); background: var(--hielo); }
+  .opcion-btn.seleccionada { border-color: var(--profundo); background: #EAF1FE; font-weight: 700; }
+  .opcion-btn.correcta { border-color: var(--menta); background: #E7FBF3; font-weight: 700; color: var(--bosque); }
+  .opcion-btn.incorrecta { border-color: #E4796B; background: #FFF0EC; color: #B94A2E; }
+  .opcion-btn:disabled { cursor: default; }
+  .trivia-feedback { margin-top: 10px; font-size: 0.86rem; color: #4A6A85; background: #F4F8FC; border-radius: 8px; padding: 8px 12px; }
+  .trivia-feedback.bien { color: var(--bosque); background: #E7FBF3; }
+  .trivia-feedback.mal { color: #B94A2E; background: #FFF0EC; }
+  .etiqueta-op {
+    float: right; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+    background: rgba(0,0,0,0.07);
+  }
+  .opcion-btn.correcta .etiqueta-op { background: var(--menta); color: #fff; }
+  .opcion-btn.incorrecta .etiqueta-op { background: #E4796B; color: #fff; }
+  .respuesta-abierta {
+    width: 100%; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 0.94rem; resize: vertical;
+  }
+  .respuesta-abierta:disabled { background: #F7FAFD; color: #4A6A85; }
+  #trivia-resumen { text-align: center; font-weight: 700; color: var(--bosque); margin: 4px 0 12px; font-family: 'Grandstander', sans-serif; }
+  /* ── Pestañas del material ── */
+  .pestanas { display: flex; gap: 4px; background: var(--hielo); border-radius: 999px; padding: 4px; margin: 14px 0 20px; }
+  .pestana {
+    flex: 1; border: none; background: none; padding: 10px 6px; border-radius: 999px; cursor: pointer;
+    font-family: 'Grandstander', sans-serif; font-weight: 600; font-size: 0.86rem; color: #5b7d99;
+    transition: background .15s, color .15s;
+  }
+  .pestana.activa { background: #fff; color: var(--profundo); box-shadow: 0 2px 6px rgba(30,58,138,0.12); }
+  .pestana-num { display: inline-block; background: var(--menta); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.72rem; }
+
+  /* ── Bloques de la pestaña Estudiar ── */
+  .bloque-est { border-left: 4px solid var(--linea); padding: 2px 0 2px 14px; margin-bottom: 18px; }
+  .bloque-est p { margin: 0; line-height: 1.65; font-size: 0.95rem; }
+  .bloque-est.destacado { border-left-color: var(--menta); background: var(--hielo); border-radius: 0 12px 12px 0; padding: 14px 16px; }
+  .bloque-est.destacado p { font-size: 1rem; color: var(--bosque); font-weight: 600; }
+  .bloque-titulo { font-family: 'Grandstander', sans-serif; color: var(--profundo); font-size: 0.98rem; margin: 0 0 6px; }
+  .parrafo-largo { margin: 0 0 10px; line-height: 1.6; }
+  .parrafo-largo:last-child { margin-bottom: 0; }
+  /* Racha del alumno — franja discreta bajo el encabezado (2-sep-2026) */
+  .racha-alumno { background: #fff; border-bottom: 2px solid var(--linea, #DCEEFC); padding: 10px 20px; text-align: center; font-size: 0.88rem; }
+  .lista-pasos { margin: 0; padding-left: 20px; }
+  .lista-pasos li { margin-bottom: 7px; line-height: 1.55; font-size: 0.94rem; }
+  .lista-ideas { margin: 0; padding-left: 18px; list-style: none; }
+  .lista-ideas li { margin-bottom: 7px; line-height: 1.5; font-size: 0.94rem; position: relative; }
+  .lista-ideas li::before { content: "▪"; color: var(--menta); position: absolute; left: -14px; font-size: 1.1rem; }
+  .caja-ojo, .caja-truco { border-radius: 12px; padding: 13px 16px; margin-bottom: 16px; }
+  .caja-ojo { background: #FFF7E6; border: 2px solid #FFDFA0; }
+  .caja-truco { background: #F3F0FF; border: 2px solid #D9D2FF; }
+  .caja-ojo strong, .caja-truco strong { display: block; font-size: 0.88rem; margin-bottom: 4px; }
+  .caja-ojo strong { color: #8A6100; } .caja-truco strong { color: #4B3BA8; }
+  .caja-ojo p, .caja-truco p { margin: 0; font-size: 0.93rem; line-height: 1.55; }
+  .bloque-est.plegable { border-left-color: var(--cielo); }
+  .bloque-est.plegable summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #5b7d99; }
+
+
+  /* ── Ejercicios ── */
+  .ejercicio { border: 2px solid var(--linea); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+  .ejercicio-cabeza { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+  .ejercicio-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--profundo); color: #fff;
+    font-family: 'Grandstander', sans-serif; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ejercicio-enunciado { margin: 0; font-weight: 700; line-height: 1.5; font-size: 0.95rem; }
+  .btn-pista, .btn-solucion {
+    border: 2px solid var(--linea); background: #fff; border-radius: 999px; padding: 7px 16px;
+    font-family: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; color: #5b7d99; margin-right: 6px;
+  }
+  .btn-solucion { border-color: var(--menta); color: var(--bosque); }
+  .btn-solucion.abierta { background: var(--hielo); }
+  .pista-caja { background: #FFF7E6; border-radius: 10px; padding: 10px 13px; margin-top: 9px; font-size: 0.9rem; color: #8A6100; }
+  .solucion-caja { background: var(--hielo); border-radius: 10px; padding: 13px 15px; margin-top: 10px; }
+  .ejercicio-respuesta {
+    background: var(--menta); color: #fff; border-radius: 8px; padding: 8px 13px; margin-top: 10px;
+    font-weight: 700; font-size: 0.93rem;
+  }
+  .ejercicio-marcar {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85rem; font-weight: 700;
+    color: var(--bosque); cursor: pointer;
+  }
+  .ejercicio-marcar input { width: 17px; height: 17px; accent-color: var(--menta); cursor: pointer; }
+  .btn-guardar-progreso { width: 100%; margin-top: 4px; }
+  .progreso-aviso { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--bosque); margin-top: 8px; }
+
+  .material-extra-box { background: #fff; border: 2px dashed var(--aqua); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  /* Tarjetas de repaso en pantalla: antes solo se veia la instruccion
+     ("recorta cada tarjeta") y las tarjetas no aparecian por ningun lado. */
+  .lista-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .tarjeta-repaso { border: 1.5px solid var(--linea); border-radius: 10px; overflow: hidden; background: #fff; }
+  .tarjeta-repaso .frente { padding: 9px 10px; font-weight: 800; font-size: 0.87rem; line-height: 1.3; }
+  .tarjeta-repaso .reverso { padding: 9px 10px; font-size: 0.85rem; line-height: 1.35; color: var(--bosque); background: var(--hielo); border-top: 1px dashed var(--aqua); }
+  .respuestas-toggle { text-align: center; }
+  .respuestas-box { background: var(--hielo); border-radius: 12px; padding: 14px 16px; margin-top: 12px; display: none; }
+  .respuestas-box.abierto { display: block; }
+  .volver { color: var(--profundo); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 14px; }
+  footer.pie {
+    max-width: 620px; margin: 24px auto 32px; padding: 0 16px;
+    text-align: center; font-size: 0.78rem; color: #6B87A0;
+  }
+  footer.pie a { color: inherit; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html"><span class="marca">Enseñ<span class="ai">AI</span></span></a>
+</header>
+
+<div class="racha-alumno" id="racha-alumno" style="display:none;"></div>
+
+<main id="contenido">
+  <div class="cargando">Cargando…</div>
+</main>
+
+<footer class="pie">
+  Tu docente o profesional te compartió esta liga. Guardamos tus respuestas para que pueda ver el avance del grupo —
+  consulta el <a href="privacidad.html">aviso de privacidad</a> para más detalle.
+</footer>
+
+<script src="figuras.js"></script>
+<script src="diagrama.js"></script>
+<script src="imprimible.js"></script>
+<script>
+  const API_BASE = "https://ensenai-backend.onrender.com";
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get("slug");
+
+  let grupoActual = null;
+  let temasActuales = [];
+
+  const ETIQUETAS_INTELIGENCIA = {
+    linguistica: "Lingüística", logico_matematica: "Lógico-matemática", espacial: "Espacial",
+    musical: "Musical", kinestesica: "Corporal-kinestésica", interpersonal: "Interpersonal",
+    intrapersonal: "Intrapersonal", naturalista: "Naturalista",
+    // Actividad única pensada para todo el grupo (31-ago-2026): así sale
+    // ahora por default en modo grupo, en vez de las 8 de la tabla.
+    todas: "Para todo el grupo",
+  };
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
+  /**
+   * El modelo escribe en markdown aunque se le pida texto plano — sale
+   * "**1. Género Narrativo**" con los asteriscos a la vista. Esto convierte
+   * lo mínimo (negritas, cursivas, código y saltos) a HTML de verdad.
+   * Siempre escapa primero: las únicas etiquetas que llegan al DOM son las
+   * que se generan aquí.
+   */
+  function formatearTexto(str) {
+    let t = escapeHtml(str || "");
+    t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[\s([{])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+    t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    return t.replace(/\n/g, "<br>");
+  }
+
+  /**
+   * "Más estructurado cuando hay mucho texto" (pedido de la usuaria,
+   * 2-sep-2026): la IA suele devolver la actividad como UN párrafo enorme
+   * con los pasos numerados en línea ("1. Ponte de pie... 2. Repite el
+   * verso..."). En celular eso es un muro de texto imposible de seguir
+   * MIENTRAS haces la actividad. Esto lo estructura al pintarlo, sin tocar
+   * lo que ya está guardado — así también se arreglan los temas viejos del
+   * historial, no solo los que se generen de aquí en adelante.
+   *
+   * Reglas a propósito conservadoras (mejor no partir que partir mal):
+   * - Lista numerada solo si los marcadores van 1, 2, 3... consecutivos y
+   *   hay al menos dos. Así "3.5", "(3, 4, 5)" o "1/2" no la disparan.
+   * - Viñetas solo cuando el guion/•/– ABRE renglón: a media frase casi
+   *   siempre es un inciso, no una lista.
+   * - Sin marcadores, un texto muy largo se parte en párrafos de ~3 frases
+   *   para que respire; uno corto se deja exactamente igual que antes.
+   */
+  function formatearLargo(str) {
+    const bruto = String(str == null ? "" : str).trim();
+    if (!bruto) return "";
+
+    // 1) Pasos numerados: "1. ", "2) "...
+    const marcas = [];
+    const re = /(^|[\s (])(\d{1,2})[.)]\s+/g;
+    let m;
+    while ((m = re.exec(bruto)) !== null) {
+      marcas.push({ num: parseInt(m[2], 10), inicio: m.index + m[1].length, fin: re.lastIndex });
+    }
+    const secuencia = [];
+    let esperado = 1;
+    for (let i = 0; i < marcas.length; i++) {
+      if (marcas[i].num === esperado) {
+        secuencia.push(marcas[i]);
+        esperado++;
+      }
+    }
+    if (secuencia.length >= 2) {
+      const pasos = [];
+      for (let i = 0; i < secuencia.length; i++) {
+        const hasta = i + 1 < secuencia.length ? secuencia[i + 1].inicio : bruto.length;
+        const paso = bruto.slice(secuencia[i].fin, hasta).trim();
+        if (paso) pasos.push(paso);
+      }
+      if (pasos.length >= 2) {
+        const intro = bruto.slice(0, secuencia[0].inicio).trim();
+        return (
+          (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+          `<ol class="lista-pasos">${pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>`
+        );
+      }
+    }
+
+    // 2) Viñetas al inicio de renglón
+    const renglones = bruto.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const esVineta = (l) => /^[-–—•*]\s+/.test(l);
+    const primera = renglones.findIndex(esVineta);
+    if (primera !== -1 && renglones.slice(primera).filter(esVineta).length >= 2) {
+      const intro = renglones.slice(0, primera).join(" ").trim();
+      const items = [];
+      renglones.slice(primera).forEach((l) => {
+        if (esVineta(l)) items.push(l.replace(/^[-–—•*]\s+/, ""));
+        else if (items.length) items[items.length - 1] += " " + l;
+      });
+      return (
+        (intro ? `<p class="parrafo-largo">${formatearTexto(intro)}</p>` : "") +
+        `<ul class="lista-ideas">${items.map((t) => `<li>${formatearTexto(t)}</li>`).join("")}</ul>`
+      );
+    }
+
+    // 3) Sin marcadores: párrafos que respiren
+    const parrafos = [];
+    bruto
+      .split(/\n{2,}/)
+      .map((b) => b.trim())
+      .filter(Boolean)
+      .forEach((bloque) => {
+        if (bloque.length <= 320) {
+          parrafos.push(bloque);
+          return;
+        }
+        const frases = bloque.match(/[^.!?…]+[.!?…]+["'”’)\]]*\s*|[^.!?…]+$/g) || [bloque];
+        let acumulado = "";
+        frases.forEach((f) => {
+          acumulado += f;
+          if (acumulado.length >= 220) {
+            parrafos.push(acumulado.trim());
+            acumulado = "";
+          }
+        });
+        const resto = acumulado.trim();
+        if (resto) {
+          // Una cola muy corta como párrafo suelto se ve peor que pegada.
+          if (resto.length < 60 && parrafos.length) parrafos[parrafos.length - 1] += " " + resto;
+          else parrafos.push(resto);
+        }
+      });
+    return parrafos.map((p) => `<p class="parrafo-largo">${formatearTexto(p)}</p>`).join("");
+  }
+
+  /**
+   * Racha del alumno (2-sep-2026). Quien entra por la liga no tiene cuenta,
+   * así que su identidad la pone su propio navegador: un id aleatorio que se
+   * guarda junto al nombre y viaja en cada envío (ver utils/rachaAlumno.js).
+   * Si entra desde otro aparato empieza racha nueva — por eso en pantalla se
+   * habla de "tu racha en este grupo" y no se promete más que eso.
+   */
+  function idAlumno(grupoSlug) {
+    const clave = `ensenai_alumno_${grupoSlug}`;
+    try {
+      let id = localStorage.getItem(clave);
+      if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, "");
+        localStorage.setItem(clave, id);
+      }
+      return id;
+    } catch (e) {
+      return null; // navegación privada: contesta igual, solo sin racha
+    }
+  }
+
+  function rachaGuardada(grupoSlug) {
+    try {
+      return JSON.parse(localStorage.getItem(`ensenai_racha_${grupoSlug}`) || "null");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Se guarda para poder saludar con la racha al volver a abrir la liga,
+   * sin pedirle nada al servidor (el alumno no tiene sesión que consultar). */
+  function guardarRacha(grupoSlug, racha) {
+    if (!racha) return;
+    try {
+      localStorage.setItem(`ensenai_racha_${grupoSlug}`, JSON.stringify(racha));
+    } catch (e) {
+      /* sin consecuencias */
+    }
+    pintarRachaAlumno(racha);
+  }
+
+  function pintarRachaAlumno(racha) {
+    const cont = document.getElementById("racha-alumno");
+    if (!cont || !racha || !racha.racha_actual) return;
+    cont.style.display = "";
+    cont.innerHTML = `🔥 <strong>${racha.racha_actual} día${racha.racha_actual === 1 ? "" : "s"} seguido${
+      racha.racha_actual === 1 ? "" : "s"
+    }</strong> en este grupo${racha.racha_record > racha.racha_actual ? ` · tu récord: ${racha.racha_record}` : ""}`;
+  }
+
+  function nombreGuardado(grupoSlug) {
+    try {
+      return localStorage.getItem(`ensenai_nombre_${grupoSlug}`);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function guardarNombre(grupoSlug, nombre) {
+    try {
+      localStorage.setItem(`ensenai_nombre_${grupoSlug}`, nombre);
+    } catch (e) {
+      // si el navegador bloquea localStorage, seguimos sin guardar —
+      // simplemente se le pedirá el nombre otra vez la próxima vez
+    }
+  }
+
+  // Sentinel para "ya se le preguntó y prefirió no dar nombre" (grupos
+  // anónimos) — distinto de "todavía no se le ha preguntado", que es lo que
+  // representa que nombreGuardado() regrese null.
+  const SIN_NOMBRE = "__sin_nombre__";
+
+  function nombreParaEnviar(grupoSlug) {
+    const n = nombreGuardado(grupoSlug);
+    return !n || n === SIN_NOMBRE ? null : n;
+  }
+
+  async function init() {
+    const cont = document.getElementById("contenido");
+    if (!slug) {
+      cont.innerHTML = `<div class="tarjeta"><div class="error">Falta la liga (URL incompleta).</div></div>`;
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Liga no encontrada.");
+
+      grupoActual = data.grupo;
+      temasActuales = data.temas || [];
+
+      // Si ya venía con racha de visitas anteriores, se le saluda con ella
+      // desde el primer segundo (viene de su propio navegador, no del
+      // servidor: el alumno no tiene sesión que consultar).
+      pintarRachaAlumno(rachaGuardada(slug));
+
+      const nombreYaGuardado = nombreGuardado(slug);
+      if (!nombreYaGuardado) {
+        mostrarPideNombre();
+      } else {
+        mostrarListaTemas();
+      }
+    } catch (err) {
+      // Un fetch que nunca llegó al servidor (sin internet, backend caído,
+      // CORS) lanza un TypeError genérico ("Failed to fetch") — no tiene
+      // sentido mostrárselo tal cual a un alumno. Un error de negocio real
+      // (ej. "Liga no encontrada.") sí lo lanzamos nosotros más arriba con
+      // Error(...), así que ese mensaje sí es legible y se muestra tal cual.
+      const mensaje =
+        err instanceof TypeError
+          ? "No pudimos conectar con EnseñAI. Revisa tu internet e intenta de nuevo."
+          : err.message;
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <div class="error">${escapeHtml(mensaje)}</div>
+          <button class="secundario" id="btn-reintentar" style="margin-top:12px;">Reintentar</button>
+        </div>`;
+      const btn = document.getElementById("btn-reintentar");
+      if (btn) btn.addEventListener("click", () => { cont.innerHTML = `<div class="cargando">Cargando…</div>`; init(); });
+    }
+  }
+
+  function mostrarPideNombre() {
+    // En grupos anónimos (mostrar_nombres = false, pensado para psicólogos
+    // con pacientes) igual pedimos un primer nombre o apodo — sirve para
+    // que el profesional distinga las respuestas de cada quien sin saber
+    // quién es en realidad — pero aquí es OPCIONAL: quien prefiera no darlo
+    // puede continuar sin escribir nada.
+    const anonimo = !grupoActual.mostrar_nombres;
+
+    document.getElementById("contenido").innerHTML = `
+      <div class="tarjeta">
+        <h1>👋 Bienvenido/a a "${escapeHtml(grupoActual.nombre)}"</h1>
+        <p class="ayuda">${
+          anonimo
+            ? "Antes de entrar, si quieres, dinos tu primer nombre o un apodo (sin apellido) — es opcional, y solo sirve para distinguir tus respuestas de las de los demás."
+            : "Antes de entrar, dinos tu nombre o apodo (solo la primera vez)."
+        }</p>
+        <label>${anonimo ? "Tu primer nombre o apodo (opcional)" : "Tu nombre o apodo"}</label>
+        <input type="text" id="input-nombre" placeholder="${anonimo ? "Ej. Ale, Paciente 3…" : "Ej. Ana, Grupo 3B - Juan…"}" autofocus>
+        ${anonimo ? "" : `<div class="error" id="error-nombre" style="display:none;">Escribe tu nombre o apodo para continuar.</div>`}
+        <button class="primario" id="btn-continuar">Continuar</button>
+        ${anonimo ? `<button class="secundario" id="btn-omitir" style="margin-top:8px;">Prefiero no darlo</button>` : ""}
+      </div>
+    `;
+    const input = document.getElementById("input-nombre");
+    const error = document.getElementById("error-nombre");
+
+    const continuarSinNombre = () => {
+      guardarNombre(slug, SIN_NOMBRE);
+      registrarAcceso(null);
+      mostrarListaTemas();
+    };
+
+    const intentarContinuar = () => {
+      const nombre = input.value.trim();
+      if (!nombre) {
+        if (anonimo) {
+          continuarSinNombre();
+          return;
+        }
+        error.style.display = "block";
+        input.focus();
+        return;
+      }
+      guardarNombre(slug, nombre);
+      registrarAcceso(nombre);
+      mostrarListaTemas();
+    };
+
+    document.getElementById("btn-continuar").addEventListener("click", intentarContinuar);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") intentarContinuar();
+    });
+    if (error) {
+      input.addEventListener("input", () => {
+        if (error.style.display !== "none") error.style.display = "none";
+      });
+    }
+    const btnOmitir = document.getElementById("btn-omitir");
+    if (btnOmitir) btnOmitir.addEventListener("click", continuarSinNombre);
+    input.focus();
+  }
+
+  async function registrarAcceso(nombre) {
+    try {
+      await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/acceso`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      });
+    } catch (err) {
+      // no bloquea la experiencia si falla el registro de acceso
+    }
+  }
+
+  /**
+   * Manda el detalle de cómo se contestó la trivia de un tema, para que el
+   * profesional vea qué está fallando (no solo un puntaje). Se llama después
+   * de que "Revisar mis respuestas" ya calificó y mostró todo en pantalla,
+   * así que si esto falla el alumno no se entera ni pierde nada — solo el
+   * profesor se queda sin ese envío en su reporte.
+   *
+   * En grupos anónimos, dar el nombre fue opcional — si la persona lo
+   * omitió, nombreParaEnviar(slug) regresa null (nunca el sentinel interno
+   * SIN_NOMBRE) y el profesor la verá como "Alumno N (anónimo)".
+   *
+   * "indice" identifica la pregunta dentro del arreglo trivia del tema —
+   * el backend lo usa para releer la pregunta real y recalcular "acerto"
+   * él mismo (nunca confía en lo que mandamos aquí); "pregunta",
+   * "respuesta_correcta" y "acerto" solo viajan como respaldo por si el
+   * backend no pudiera encontrar la pregunta original.
+   */
+  async function enviarRespuestas(temaId, respuestas) {
+    try {
+      const res = await fetch(`${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(temaId)}/respuestas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombreParaEnviar(slug), respuestas, alumnoId: idAlumno(slug) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.racha) guardarRacha(slug, data.racha);
+    } catch (err) {
+      // no bloquea la experiencia del alumno si falla
+    }
+  }
+
+  /**
+   * "Checkbox ligero" de progreso (31-ago-2026): manda qué ejercicios de la
+   * pestaña "Practicar" quedaron marcados como resueltos, para que el
+   * profesional vea algo de avance sin necesitar fotos. Se puede guardar
+   * más de una vez conforme se van resolviendo más ejercicios — cada click
+   * en "Guardar mi progreso" manda el estado completo de los checkboxes en
+   * ese momento (ver POST .../ejercicios-marcados en routes/grupos.js).
+   */
+  async function guardarEjerciciosMarcados() {
+    const tema = temasActuales[temaAbiertoIdx];
+    const aviso = document.getElementById("progreso-aviso");
+    if (!tema) return;
+
+    const totalCheckboxes = document.querySelectorAll(".chk-ejercicio-resuelto").length;
+    const indices = Array.from(document.querySelectorAll(".chk-ejercicio-resuelto:checked")).map((chk) =>
+      parseInt(chk.dataset.ej, 10)
+    );
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/grupos/publico/${encodeURIComponent(slug)}/temas/${encodeURIComponent(tema.id)}/ejercicios-marcados`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre: nombreParaEnviar(slug), indices, alumnoId: idAlumno(slug) }),
+        }
+      );
+      if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => ({}));
+      if (data.racha) guardarRacha(slug, data.racha);
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = indices.length
+          ? `✓ Guardado — ${indices.length} de ${totalCheckboxes} marcados.`
+          : "Guardado — todavía no marcaste ninguno.";
+      }
+    } catch (err) {
+      if (aviso) {
+        aviso.style.display = "block";
+        aviso.textContent = "No se pudo guardar tu progreso — intenta de nuevo en un momento.";
+      }
+    }
+  }
+
+  function mostrarListaTemas() {
+    const cont = document.getElementById("contenido");
+
+    if (temasActuales.length === 0) {
+      cont.innerHTML = `
+        <div class="tarjeta">
+          <h1>🏫 ${escapeHtml(grupoActual.nombre)}</h1>
+          <p class="ayuda">Tu profesor(a) todavía no ha compartido ningún tema aquí. Vuelve a revisar más tarde.</p>
+        </div>
+      `;
+      return;
+    }
+
+    cont.innerHTML = `
+      <div class="tarjeta">
+        <h1>🏫 ${escapeHtml(grupoActual.nombre)}</h1>
+        <p class="ayuda">${temasActuales.length} tema${temasActuales.length === 1 ? "" : "s"} disponible${temasActuales.length === 1 ? "" : "s"}. Toca uno para ver la explicación, la actividad y la trivia.</p>
+      </div>
+      ${temasActuales
+        .map(
+          (t, i) => `
+        <div class="tema-card" data-idx="${i}">
+          <div class="titulo">📘 ${escapeHtml(t.titulo)}</div>
+          <div class="resumen-corto">${escapeHtml(textoResumenCorto(t.contenido?.resumen))}</div>
+        </div>
+      `
+        )
+        .join("")}
+    `;
+
+    cont.querySelectorAll(".tema-card").forEach((el) => {
+      el.addEventListener("click", () => mostrarTema(parseInt(el.dataset.idx, 10)));
+    });
+  }
+
+  function normalizarTexto(s) {
+    return (s || "").trim().toLowerCase();
+  }
+
+  /**
+   * Antes, al revisar, la opción correcta se pintaba de verde — pero si tú
+   * también la habías elegido, se veía idéntica: no había forma de saber
+   * cuál habías escogido tú. Y si fallabas, no se decía con palabras cuál
+   * era la buena. Ahora cada opción se etiqueta ("Tu respuesta" / "Correcta")
+   * y debajo de cada pregunta sale una línea que explica qué pasó.
+   */
+  function revisarTrivia() {
+    let total = 0;
+    let correctas = 0;
+    const detalle = [];
+
+    Array.from(document.querySelectorAll(".trivia-item")).forEach((item, indice) => {
+      item.classList.add("revisado");
+      const correcta = item.dataset.correcta || "";
+      const pregunta = item.dataset.pregunta || "";
+      const opciones = item.querySelectorAll(".opcion-btn");
+      const feedback = item.querySelector(".trivia-feedback");
+      const abierta = item.querySelector(".respuesta-abierta");
+
+      if (opciones.length) {
+        total++;
+        const seleccionado = item.querySelector(".opcion-btn.seleccionada");
+        const acerto = seleccionado && normalizarTexto(seleccionado.dataset.valor) === normalizarTexto(correcta);
+
+        opciones.forEach((btn) => {
+          btn.disabled = true;
+          const esCorrecta = normalizarTexto(btn.dataset.valor) === normalizarTexto(correcta);
+          const esTuya = btn === seleccionado;
+          if (esCorrecta) btn.classList.add("correcta");
+          else if (esTuya) btn.classList.add("incorrecta");
+
+          let etiqueta = "";
+          if (esTuya && esCorrecta) etiqueta = "Tu respuesta · correcta";
+          else if (esTuya) etiqueta = "Tu respuesta";
+          else if (esCorrecta) etiqueta = "Correcta";
+          if (etiqueta) btn.insertAdjacentHTML("beforeend", `<span class="etiqueta-op">${etiqueta}</span>`);
+        });
+
+        feedback.style.display = "block";
+        if (acerto) {
+          correctas++;
+          feedback.className = "trivia-feedback bien";
+          feedback.textContent = "✅ ¡Correcto!";
+        } else if (seleccionado) {
+          feedback.className = "trivia-feedback mal";
+          feedback.innerHTML = `❌ La respuesta correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        } else {
+          feedback.className = "trivia-feedback";
+          feedback.innerHTML = `No elegiste respuesta. La correcta era: <strong>${escapeHtml(correcta)}</strong>`;
+        }
+
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: seleccionado ? seleccionado.dataset.valor : null,
+          respuesta_correcta: correcta,
+          acerto: !!acerto,
+        });
+      } else {
+        if (abierta) abierta.disabled = true;
+        const escribio = abierta && abierta.value.trim();
+        feedback.style.display = "block";
+        feedback.className = "trivia-feedback";
+        feedback.innerHTML =
+          (escribio ? "" : "<em>No escribiste nada.</em> ") +
+          `<strong>Respuesta sugerida:</strong> ${escapeHtml(correcta)}`;
+
+        // respuesta abierta: no se autocalifica, así que acerto queda en
+        // null — el profesor la lee y juzga él mismo.
+        detalle.push({
+          indice,
+          pregunta,
+          respuesta: escribio || null,
+          respuesta_correcta: correcta,
+          acerto: null,
+        });
+      }
+    });
+
+    if (detalle.length && temasActuales[temaAbiertoIdx]) {
+      enviarRespuestas(temasActuales[temaAbiertoIdx].id, detalle);
+    }
+
+    const resumen = document.getElementById("trivia-resumen");
+    if (resumen && total > 0) {
+      resumen.style.display = "block";
+      const pct = correctas / total;
+      const mensaje =
+        pct === 1 ? "¡Todas correctas! 🎉" : pct >= 0.6 ? "¡Vas bien!" : "Vale la pena repasar y volver a intentar.";
+      resumen.textContent = `${mensaje} Acertaste ${correctas} de ${total}.`;
+    }
+
+    const btnRevisar = document.getElementById("btn-revisar-trivia");
+    if (btnRevisar) {
+      // Clon para soltar el listener anterior (si no, "Intentar de nuevo"
+      // volvería a ejecutar la revisión también).
+      const nuevo = btnRevisar.cloneNode(false);
+      nuevo.textContent = "Intentar de nuevo";
+      btnRevisar.replaceWith(nuevo);
+      nuevo.addEventListener("click", () => mostrarTema(temaAbiertoIdx));
+    }
+  }
+
+  // ── Diagramas del tema ─────────────────────────────────────────────────
+  // Antes se dibujaban como SVG de 600px de ancho: en celular el texto
+  // acababa renderizando a ~6px o el diagrama se cortaba con scroll
+  // lateral. Ahora viven en diagrama.js y salen como HTML responsivo.
+  function dibujarDiagrama(diagrama) {
+    try {
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.dibujar(diagrama) : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /** Las imágenes fijas de la biblioteca que el tema traiga colgadas
+   *  (ver adjuntarIlustraciones en routes/temas.js). Los temas viejos no
+   *  traen ninguna y simplemente no se pinta nada. */
+  function dibujarIlustraciones(lista) {
+    try {
+      return window.EnsenaiDiagrama ? window.EnsenaiDiagrama.ilustraciones(lista) : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /**
+   * Los temas creados ANTES del rediseño tienen `resumen` como un string de
+   * texto corrido; los nuevos lo traen partido en secciones. Estas dos
+   * funciones dejan todo en la forma nueva, para que un alumno que abra un
+   * tema viejo de la liga lo siga viendo bien.
+   */
+  function normalizarResumen(resumen) {
+    const vacio = { que_es: "", secciones: [], pasos: [], ideas_clave: [], ojo_aqui: "", truco: "" };
+    if (!resumen) return vacio;
+    if (typeof resumen === "string") return { ...vacio, que_es: resumen };
+    return {
+      que_es: resumen.que_es || "",
+      secciones: Array.isArray(resumen.secciones) ? resumen.secciones.filter((s) => s && (s.titulo || s.texto)) : [],
+      pasos: Array.isArray(resumen.pasos) ? resumen.pasos.filter(Boolean) : [],
+      ideas_clave: Array.isArray(resumen.ideas_clave) ? resumen.ideas_clave.filter(Boolean) : [],
+      ojo_aqui: resumen.ojo_aqui || "",
+      truco: resumen.truco || "",
+    };
+  }
+
+  function textoResumenCorto(resumen) {
+    const t = normalizarResumen(resumen).que_es || "";
+    return t.length > 110 ? t.slice(0, 110) + "…" : t;
+  }
+
+  let temaAbiertoIdx = 0; // para poder re-renderizar el mismo tema al "Intentar de nuevo"
+
+  function mostrarTema(idx) {
+    temaAbiertoIdx = idx;
+    const tema = temasActuales[idx];
+    const c = tema.contenido || {};
+    const cont = document.getElementById("contenido");
+
+    // Igual que en tema.html: una actividad vacía (Modo Examen deja la
+    // actividad en blanco a propósito) no debe pintar un recuadro vacío
+    // bajo el título "Actividad" (31-ago-2026).
+    const tieneContenido = (a) => !!a && (String(a.titulo || "").trim() || String(a.instrucciones || "").trim());
+    const actividadesConTexto = Array.isArray(c.actividades) ? c.actividades.filter(tieneContenido) : [];
+
+    const actividadesHtml = actividadesConTexto.length
+      ? actividadesConTexto
+          .map(
+            (a) => `
+        <div class="actividad-box">
+          <span class="inteligencia">${escapeHtml(ETIQUETAS_INTELIGENCIA[a.inteligencia] || a.inteligencia)}</span>
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(a.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(a.instrucciones || "")}</div>
+        </div>
+      `
+          )
+          .join("")
+      : tieneContenido(c.actividad)
+      ? `
+        <div class="actividad-box">
+          <div style="font-weight:700; margin-bottom:4px;">${formatearTexto(c.actividad.titulo || "")}</div>
+          <div style="font-size:0.92rem; line-height:1.5;">${formatearLargo(c.actividad.instrucciones || "")}</div>
+        </div>
+      `
+      : "";
+
+    const triviaHtml = (c.trivia || [])
+      .map(
+        (p, i) => `
+      <div class="trivia-item" data-correcta="${escapeHtml(p.respuesta_correcta || "")}" data-pregunta="${escapeHtml(p.pregunta || "")}">
+        <div class="trivia-pregunta"><span class="trivia-num">${i + 1}</span> ${formatearTexto(p.pregunta || "")}</div>
+        ${
+          p.opciones?.length
+            ? `<div class="opciones">${p.opciones
+                .map((o) => `<button type="button" class="opcion-btn" data-valor="${escapeHtml(o)}">${formatearTexto(o)}</button>`)
+                .join("")}</div>`
+            : `<textarea class="respuesta-abierta" rows="3" placeholder="Escribe tu respuesta aquí…"></textarea>`
+        }
+        <div class="trivia-feedback" style="display:none;"></div>
+      </div>
+    `
+      )
+      .join("");
+
+    // El material de repaso traia SOLO la linea de instrucciones ("recorta
+    // cada tarjeta..."), nunca las tarjetas: el alumno no tenia nada que
+    // recortar. Ahora se pintan las tarjetas y se puede imprimir, igual que
+    // en el modo individual (ver imprimible.js).
+    const materialExtraHtml = (c.material_extra || [])
+      .map((m, i) => {
+        const tarjetas = Array.isArray(m.tarjetas) ? m.tarjetas.filter((t) => t && (t.frente || t.reverso)) : [];
+        return `
+      <div class="material-extra-box">
+        <div style="font-weight:700; text-transform:capitalize; margin-bottom:4px;">${escapeHtml(m.tipo || "")}</div>
+        ${
+          m.contenido
+            ? `<div style="font-size:0.92rem; line-height:1.5; white-space:pre-line; margin-bottom:${
+                tarjetas.length ? "10px" : "0"
+              };">${formatearTexto(m.contenido)}</div>`
+            : ""
+        }
+        ${
+          tarjetas.length
+            ? `<div class="lista-tarjetas">${tarjetas
+                .map(
+                  (t) => `<div class="tarjeta-repaso">
+                      <div class="frente">${escapeHtml(t.frente || "")}</div>
+                      ${t.reverso ? `<div class="reverso">${escapeHtml(t.reverso)}</div>` : ""}
+                    </div>`
+                )
+                .join("")}</div>
+               <button type="button" class="secundario btn-imprimir-tarjetas" data-material-idx="${i}" style="margin:10px 0 0;">🖨️ Imprimir ${
+                tarjetas.length === 1 ? "tarjeta" : "tarjetas"
+              } (${tarjetas.length})</button>`
+            : ""
+        }
+      </div>
+    `;
+      })
+      .join("");
+
+    const r = c.respuestas || {};
+    const respuestasHtml = `
+      ${
+        r.trivia_resuelta?.length
+          ? `<h3 style="margin-top:0;">Respuestas de la trivia</h3>` +
+            r.trivia_resuelta.map((rt) => `<p style="margin:4px 0;"><strong>${escapeHtml(rt.pregunta)}</strong> — ${escapeHtml(rt.respuesta)}</p>`).join("")
+          : ""
+      }
+      ${r.solucion_actividad ? `<h3>Solución de la actividad</h3><p style="margin:0;">${escapeHtml(r.solucion_actividad)}</p>` : ""}
+      ${
+        r.conceptos_clave?.length
+          ? `<h3>Conceptos clave</h3><ul>${r.conceptos_clave.map((k) => `<li>${escapeHtml(k)}</li>`).join("")}</ul>`
+          : ""
+      }
+      ${r.autoevaluacion ? `<h3>Autoevaluación</h3><p style="margin:0;">${escapeHtml(r.autoevaluacion)}</p>` : ""}
+    `;
+
+    const res = normalizarResumen(c.resumen);
+    const ejercicios = c.ejercicios || [];
+
+    const estudiarHtml = `
+      ${res.que_es ? `<div class="bloque-est destacado"><p>${formatearTexto(res.que_es)}</p></div>` : ""}
+      ${dibujarIlustraciones(c.ilustraciones)}
+      ${dibujarDiagrama(c.diagrama)}
+      ${res.secciones
+        .map(
+          (s) => `
+        <div class="bloque-est">
+          ${s.titulo ? `<h3 class="bloque-titulo">${formatearTexto(s.titulo)}</h3>` : ""}
+          ${formatearLargo(s.texto || "")}
+        </div>`
+        )
+        .join("")}
+      ${
+        res.pasos.length
+          ? `<div class="bloque-est"><h3 class="bloque-titulo">🧭 Paso a paso</h3>
+             <ol class="lista-pasos">${res.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol></div>`
+          : ""
+      }
+      ${
+        res.ideas_clave.length
+          ? `<div class="bloque-est"><h3 class="bloque-titulo">⭐ Lo que no se te puede olvidar</h3>
+             <ul class="lista-ideas">${res.ideas_clave.map((k) => `<li>${formatearTexto(k)}</li>`).join("")}</ul></div>`
+          : ""
+      }
+      ${res.ojo_aqui ? `<div class="caja-ojo"><strong>⚠️ Ojo aquí</strong><p>${formatearTexto(res.ojo_aqui)}</p></div>` : ""}
+      ${res.truco ? `<div class="caja-truco"><strong>🎯 Truco para recordarlo</strong><p>${formatearTexto(res.truco)}</p></div>` : ""}
+      ${
+        c.esquema_visual
+          ? `<details class="bloque-est plegable"><summary>Ver el esquema completo</summary>
+             <p style="white-space:pre-line; margin-top:8px;">${formatearTexto(c.esquema_visual)}</p></details>`
+          : ""
+      }
+    `;
+
+    const ejerciciosHtml = ejercicios
+      .map(
+        (e, i) => `
+      <div class="ejercicio">
+        <div class="ejercicio-cabeza">
+          <span class="ejercicio-num">${i + 1}</span>
+          <p class="ejercicio-enunciado">${formatearTexto(e.enunciado || "")}</p>
+        </div>
+        ${
+          e.pista
+            ? `<button type="button" class="btn-pista" data-ej="${i}">💡 Ver pista</button>
+               <div class="pista-caja" id="pista-${i}" style="display:none;">${formatearTexto(e.pista)}</div>`
+            : ""
+        }
+        <button type="button" class="btn-solucion" data-ej="${i}">Ver solución</button>
+        <div class="solucion-caja" id="solucion-${i}" style="display:none;">
+          ${(e.pasos || []).length ? `<ol class="lista-pasos">${e.pasos.map((p) => `<li>${formatearTexto(p)}</li>`).join("")}</ol>` : ""}
+          ${e.respuesta ? `<div class="ejercicio-respuesta">✅ ${formatearTexto(e.respuesta)}</div>` : ""}
+        </div>
+        <label class="ejercicio-marcar">
+          <input type="checkbox" class="chk-ejercicio-resuelto" data-ej="${i}">
+          ✓ Ya la resolví
+        </label>
+      </div>`
+      )
+      .join("");
+
+    const practicarHtml = `
+      ${
+        ejerciciosHtml
+          ? `<p class="ayuda" style="margin:0 0 14px;">Resuélvelos en tu cuaderno primero. La solución trae el procedimiento completo para que puedas ver <em>en qué paso</em> te trabaste.</p>${ejerciciosHtml}
+             <button class="secundario btn-guardar-progreso" id="btn-guardar-progreso">💾 Guardar mi progreso</button>
+             <div class="progreso-aviso" id="progreso-aviso" style="display:none;"></div>`
+          : ""
+      }
+      ${
+        actividadesHtml
+          ? `<h2 style="margin-top:${ejerciciosHtml ? "22px" : "0"};">✏️ Actividad${
+              (c.actividades || []).filter((a) => a && a.inteligencia !== "todas").length > 1
+                ? "es (elige la de tu tipo de inteligencia)"
+                : ""
+            }</h2>${actividadesHtml}`
+          : ""
+      }
+      ${!ejerciciosHtml && !actividadesHtml ? `<p class="ayuda">Este tema no trae ejercicios.</p>` : ""}
+    `;
+
+    const repasarHtml = `
+      ${
+        triviaHtml
+          ? `<h2 style="margin-top:0;">🧠 Trivia</h2>
+             <p class="ayuda" style="margin:0 0 12px;">Elige tu respuesta en cada pregunta y luego dale a "Revisar mis respuestas".</p>
+             ${triviaHtml}
+             <div id="trivia-resumen" style="display:none;"></div>
+             <button class="primario" id="btn-revisar-trivia">Revisar mis respuestas</button>`
+          : ""
+      }
+      ${
+        materialExtraHtml
+          ? `<h2 style="margin-top:${triviaHtml ? "24px" : "0"};">📎 Material de repaso</h2>
+             <button type="button" class="secundario" id="btn-imprimir-repaso" style="margin:0 0 12px; width:100%;">🖨️ Imprimir todo el material de repaso</button>
+             ${materialExtraHtml}`
+          : ""
+      }
+      <div class="respuestas-toggle" style="margin-top:20px;"><button class="secundario" id="btn-respuestas">Ver respuestas</button></div>
+      <div class="respuestas-box" id="caja-respuestas">${respuestasHtml}</div>
+    `;
+
+    const nEj = ejercicios.length;
+
+    // Modo Examen (simulador puro, 31-ago-2026, ver agents/combinarTemas.js)
+    // deja el resumen vacío A PROPÓSITO — sin esto, "Estudiar" se abriría
+    // por default mostrando un panel completamente en blanco. Si no hay
+    // nada que exponer, ni siquiera se muestra esa pestaña, y se arranca
+    // directo en Practicar (o Repasar si el simulador es solo trivia).
+    const resumenVacio =
+      !res.que_es && !res.secciones.length && !res.pasos.length && !res.ideas_clave.length &&
+      !res.ojo_aqui && !res.truco && !c.diagrama && !c.esquema_visual && !(c.ilustraciones || []).length;
+    // Un simulador puede traer SOLO ejercicios o SOLO trivia. Antes se
+    // pintaban igual las tres pestañas y el alumno abría una vacía
+    // (31-ago-2026): ahora cada pestaña aparece solo si tiene algo dentro.
+    const hayPracticar = !!(ejerciciosHtml || actividadesHtml);
+    // respuestasHtml siempre es una plantilla no vacía, así que se mira el
+    // dato real: si no hay trivia, ni material extra, ni respuestas con
+    // contenido, la pestaña Repasar no aporta nada.
+    const hayRespuestasUtiles = !!(
+      (r.trivia_resuelta || []).length ||
+      String(r.solucion_actividad || "").trim() ||
+      (r.conceptos_clave || []).length ||
+      String(r.autoevaluacion || "").trim()
+    );
+    const hayRepasar = !!(triviaHtml || materialExtraHtml || hayRespuestasUtiles);
+    const tabInicial = !resumenVacio ? "estudiar" : hayPracticar ? "practicar" : "repasar";
+
+    cont.innerHTML = `
+      <a class="volver" href="javascript:void(0)" id="btn-volver">← Volver a la liga</a>
+      <div class="tarjeta">
+        <h1>📘 ${escapeHtml(c.tema || tema.titulo)}</h1>
+        <div class="pestanas">
+          ${
+            resumenVacio
+              ? ""
+              : `<button class="pestana${tabInicial === "estudiar" ? " activa" : ""}" data-panel="estudiar">📖 Estudiar</button>`
+          }
+          ${
+            hayPracticar
+              ? `<button class="pestana${tabInicial === "practicar" ? " activa" : ""}" data-panel="practicar">✏️ Practicar${nEj ? ` <span class="pestana-num">${nEj}</span>` : ""}</button>`
+              : ""
+          }
+          ${
+            hayRepasar
+              ? `<button class="pestana${tabInicial === "repasar" ? " activa" : ""}" data-panel="repasar">🔁 Repasar</button>`
+              : ""
+          }
+        </div>
+        <div class="panel" id="panel-estudiar" style="${tabInicial === "estudiar" ? "" : "display:none;"}">${estudiarHtml}</div>
+        <div class="panel" id="panel-practicar" style="${tabInicial === "practicar" ? "" : "display:none;"}">${practicarHtml}</div>
+        <div class="panel" id="panel-repasar" style="${tabInicial === "repasar" ? "" : "display:none;"}">${repasarHtml}</div>
+        ${tema.pdf_url ? `<a href="${escapeHtml(tema.pdf_url)}" target="_blank" style="text-decoration:none;"><button class="secundario" style="margin-top:18px; width:100%;">📄 Descargar imprimible (PDF)</button></a>` : ""}
+      </div>
+    `;
+
+    document.querySelectorAll(".pestana").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".pestana").forEach((b) => b.classList.toggle("activa", b === btn));
+        ["estudiar", "practicar", "repasar"].forEach((p) => {
+          document.getElementById("panel-" + p).style.display = p === btn.dataset.panel ? "" : "none";
+        });
+      });
+    });
+
+    document.querySelectorAll(".btn-pista").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("pista-" + btn.dataset.ej);
+        caja.style.display = caja.style.display === "none" ? "block" : "none";
+        btn.textContent = caja.style.display === "none" ? "💡 Ver pista" : "💡 Ocultar pista";
+      });
+    });
+
+    document.querySelectorAll(".btn-solucion").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const caja = document.getElementById("solucion-" + btn.dataset.ej);
+        const abierta = caja.style.display !== "none";
+        caja.style.display = abierta ? "none" : "block";
+        btn.textContent = abierta ? "Ver solución" : "Ocultar solución";
+        btn.classList.toggle("abierta", !abierta);
+      });
+    });
+
+    document.getElementById("btn-volver").addEventListener("click", mostrarListaTemas);
+    document.querySelectorAll(".btn-imprimir-tarjetas").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const m = (c.material_extra || [])[parseInt(btn.dataset.materialIdx, 10)];
+        if (m && window.EnsenaiImprimible) window.EnsenaiImprimible.tarjetas(m.tipo, m.tarjetas);
+      });
+    });
+    const btnImprimirRepaso = document.getElementById("btn-imprimir-repaso");
+    if (btnImprimirRepaso) {
+      btnImprimirRepaso.addEventListener("click", () => {
+        if (window.EnsenaiImprimible) window.EnsenaiImprimible.materialExtra(c.material_extra, c.titulo || "");
+      });
+    }
+
+    document.getElementById("btn-respuestas").addEventListener("click", () => {
+      const caja = document.getElementById("caja-respuestas");
+      caja.classList.toggle("abierto");
+    });
+
+    document.querySelectorAll(".opcion-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = btn.closest(".trivia-item");
+        if (item.classList.contains("revisado")) return;
+        item.querySelectorAll(".opcion-btn").forEach((b) => b.classList.remove("seleccionada"));
+        btn.classList.add("seleccionada");
+      });
+    });
+    const btnRevisarTrivia = document.getElementById("btn-revisar-trivia");
+    if (btnRevisarTrivia) btnRevisarTrivia.addEventListener("click", revisarTrivia);
+
+    const btnGuardarProgreso = document.getElementById("btn-guardar-progreso");
+    if (btnGuardarProgreso) btnGuardarProgreso.addEventListener("click", guardarEjerciciosMarcados);
+  }
+
+  init();
+</script>
+</body>
+</html>
