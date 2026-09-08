@@ -86,8 +86,8 @@
   var lanzador = document.createElement("button");
   lanzador.id = "fb-lanzador";
   lanzador.type = "button";
-  lanzador.textContent = "💬 Contarle a Claudia";
-  lanzador.title = "Mándame un comentario o repórtame una falla";
+  lanzador.textContent = "💬 Ayúdanos a mejorar";
+  lanzador.title = "Mándanos un comentario o repórtanos una falla";
   document.body.appendChild(lanzador);
 
   var fondo = null;
