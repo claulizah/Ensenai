@@ -55,8 +55,8 @@
   header {
     background: var(--profundo); color: #fff; padding: 16px 0; position: sticky; top: 0; z-index: 10;
   }
-  header .fila { display: flex; align-items: center; justify-content: space-between; }
-  .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; text-decoration: none; color: #fff; }
+  header .fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .marca { font-family: 'Grandstander', sans-serif; font-weight: 700; font-size: 1.4rem; text-decoration: none; color: #fff; white-space: nowrap; flex-shrink: 0; }
   .marca .ai { display: inline-block; color: var(--aqua); background: rgba(255,255,255,0.14); padding: 1px 10px; border-radius: 999px; font-size: 0.75em; vertical-align: middle; }
   header nav { display: flex; align-items: center; gap: 10px; }
   header .nav-link { color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem; opacity: 0.9; }
@@ -225,9 +225,15 @@
     header .pill-btn.primario { padding: 9px 14px; font-size: 0.82rem; }
     .precios-tabs { flex-direction: column; align-items: stretch; }
   }
+  /* Con 4 links + botón ya no cabe en una fila en celular (se venía encimando
+     el logo y empujando "Empezar gratis" fuera de la pantalla). Se ocultan
+     los links de texto y se deja solo la marca + el botón, igual que en
+     gratis.html y hojas/index.html. */
+  @media (max-width: 640px) {
+    header .nav-link { display: none; }
+    header nav { gap: 0; }
+  }
   @media (max-width: 420px) {
-    header nav { gap: 6px; }
-    header .nav-link { font-size: 0.7rem; white-space: nowrap; }
     header .pill-btn.primario { padding: 7px 10px; font-size: 0.7rem; white-space: nowrap; }
   }
 
@@ -236,7 +242,7 @@
 .regalo-card{
   display:grid; grid-template-columns:1.35fr .65fr; gap:34px; align-items:center;
   background:var(--hielo, #F0FDF4); border:1px solid var(--linea, #DCEEFC);
-  border-radius:22px; padding:34px 36px;
+  border-radius:22px; padding:34px 36px; box-shadow:0 3px 0 var(--linea, #DCEEFC);
 }
 @media (max-width:760px){ .regalo-card{ grid-template-columns:1fr; gap:22px; text-align:center; } }
 .regalo-ojo{
@@ -246,10 +252,19 @@
 .regalo-card h2{ font-size:1.6rem; margin:0 0 10px; }
 .regalo-card p{ color:#4A6A85; margin:0 0 20px; max-width:52ch; }
 @media (max-width:760px){ .regalo-card p{ margin-inline:auto; } }
+.regalo-img{ position:relative; display:inline-block; }
 .regalo-img img{
   width:100%; max-width:210px; display:block; margin:0 auto; border-radius:12px;
   border:1px solid var(--linea, #DCEEFC); box-shadow:0 12px 30px rgba(30,58,138,.14);
+  transform:rotate(-3deg);
 }
+.regalo-cinta{
+  position:absolute; top:-12px; right:6px; background:var(--coral, #F97066); color:#fff;
+  font-family:'Grandstander',sans-serif; font-weight:700; font-size:.76rem;
+  padding:6px 14px; border-radius:999px; box-shadow:0 3px 0 var(--coral-oscuro, #D9553F);
+  transform:rotate(6deg);
+}
+@media (max-width:760px){ .regalo-img{ margin-top:6px; } }
 </style>
 <script type="application/ld+json">
 {
@@ -389,6 +404,7 @@
         </p>
       </div>
       <div class="regalo-img">
+        <span class="regalo-cinta">Gratis</span>
         <img src="assets/muestra-portada.png" alt="Portada del cuadernillo de seis hojas gratis" loading="lazy">
       </div>
     </div>
