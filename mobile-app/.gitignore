@@ -4,6 +4,8 @@ android/build/
 android/.gradle/
 android/local.properties
 android/.idea/
+android/*.keystore
+android/keystore.properties
 ios/App/Pods/
 ios/App/build/
 ios/App/App.xcworkspace/xcuserdata/
