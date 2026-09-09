@@ -106,6 +106,14 @@
   .pl-item .pl-datos { flex: 1 1 auto; min-width: 0; }
   .pl-item .pl-nombre { font-weight: 800; font-size: 0.92rem; line-height: 1.3; }
   .pl-item .pl-desc { font-size: 0.82rem; color: #4A6A85; margin-top: 2px; }
+  /* Detalle plegado por defecto: el título es el <summary>, así se ve
+     solo el nombre y la descripción se despliega nada más si le dan tap
+     — antes salía siempre completa y hacía la lista muy larga. */
+  .pl-item .pl-detalle { flex: 1 1 auto; min-width: 0; }
+  .pl-item .pl-detalle > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .pl-item .pl-detalle > summary::-webkit-details-marker { display: none; }
+  .pl-item .pl-detalle > summary::after { content: "▾"; font-size: 0.75em; color: #7089A8; transition: transform .15s; }
+  .pl-item .pl-detalle[open] > summary::after { transform: rotate(180deg); }
   .pl-item button { margin: 0; width: auto; flex: 0 0 auto; padding: 8px 14px; font-size: 0.85rem; }
   .pl-nota { color: #4A6A85; font-size: 0.9rem; margin: 4px 0 0; }
   .pl-aviso { margin-top: 8px; }
@@ -130,12 +138,16 @@
 
   function fila(p) {
     const detalle = [p.descripcion, p.nivel ? ETIQUETAS_NIVEL[p.nivel] : null].filter(Boolean).join(" · ");
+    // Sin descripción no hay nada que plegar — el título se queda como
+    // texto normal, sin la flechita de despliegue.
+    const nombreHtml = detalle
+      ? `<details class="pl-detalle"><summary class="pl-nombre">${escapar(p.nombre)}</summary><div class="pl-desc">${escapar(detalle)}</div></details>`
+      : `<div class="pl-nombre">${escapar(p.nombre)}</div>`;
     return `
       <div class="pl-item">
         <div class="pl-icono">${p.tipo_mime === "application/pdf" ? "📄" : "🖼️"}</div>
         <div class="pl-datos">
-          <div class="pl-nombre">${escapar(p.nombre)}</div>
-          ${detalle ? `<div class="pl-desc">${escapar(detalle)}</div>` : ""}
+          ${nombreHtml}
         </div>
         <button type="button" class="secundario chico" data-descargar="${escapar(p.id)}">Descargar</button>
       </div>`;
