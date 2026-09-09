@@ -217,6 +217,14 @@
 
 <script>
   const API_BASE = "https://ensenai-backend.onrender.com";
+
+  // Dentro de la app nativa (Capacitor) no vendemos nada — Google/Apple
+  // exigen su propio sistema de cobro para eso. Quien quiera cambiar de
+  // plan o activar un tema lo hace desde el navegador, en la web normal.
+  function esAppNativa() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  }
+
   const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -912,6 +920,16 @@
 
   async function suscribirGrupo(nivel, periodo = "mensual") {
     const cont = document.getElementById("zona-suscripcion-grupo");
+    if (esAppNativa()) {
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:10px 0 4px; font-size:0.9rem;">
+          Para cambiar de plan, hazlo desde el navegador en
+          <a href="https://ensenai.com/grupo.html" target="_blank" rel="noopener">ensenai.com</a>
+          — no vendemos suscripciones dentro de la app.
+        </p>
+      `;
+      return;
+    }
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
       const res = await fetchConReintento(
@@ -2154,6 +2172,17 @@
   }
 
   async function pagarTema(temaId) {
+    if (esAppNativa()) {
+      const a = document.createElement("a");
+      a.href = "https://ensenai.com/grupo.html";
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      alert("Para activar este tema con un pago, hazlo desde el navegador que se acaba de abrir — no vendemos dentro de la app.");
+      return;
+    }
     try {
       const res = await fetchConReintento(
         `${API_BASE}/api/grupos/temas/${temaId}/checkout`,

@@ -156,6 +156,14 @@
 
 <script>
   const API_BASE = "https://ensenai-backend.onrender.com";
+
+  // Dentro de la app nativa (Capacitor) no vendemos nada — Google/Apple
+  // exigen su propio sistema de cobro para eso. Quien quiera cambiar de
+  // plan lo hace desde el navegador, en la web normal.
+  function esAppNativa() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  }
+
   const SUPABASE_URL = "https://azslvqfgeghhzghfxmdh.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c2x2cWZnZWdoaHpnaGZ4bWRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTUzMzksImV4cCI6MjEwMTk3MTMzOX0.zd22nrf9OUrg0h2YnGJJt9mkKzoFERM54F4S48r-xEQ";
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -882,6 +890,16 @@
 
   async function suscribirse(session, tipo, nivel, periodo = "mensual") {
     const cont = document.getElementById("zonaSuscripcion");
+    if (esAppNativa()) {
+      cont.innerHTML = `
+        <p class="ayuda" style="margin:10px 0 4px; text-align:left; font-size:0.9rem;">
+          Para cambiar de plan, hazlo desde el navegador en
+          <a href="https://ensenai.com/comprador.html" target="_blank" rel="noopener">ensenai.com</a>
+          — no vendemos suscripciones dentro de la app.
+        </p>
+      `;
+      return;
+    }
     cont.innerHTML = `<div class="cargando">Redirigiendo a pago seguro…</div>`;
     try {
       const res = await fetchConReintento(
